@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from tools.basic_analysis import run_workforce_analysis
 
 SAMPLE_CSV = Path(__file__).resolve().parent.parent / "sample_data" / "fictional_workforce.csv"

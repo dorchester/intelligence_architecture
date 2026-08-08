@@ -19,14 +19,14 @@ def render_report(
     ctx: RunContext,
     metrics: dict,
     narrative: str,
-    chart_path: Path,
-) -> Path:
-    """Render the HTML report and write it to the run's output directory."""
+    chart_png_bytes: bytes,
+) -> str:
+    """Render the HTML report and return it as a string."""
 
     env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)), autoescape=True)
     template = env.get_template("report.html.j2")
 
-    chart_b64 = base64.b64encode(chart_path.read_bytes()).decode("utf-8")
+    chart_b64 = base64.b64encode(chart_png_bytes).decode("utf-8")
 
     html = template.render(
         client_name=ctx.client_name,
@@ -34,11 +34,10 @@ def render_report(
         created_at=ctx.created_at,
         methodology_version=ctx.methodology_version,
         code_version=ctx.code_version,
+        model_id=ctx.model_id or "stub",
         metrics=metrics,
         narrative=narrative,
         chart_b64=chart_b64,
     )
 
-    report_path = ctx.output_path / "report.html"
-    report_path.write_text(html, encoding="utf-8")
-    return report_path
+    return html
