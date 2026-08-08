@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelligence Engine V0 — Architecture Report</title>
+    <style>
+        :root {
+            --bg-primary: #0f1117;
+            --bg-secondary: #1a1d27;
+            --bg-tertiary: #242836;
+            --bg-card: #1e2230;
+            --border: #2d3348;
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0b0;
+            --text-muted: #6b7280;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-orange: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-pink: #ec4899;
+            --glow-blue: rgba(59, 130, 246, 0.15);
+            --glow-purple: rgba(139, 92, 246, 0.15);
+            --glow-green: rgba(16, 185, 129, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 0 2rem; }
+
+        /* Hero */
+        .hero {
+            padding: 4rem 0 3rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at center, var(--glow-purple) 0%, transparent 50%);
+            animation: pulse 8s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+        .hero h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            position: relative;
+            margin-bottom: 0.5rem;
+        }
+        .hero .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            position: relative;
+        }
+        .hero .version-badge {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 0.3rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: var(--accent-green);
+            position: relative;
+        }
+
+        /* Section headers */
+        .section-header {
+            margin: 3rem 0 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .section-header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .section-header .section-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 0.3rem;
+        }
+
+        /* Stats grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-blue);
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-card.green .stat-value {
+            background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-card.purple .stat-value {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-card.orange .stat-value {
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-red));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.25rem;
+        }
+
+        /* Architecture diagram */
+        .arch-diagram {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            margin: 2rem 0;
+            overflow-x: auto;
+        }
+        .arch-diagram svg {
+            width: 100%;
+            height: auto;
+            min-width: 900px;
+        }
+
+        /* Flow diagram */
+        .flow-container {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin: 2rem 0;
+            overflow-x: auto;
+            padding: 1rem 0;
+        }
+        .flow-node {
+            flex-shrink: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            text-align: center;
+            min-width: 120px;
+            position: relative;
+        }
+        .flow-node.active {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 20px var(--glow-green);
+        }
+        .flow-node .node-icon { font-size: 1.3rem; margin-bottom: 0.25rem; }
+        .flow-node .node-label { font-size: 0.7rem; color: var(--text-secondary); }
+        .flow-node .node-title { font-size: 0.8rem; font-weight: 600; }
+        .flow-arrow {
+            flex-shrink: 0;
+            width: 40px;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            position: relative;
+        }
+        .flow-arrow::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: -4px;
+            border: 5px solid transparent;
+            border-left: 6px solid var(--accent-purple);
+        }
+
+        /* Component cards */
+        .components-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.25rem;
+            margin: 1.5rem 0;
+        }
+        .component-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: border-color 0.2s;
+        }
+        .component-card:hover { border-color: var(--accent-blue); }
+        .component-card .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .component-card .card-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+        .component-card .card-icon.blue { background: var(--glow-blue); }
+        .component-card .card-icon.purple { background: var(--glow-purple); }
+        .component-card .card-icon.green { background: var(--glow-green); }
+        .component-card .card-title { font-weight: 700; font-size: 0.95rem; }
+        .component-card .card-path { font-size: 0.75rem; color: var(--text-muted); font-family: monospace; }
+        .component-card .card-desc { font-size: 0.85rem; color: var(--text-secondary); }
+        .component-card .card-tags { margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+        .tag {
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        .tag.aws { color: var(--accent-orange); border-color: rgba(245, 158, 11, 0.3); }
+        .tag.python { color: var(--accent-blue); border-color: rgba(59, 130, 246, 0.3); }
+        .tag.infra { color: var(--accent-green); border-color: rgba(16, 185, 129, 0.3); }
+
+        /* Layers diagram */
+        .layers {
+            margin: 2rem 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .layer {
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .layer-1 { background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.08)); border-color: rgba(139,92,246,0.3); }
+        .layer-2 { background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(6,182,212,0.08)); border-color: rgba(59,130,246,0.3); }
+        .layer-3 { background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(6,182,212,0.08)); border-color: rgba(16,185,129,0.3); }
+        .layer-4 { background: linear-gradient(135deg, rgba(245,158,11,0.08), rgba(239,68,68,0.08)); border-color: rgba(245,158,11,0.3); }
+        .layer-5 { background: linear-gradient(135deg, rgba(236,72,153,0.08), rgba(139,92,246,0.08)); border-color: rgba(236,72,153,0.3); }
+        .layer-badge {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+        .layer-1 .layer-badge { background: rgba(139,92,246,0.2); color: var(--accent-purple); }
+        .layer-2 .layer-badge { background: rgba(59,130,246,0.2); color: var(--accent-blue); }
+        .layer-3 .layer-badge { background: rgba(16,185,129,0.2); color: var(--accent-green); }
+        .layer-4 .layer-badge { background: rgba(245,158,11,0.2); color: var(--accent-orange); }
+        .layer-5 .layer-badge { background: rgba(236,72,153,0.2); color: var(--accent-pink); }
+        .layer-content { flex: 1; }
+        .layer-title { font-weight: 700; font-size: 0.9rem; }
+        .layer-desc { font-size: 0.8rem; color: var(--text-secondary); }
+        .layer-tech { font-size: 0.75rem; color: var(--text-muted); font-family: monospace; margin-top: 0.25rem; }
+
+        /* Timeline */
+        .timeline {
+            margin: 2rem 0;
+            position: relative;
+            padding-left: 2rem;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, var(--accent-blue), var(--accent-purple), var(--accent-green));
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.25rem;
+            padding-left: 1.5rem;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -1.55rem;
+            top: 0.5rem;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            border: 2px solid var(--bg-primary);
+        }
+        .timeline-item.complete::before { background: var(--accent-green); }
+        .timeline-item .tl-title { font-weight: 600; font-size: 0.9rem; }
+        .timeline-item .tl-hash { font-family: monospace; font-size: 0.75rem; color: var(--accent-cyan); }
+        .timeline-item .tl-desc { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.15rem; }
+
+        /* Separation diagram */
+        .separation-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        .sep-col {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        .sep-col h4 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .sep-col.reasoning h4 { color: var(--accent-purple); }
+        .sep-col.deterministic h4 { color: var(--accent-blue); }
+        .sep-col.security h4 { color: var(--accent-red); }
+        .sep-item {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            padding: 0.4rem 0;
+            border-bottom: 1px solid rgba(45,51,72,0.5);
+        }
+        .sep-item:last-child { border-bottom: none; }
+
+        /* Data flow SVG */
+        .data-flow-wrap {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        /* AWS resources table */
+        .resource-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-size: 0.85rem;
+        }
+        .resource-table th {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .resource-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+        .resource-table tr:hover td { background: var(--bg-tertiary); }
+        .resource-table code {
+            background: var(--bg-primary);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: var(--accent-cyan);
+        }
+
+        /* Principle cards */
+        .principle-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        .principle-card {
+            background: var(--bg-card);
+            border-left: 3px solid var(--accent-blue);
+            border-radius: 0 8px 8px 0;
+            padding: 1rem 1.25rem;
+        }
+        .principle-card .p-title { font-weight: 700; font-size: 0.85rem; margin-bottom: 0.3rem; }
+        .principle-card .p-desc { font-size: 0.8rem; color: var(--text-secondary); }
+        .principle-card.warn { border-left-color: var(--accent-orange); }
+        .principle-card.secure { border-left-color: var(--accent-red); }
+        .principle-card.green { border-left-color: var(--accent-green); }
+
+        /* Footer */
+        footer {
+            margin-top: 4rem;
+            padding: 2rem 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .separation-grid { grid-template-columns: 1fr; }
+            .hero h1 { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Hero -->
+    <section class="hero">
+        <h1>Intelligence Engine V0</h1>
+        <p class="subtitle">AWS-Hosted Agentic Analytical Workflow Architecture</p>
+        <span class="version-badge">V0 Thin Slice Complete &mdash; August 2026</span>
+    </section>
+
+    <!-- Key Metrics -->
+    <section>
+        <div class="section-header">
+            <h2>System Metrics</h2>
+            <p class="section-desc">Verified end-to-end run statistics</p>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card green">
+                <div class="stat-value">17</div>
+                <div class="stat-label">Tests Passing</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">28.7s</div>
+                <div class="stat-label">Agent Run Time</div>
+            </div>
+            <div class="stat-card purple">
+                <div class="stat-value">4</div>
+                <div class="stat-label">Agent Turns</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">3</div>
+                <div class="stat-label">Tool Invocations</div>
+            </div>
+            <div class="stat-card orange">
+                <div class="stat-value">3</div>
+                <div class="stat-label">CFN Stacks</div>
+            </div>
+            <div class="stat-card green">
+                <div class="stat-value">7</div>
+                <div class="stat-label">Git Commits</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Data Flow -->
+    <section>
+        <div class="section-header">
+            <h2>End-to-End Data Flow</h2>
+            <p class="section-desc">The complete thin-slice execution path from operator request to S3 output</p>
+        </div>
+        <div class="flow-container">
+            <div class="flow-node">
+                <div class="node-icon">&#x1F469;&#x200D;&#x1F4BC;</div>
+                <div class="node-title">Operator</div>
+                <div class="node-label">orchestrator.py</div>
+            </div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node">
+                <div class="node-icon">&#x1F4CB;</div>
+                <div class="node-title">Run Created</div>
+                <div class="node-label">DynamoDB</div>
+            </div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node">
+                <div class="node-icon">&#x2601;</div>
+                <div class="node-title">S3 Input</div>
+                <div class="node-label">CSV uploaded</div>
+            </div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node active">
+                <div class="node-icon">&#x2705;</div>
+                <div class="node-title">Checkpoint</div>
+                <div class="node-label">Approval gate</div>
+            </div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node">
+                <div class="node-icon">&#x1F9E0;</div>
+                <div class="node-title">Agent</div>
+                <div class="node-label">Bedrock Claude</div>
+            </div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node">
+                <div class="node-icon">&#x1F4CA;</div>
+                <div class="node-title">Analysis</div>
+                <div class="node-label">pandas tool</div>
+            </div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node">
+                <div class="node-icon">&#x1F4C8;</div>
+                <div class="node-title">Chart</div>
+                <div class="node-label">matplotlib</div>
+            </div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node">
+                <div class="node-icon">&#x270D;</div>
+                <div class="node-title">Narrative</div>
+                <div class="node-label">LLM generation</div>
+            </div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node">
+                <div class="node-icon">&#x1F4C4;</div>
+                <div class="node-title">Report</div>
+                <div class="node-label">HTML (Jinja2)</div>
+            </div>
+            <div class="flow-arrow"></div>
+            <div class="flow-node active">
+                <div class="node-icon">&#x2601;</div>
+                <div class="node-title">S3 Output</div>
+                <div class="node-label">report.html</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architectural Layers -->
+    <section>
+        <div class="section-header">
+            <h2>Architectural Layers</h2>
+            <p class="section-desc">Five distinct layers with clear responsibility boundaries</p>
+        </div>
+        <div class="layers">
+            <div class="layer layer-1">
+                <div class="layer-badge">1</div>
+                <div class="layer-content">
+                    <div class="layer-title">Operator Interface</div>
+                    <div class="layer-desc">CLI entry point: start runs, approve checkpoints, check status, download reports</div>
+                    <div class="layer-tech">orchestrator.py &middot; run/status/download commands</div>
+                </div>
+            </div>
+            <div class="layer layer-2">
+                <div class="layer-badge">2</div>
+                <div class="layer-content">
+                    <div class="layer-title">Agent / Control Plane</div>
+                    <div class="layer-desc">Methodology-driven reasoning via Bedrock tool-use API. Reads playbook, decides next step, invokes tools.</div>
+                    <div class="layer-tech">agent/engine.py &middot; Claude Sonnet 4.6 &middot; us.anthropic.claude-sonnet-4-6</div>
+                </div>
+            </div>
+            <div class="layer layer-3">
+                <div class="layer-badge">3</div>
+                <div class="layer-content">
+                    <div class="layer-title">Deterministic Tools</div>
+                    <div class="layer-desc">Pure Python functions: same input &rarr; same output. Tested, versioned, auditable.</div>
+                    <div class="layer-tech">tools/basic_analysis.py &middot; tools/chart.py &middot; tools/report.py</div>
+                </div>
+            </div>
+            <div class="layer layer-4">
+                <div class="layer-badge">4</div>
+                <div class="layer-content">
+                    <div class="layer-title">Persistent Artifacts &amp; State</div>
+                    <div class="layer-desc">S3 for run data (input/working/output). DynamoDB for lifecycle state and checkpoints.</div>
+                    <div class="layer-tech">storage/s3.py &middot; state/run_state.py &middot; CloudFormation-managed</div>
+                </div>
+            </div>
+            <div class="layer layer-5">
+                <div class="layer-badge">5</div>
+                <div class="layer-content">
+                    <div class="layer-title">Observability</div>
+                    <div class="layer-desc">Structured JSON logs (run_id, tool calls, timing). CloudWatch dashboard for Bedrock usage.</div>
+                    <div class="layer-tech">agent/logging_config.py &middot; intelligence-engine-bedrock-usage dashboard</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Separation of Concerns -->
+    <section>
+        <div class="section-header">
+            <h2>Separation of Concerns</h2>
+            <p class="section-desc">The fundamental architectural principle: what reasons vs. what computes vs. what enforces</p>
+        </div>
+        <div class="separation-grid">
+            <div class="sep-col reasoning">
+                <h4>Reasoning (Agent / LLM)</h4>
+                <div class="sep-item">Interpret methodology playbook</div>
+                <div class="sep-item">Decide which tool to invoke next</div>
+                <div class="sep-item">Generate narrative from metrics</div>
+                <div class="sep-item">Explain patterns and risks</div>
+                <div class="sep-item">Non-deterministic output</div>
+                <div class="sep-item">Bounded by methodology, not code</div>
+            </div>
+            <div class="sep-col deterministic">
+                <h4>Deterministic (Tools / Code)</h4>
+                <div class="sep-item">Compute headcount metrics</div>
+                <div class="sep-item">Calculate tenure statistics</div>
+                <div class="sep-item">Generate charts (matplotlib)</div>
+                <div class="sep-item">Render HTML report (Jinja2)</div>
+                <div class="sep-item">Same input &rarr; same output</div>
+                <div class="sep-item">Unit-tested, version-controlled</div>
+            </div>
+            <div class="sep-col security">
+                <h4>Security (Infrastructure)</h4>
+                <div class="sep-item">S3 prefix isolation (client/run)</div>
+                <div class="sep-item">IAM policy enforcement</div>
+                <div class="sep-item">No public S3 access</div>
+                <div class="sep-item">TLS-only bucket policy</div>
+                <div class="sep-item">Sandbox for dynamic code</div>
+                <div class="sep-item">Prompts are NOT a boundary</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture Diagram (SVG) -->
+    <section>
+        <div class="section-header">
+            <h2>System Architecture</h2>
+            <p class="section-desc">AWS resource topology and data paths</p>
+        </div>
+        <div class="arch-diagram">
+            <svg viewBox="0 0 1000 520" xmlns="http://www.w3.org/2000/svg">
+                <!-- Background grid -->
+                <defs>
+                    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                        <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(45,51,72,0.3)" stroke-width="0.5"/>
+                    </pattern>
+                    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.2"/>
+                        <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:0.2"/>
+                    </linearGradient>
+                    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#10b981;stop-opacity:0.2"/>
+                        <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:0.2"/>
+                    </linearGradient>
+                    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:0.2"/>
+                        <stop offset="100%" style="stop-color:#ef4444;stop-opacity:0.2"/>
+                    </linearGradient>
+                </defs>
+                <rect width="1000" height="520" fill="url(#grid)"/>
+
+                <!-- Operator -->
+                <rect x="30" y="20" width="180" height="70" rx="10" fill="url(#blueGrad)" stroke="#8b5cf6" stroke-width="1.5"/>
+                <text x="120" y="50" text-anchor="middle" fill="#e8eaed" font-size="13" font-weight="700">Operator CLI</text>
+                <text x="120" y="70" text-anchor="middle" fill="#9aa0b0" font-size="10">orchestrator.py</text>
+
+                <!-- Arrow down -->
+                <path d="M 120 90 L 120 130" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arrowPurple)"/>
+                <defs><marker id="arrowPurple" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+                    <path d="M 0 0 L 8 4 L 0 8" fill="none" stroke="#8b5cf6" stroke-width="1.5"/>
+                </marker></defs>
+
+                <!-- Agent Engine -->
+                <rect x="30" y="130" width="400" height="100" rx="12" fill="url(#blueGrad)" stroke="#3b82f6" stroke-width="1.5"/>
+                <text x="230" y="158" text-anchor="middle" fill="#e8eaed" font-size="14" font-weight="700">Agent Engine</text>
+                <text x="230" y="178" text-anchor="middle" fill="#9aa0b0" font-size="10">Methodology-driven reasoning via Bedrock tool-use API</text>
+                <text x="230" y="198" text-anchor="middle" fill="#06b6d4" font-size="10" font-family="monospace">agent/engine.py + agent/model.py</text>
+                <text x="230" y="218" text-anchor="middle" fill="#9aa0b0" font-size="9">Claude Sonnet 4.6 | us.anthropic.claude-sonnet-4-6</text>
+
+                <!-- Arrow to tools -->
+                <path d="M 120 230 L 120 280" stroke="#10b981" stroke-width="1.5" marker-end="url(#arrowGreen)"/>
+                <defs><marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+                    <path d="M 0 0 L 8 4 L 0 8" fill="none" stroke="#10b981" stroke-width="1.5"/>
+                </marker></defs>
+
+                <!-- Tools -->
+                <rect x="30" y="280" width="200" height="120" rx="10" fill="url(#greenGrad)" stroke="#10b981" stroke-width="1.5"/>
+                <text x="130" y="305" text-anchor="middle" fill="#e8eaed" font-size="12" font-weight="700">Deterministic Tools</text>
+                <text x="130" y="328" text-anchor="middle" fill="#9aa0b0" font-size="10">basic_analysis.py</text>
+                <text x="130" y="348" text-anchor="middle" fill="#9aa0b0" font-size="10">chart.py</text>
+                <text x="130" y="368" text-anchor="middle" fill="#9aa0b0" font-size="10">report.py</text>
+                <text x="130" y="390" text-anchor="middle" fill="#10b981" font-size="9">Pure Python | Tested</text>
+
+                <!-- Methodology -->
+                <rect x="250" y="280" width="180" height="80" rx="10" fill="url(#blueGrad)" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="4"/>
+                <text x="340" y="310" text-anchor="middle" fill="#e8eaed" font-size="12" font-weight="700">Methodology</text>
+                <text x="340" y="330" text-anchor="middle" fill="#9aa0b0" font-size="10">thin_slice.md</text>
+                <text x="340" y="350" text-anchor="middle" fill="#9aa0b0" font-size="10">master_playbook.md</text>
+
+                <!-- Arrow from methodology to agent -->
+                <path d="M 340 280 L 340 230" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4" marker-end="url(#arrowPurple)"/>
+
+                <!-- S3 -->
+                <rect x="520" y="130" width="220" height="160" rx="12" fill="url(#orangeGrad)" stroke="#f59e0b" stroke-width="1.5"/>
+                <text x="630" y="158" text-anchor="middle" fill="#e8eaed" font-size="13" font-weight="700">Amazon S3</text>
+                <text x="630" y="178" text-anchor="middle" fill="#f59e0b" font-size="9" font-family="monospace">intelligence-engine-dev-runs-*</text>
+                <text x="545" y="205" fill="#9aa0b0" font-size="10">runs/{client_id}/{run_id}/</text>
+                <text x="560" y="225" fill="#9aa0b0" font-size="10">  input/   &larr; source CSV</text>
+                <text x="560" y="245" fill="#9aa0b0" font-size="10">  working/ &larr; charts, metrics</text>
+                <text x="560" y="265" fill="#9aa0b0" font-size="10">  output/  &larr; report.html</text>
+                <text x="630" y="283" text-anchor="middle" fill="#f59e0b" font-size="9">Versioned | Encrypted | Private</text>
+
+                <!-- Arrow from agent to S3 -->
+                <path d="M 430 180 L 520 180" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+                <defs><marker id="arrowOrange" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+                    <path d="M 0 0 L 8 4 L 0 8" fill="none" stroke="#f59e0b" stroke-width="1.5"/>
+                </marker></defs>
+
+                <!-- DynamoDB -->
+                <rect x="520" y="320" width="220" height="120" rx="12" fill="url(#orangeGrad)" stroke="#ef4444" stroke-width="1.5"/>
+                <text x="630" y="348" text-anchor="middle" fill="#e8eaed" font-size="13" font-weight="700">Amazon DynamoDB</text>
+                <text x="630" y="368" text-anchor="middle" fill="#ef4444" font-size="9" font-family="monospace">intelligence-engine-dev-runs</text>
+                <text x="560" y="393" fill="#9aa0b0" font-size="10">run_id (PK) | client_id (GSI)</text>
+                <text x="560" y="413" fill="#9aa0b0" font-size="10">stage | checkpoints[] | timestamps</text>
+                <text x="630" y="433" text-anchor="middle" fill="#ef4444" font-size="9">PAY_PER_REQUEST | PITR enabled</text>
+
+                <!-- Arrow from agent to DynamoDB -->
+                <path d="M 350 230 L 350 260 L 500 260 L 500 380 L 520 380" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrowRed)"/>
+                <defs><marker id="arrowRed" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+                    <path d="M 0 0 L 8 4 L 0 8" fill="none" stroke="#ef4444" stroke-width="1.5"/>
+                </marker></defs>
+
+                <!-- CloudWatch -->
+                <rect x="790" y="130" width="180" height="100" rx="10" fill="url(#greenGrad)" stroke="#06b6d4" stroke-width="1.5"/>
+                <text x="880" y="158" text-anchor="middle" fill="#e8eaed" font-size="12" font-weight="700">CloudWatch</text>
+                <text x="880" y="178" text-anchor="middle" fill="#9aa0b0" font-size="10">Bedrock usage dashboard</text>
+                <text x="880" y="198" text-anchor="middle" fill="#9aa0b0" font-size="10">Structured JSON logs</text>
+                <text x="880" y="218" text-anchor="middle" fill="#06b6d4" font-size="9">Tokens | Latency | Errors</text>
+
+                <!-- Bedrock -->
+                <rect x="790" y="280" width="180" height="90" rx="10" fill="url(#blueGrad)" stroke="#3b82f6" stroke-width="1.5"/>
+                <text x="880" y="308" text-anchor="middle" fill="#e8eaed" font-size="12" font-weight="700">Amazon Bedrock</text>
+                <text x="880" y="328" text-anchor="middle" fill="#9aa0b0" font-size="10">Claude inference</text>
+                <text x="880" y="348" text-anchor="middle" fill="#9aa0b0" font-size="10">Tool-use API</text>
+                <text x="880" y="363" text-anchor="middle" fill="#3b82f6" font-size="9">Inference Profiles</text>
+
+                <!-- Arrow from agent to Bedrock -->
+                <path d="M 430 200 L 460 200 L 460 90 L 880 90 L 880 130" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4" marker-end="url(#arrowBlue)"/>
+                <defs><marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+                    <path d="M 0 0 L 8 4 L 0 8" fill="none" stroke="#3b82f6" stroke-width="1.5"/>
+                </marker></defs>
+
+                <!-- Legend -->
+                <rect x="30" y="450" width="940" height="55" rx="8" fill="rgba(26,29,39,0.8)" stroke="var(--border)" stroke-width="1"/>
+                <text x="50" y="472" fill="#9aa0b0" font-size="10" font-weight="600">LEGEND:</text>
+                <line x1="120" y1="470" x2="150" y2="470" stroke="#8b5cf6" stroke-width="2"/>
+                <text x="155" y="474" fill="#9aa0b0" font-size="9">Control flow</text>
+                <line x1="250" y1="470" x2="280" y2="470" stroke="#f59e0b" stroke-width="2"/>
+                <text x="285" y="474" fill="#9aa0b0" font-size="9">Data write</text>
+                <line x1="380" y1="470" x2="410" y2="470" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4"/>
+                <text x="415" y="474" fill="#9aa0b0" font-size="9">LLM inference</text>
+                <line x1="520" y1="470" x2="550" y2="470" stroke="#10b981" stroke-width="2"/>
+                <text x="555" y="474" fill="#9aa0b0" font-size="9">Tool invocation</text>
+                <rect x="660" y="462" width="18" height="18" rx="3" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="3"/>
+                <text x="685" y="476" fill="#9aa0b0" font-size="9">Version-controlled input</text>
+
+                <text x="50" y="495" fill="#6b7280" font-size="9">All infrastructure managed via CloudFormation. No hardcoded account IDs. Region: us-east-1.</text>
+            </svg>
+        </div>
+    </section>
+
+    <!-- Run Isolation -->
+    <section>
+        <div class="section-header">
+            <h2>Run Isolation Model</h2>
+            <p class="section-desc">Structural enforcement: storage paths make cross-contamination impossible through normal interfaces</p>
+        </div>
+        <div class="data-flow-wrap">
+            <svg viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg">
+                <!-- Client A -->
+                <rect x="20" y="20" width="370" height="160" rx="10" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4"/>
+                <text x="35" y="42" fill="#3b82f6" font-size="11" font-weight="700">client-001 (Meridian Dynamics)</text>
+
+                <rect x="40" y="55" width="160" height="110" rx="6" fill="rgba(59,130,246,0.08)" stroke="#2d3348" stroke-width="1"/>
+                <text x="50" y="75" fill="#e8eaed" font-size="10" font-weight="600">run-85fae774</text>
+                <text x="55" y="95" fill="#9aa0b0" font-size="9">input/fictional_workforce.csv</text>
+                <text x="55" y="112" fill="#9aa0b0" font-size="9">working/metrics.json</text>
+                <text x="55" y="129" fill="#9aa0b0" font-size="9">working/chart.png</text>
+                <text x="55" y="146" fill="#10b981" font-size="9" font-weight="600">output/report.html</text>
+
+                <rect x="215" y="55" width="160" height="110" rx="6" fill="rgba(59,130,246,0.08)" stroke="#2d3348" stroke-width="1"/>
+                <text x="225" y="75" fill="#e8eaed" font-size="10" font-weight="600">run-04665852</text>
+                <text x="230" y="95" fill="#9aa0b0" font-size="9">input/fictional_workforce.csv</text>
+                <text x="230" y="112" fill="#9aa0b0" font-size="9">working/metrics.json</text>
+                <text x="230" y="129" fill="#9aa0b0" font-size="9">working/chart.png</text>
+                <text x="230" y="146" fill="#10b981" font-size="9" font-weight="600">output/report.html</text>
+
+                <!-- X between runs -->
+                <text x="195" y="115" fill="#ef4444" font-size="16" font-weight="900">&#x2716;</text>
+
+                <!-- Client B -->
+                <rect x="420" y="20" width="360" height="160" rx="10" fill="none" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="4"/>
+                <text x="435" y="42" fill="#8b5cf6" font-size="11" font-weight="700">client-002 (Fictional Corp)</text>
+
+                <rect x="440" y="55" width="160" height="110" rx="6" fill="rgba(139,92,246,0.08)" stroke="#2d3348" stroke-width="1"/>
+                <text x="450" y="75" fill="#e8eaed" font-size="10" font-weight="600">run-aabbcc01</text>
+                <text x="455" y="95" fill="#9aa0b0" font-size="9">input/...</text>
+                <text x="455" y="112" fill="#9aa0b0" font-size="9">working/...</text>
+                <text x="455" y="146" fill="#10b981" font-size="9" font-weight="600">output/report.html</text>
+
+                <!-- X between clients -->
+                <text x="395" y="105" fill="#ef4444" font-size="22" font-weight="900">&#x2716;</text>
+
+                <!-- Explanation -->
+                <text x="620" y="85" fill="#ef4444" font-size="9" font-weight="600">ENFORCED BY:</text>
+                <text x="620" y="105" fill="#9aa0b0" font-size="9">- S3 prefix structure</text>
+                <text x="620" y="120" fill="#9aa0b0" font-size="9">- Storage interface</text>
+                <text x="620" y="135" fill="#9aa0b0" font-size="9">- IAM policies (prod)</text>
+                <text x="620" y="155" fill="#ef4444" font-size="9" font-weight="600">NOT BY:</text>
+                <text x="620" y="170" fill="#9aa0b0" font-size="9">- Prompts or instructions</text>
+            </svg>
+        </div>
+    </section>
+
+    <!-- Agent Execution Model -->
+    <section>
+        <div class="section-header">
+            <h2>Agent Execution Model</h2>
+            <p class="section-desc">How the agent reasons through methodology using Bedrock tool-use</p>
+        </div>
+        <div class="data-flow-wrap">
+            <svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg">
+                <!-- Turn 1 -->
+                <rect x="20" y="20" width="200" height="55" rx="8" fill="rgba(139,92,246,0.1)" stroke="#8b5cf6" stroke-width="1"/>
+                <text x="30" y="40" fill="#8b5cf6" font-size="9" font-weight="700">TURN 1 (4.5s)</text>
+                <text x="30" y="58" fill="#e8eaed" font-size="10">Reads methodology, reasons</text>
+                <text x="30" y="72" fill="#10b981" font-size="9">&#x2192; tool_use: run_workforce_analysis</text>
+
+                <!-- Turn 2 -->
+                <rect x="235" y="20" width="200" height="55" rx="8" fill="rgba(139,92,246,0.1)" stroke="#8b5cf6" stroke-width="1"/>
+                <text x="245" y="40" fill="#8b5cf6" font-size="9" font-weight="700">TURN 2 (4.5s)</text>
+                <text x="245" y="58" fill="#e8eaed" font-size="10">Reviews metrics, decides</text>
+                <text x="245" y="72" fill="#10b981" font-size="9">&#x2192; tool_use: generate_chart</text>
+
+                <!-- Turn 3 -->
+                <rect x="450" y="20" width="200" height="55" rx="8" fill="rgba(139,92,246,0.1)" stroke="#8b5cf6" stroke-width="1"/>
+                <text x="460" y="40" fill="#8b5cf6" font-size="9" font-weight="700">TURN 3 (11.6s)</text>
+                <text x="460" y="58" fill="#e8eaed" font-size="10">Generates narrative, then</text>
+                <text x="460" y="72" fill="#10b981" font-size="9">&#x2192; tool_use: generate_report</text>
+
+                <!-- Turn 4 -->
+                <rect x="665" y="20" width="200" height="55" rx="8" fill="rgba(16,185,129,0.1)" stroke="#10b981" stroke-width="1"/>
+                <text x="675" y="40" fill="#10b981" font-size="9" font-weight="700">TURN 4 (5.3s)</text>
+                <text x="675" y="58" fill="#e8eaed" font-size="10">Summarizes completion</text>
+                <text x="675" y="72" fill="#10b981" font-size="9">stop_reason: end_turn</text>
+
+                <!-- Arrows between turns -->
+                <path d="M 220 47 L 235 47" stroke="#8b5cf6" stroke-width="1"/>
+                <path d="M 435 47 L 450 47" stroke="#8b5cf6" stroke-width="1"/>
+                <path d="M 650 47 L 665 47" stroke="#8b5cf6" stroke-width="1"/>
+
+                <!-- Tool execution detail -->
+                <rect x="20" y="100" width="860" height="160" rx="10" fill="rgba(26,29,39,0.6)" stroke="#2d3348" stroke-width="1"/>
+                <text x="40" y="125" fill="#f59e0b" font-size="11" font-weight="700">Tool Execution Detail</text>
+
+                <!-- Tool 1 -->
+                <rect x="40" y="140" width="250" height="100" rx="6" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+                <text x="55" y="160" fill="#10b981" font-size="10" font-weight="700">run_workforce_analysis</text>
+                <text x="55" y="178" fill="#9aa0b0" font-size="9">Input: fictional_workforce.csv</text>
+                <text x="55" y="194" fill="#9aa0b0" font-size="9">Output: metrics dict (10 keys)</text>
+                <text x="55" y="210" fill="#9aa0b0" font-size="9">Side effect: working/metrics.json</text>
+                <text x="55" y="228" fill="#06b6d4" font-size="9">pandas | deterministic</text>
+
+                <!-- Tool 2 -->
+                <rect x="310" y="140" width="250" height="100" rx="6" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+                <text x="325" y="160" fill="#10b981" font-size="10" font-weight="700">generate_chart</text>
+                <text x="325" y="178" fill="#9aa0b0" font-size="9">Input: metrics JSON</text>
+                <text x="325" y="194" fill="#9aa0b0" font-size="9">Output: chart PNG bytes</text>
+                <text x="325" y="210" fill="#9aa0b0" font-size="9">Side effect: working/chart.png</text>
+                <text x="325" y="228" fill="#06b6d4" font-size="9">matplotlib | deterministic</text>
+
+                <!-- Tool 3 -->
+                <rect x="580" y="140" width="280" height="100" rx="6" fill="rgba(16,185,129,0.06)" stroke="#10b981" stroke-width="1"/>
+                <text x="595" y="160" fill="#10b981" font-size="10" font-weight="700">generate_report</text>
+                <text x="595" y="178" fill="#9aa0b0" font-size="9">Input: metrics + narrative + chart</text>
+                <text x="595" y="194" fill="#9aa0b0" font-size="9">Output: s3://...output/report.html</text>
+                <text x="595" y="210" fill="#9aa0b0" font-size="9">Includes: provenance metadata</text>
+                <text x="595" y="228" fill="#06b6d4" font-size="9">Jinja2 | deterministic template</text>
+            </svg>
+        </div>
+    </section>
+
+    <!-- Components -->
+    <section>
+        <div class="section-header">
+            <h2>Component Map</h2>
+            <p class="section-desc">Repository modules and their responsibilities</p>
+        </div>
+        <div class="components-grid">
+            <div class="component-card">
+                <div class="card-header">
+                    <div class="card-icon purple">&#x1F9E0;</div>
+                    <div>
+                        <div class="card-title">Agent Engine</div>
+                        <div class="card-path">agent/engine.py</div>
+                    </div>
+                </div>
+                <div class="card-desc">Methodology-driven reasoning loop. Reads playbook, invokes Bedrock with tool definitions, dispatches tool calls, accumulates conversation turns until completion.</div>
+                <div class="card-tags">
+                    <span class="tag python">Python</span>
+                    <span class="tag aws">Bedrock</span>
+                    <span class="tag">Tool-Use API</span>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="card-header">
+                    <div class="card-icon blue">&#x2699;</div>
+                    <div>
+                        <div class="card-title">Model Abstraction</div>
+                        <div class="card-path">agent/model.py</div>
+                    </div>
+                </div>
+                <div class="card-desc">Configurable Bedrock Claude interface. Model ID, region, profile, temperature all injectable. Decouples analytical code from specific model version.</div>
+                <div class="card-tags">
+                    <span class="tag python">Python</span>
+                    <span class="tag aws">Bedrock Runtime</span>
+                    <span class="tag">Inference Profiles</span>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="card-header">
+                    <div class="card-icon green">&#x1F4CA;</div>
+                    <div>
+                        <div class="card-title">Workforce Analysis Tool</div>
+                        <div class="card-path">tools/basic_analysis.py</div>
+                    </div>
+                </div>
+                <div class="card-desc">Pure deterministic pandas analysis. Computes headcount, department breakdown, tenure stats, turnover risk. 6 unit tests ensure reproducibility.</div>
+                <div class="card-tags">
+                    <span class="tag python">Python</span>
+                    <span class="tag">pandas</span>
+                    <span class="tag">Deterministic</span>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="card-header">
+                    <div class="card-icon green">&#x2601;</div>
+                    <div>
+                        <div class="card-title">Storage Abstraction</div>
+                        <div class="card-path">storage/</div>
+                    </div>
+                </div>
+                <div class="card-desc">Interface with Local and S3 backends. Enforces client_id/run_id prefix isolation by construction. Same code paths in dev and production.</div>
+                <div class="card-tags">
+                    <span class="tag python">Python</span>
+                    <span class="tag aws">S3</span>
+                    <span class="tag">Isolation</span>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="card-header">
+                    <div class="card-icon purple">&#x1F4CB;</div>
+                    <div>
+                        <div class="card-title">State Manager</div>
+                        <div class="card-path">state/run_state.py</div>
+                    </div>
+                </div>
+                <div class="card-desc">DynamoDB run lifecycle: create, update stage, request/approve/reject checkpoints, complete. Client GSI for multi-tenant querying.</div>
+                <div class="card-tags">
+                    <span class="tag python">Python</span>
+                    <span class="tag aws">DynamoDB</span>
+                    <span class="tag">Checkpoints</span>
+                </div>
+            </div>
+            <div class="component-card">
+                <div class="card-header">
+                    <div class="card-icon blue">&#x1F4DD;</div>
+                    <div>
+                        <div class="card-title">Methodology</div>
+                        <div class="card-path">methodology/*.md</div>
+                    </div>
+                </div>
+                <div class="card-desc">Version-controlled Markdown playbooks. Agent reads these as instructions, preserving space for reasoning while maintaining workflow structure.</div>
+                <div class="card-tags">
+                    <span class="tag">Markdown</span>
+                    <span class="tag">Version-controlled</span>
+                    <span class="tag">Auditable</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- AWS Resources -->
+    <section>
+        <div class="section-header">
+            <h2>AWS Resources</h2>
+            <p class="section-desc">All infrastructure managed via CloudFormation with consistent tagging</p>
+        </div>
+        <table class="resource-table">
+            <thead>
+                <tr>
+                    <th>Stack</th>
+                    <th>Resource</th>
+                    <th>Service</th>
+                    <th>Cost Model</th>
+                    <th>Key Property</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>intelligence-engine-dev-storage</code></td>
+                    <td>Run artifact bucket</td>
+                    <td>S3</td>
+                    <td>Pay per GB stored + request</td>
+                    <td>Versioned, encrypted, private, TLS-only</td>
+                </tr>
+                <tr>
+                    <td><code>intelligence-engine-dev-state</code></td>
+                    <td>Run state table</td>
+                    <td>DynamoDB</td>
+                    <td>Pay per request (on-demand)</td>
+                    <td>PITR, client_id GSI</td>
+                </tr>
+                <tr>
+                    <td><code>intelligence-engine-dev-observability</code></td>
+                    <td>Usage dashboard</td>
+                    <td>CloudWatch</td>
+                    <td>Free (dashboard only)</td>
+                    <td>Opus token/latency/error metrics</td>
+                </tr>
+                <tr>
+                    <td>(runtime)</td>
+                    <td>Claude Sonnet 4.6</td>
+                    <td>Bedrock</td>
+                    <td>Pay per token (on-demand)</td>
+                    <td>Inference profile: us.anthropic.claude-sonnet-4-6</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Design Principles -->
+    <section>
+        <div class="section-header">
+            <h2>Design Principles</h2>
+            <p class="section-desc">Architectural constraints that shape every decision</p>
+        </div>
+        <div class="principle-grid">
+            <div class="principle-card green">
+                <div class="p-title">Deterministic &ne; Generative</div>
+                <div class="p-desc">Tools compute metrics reproducibly. The agent interprets them. These are distinct stages with distinct guarantees.</div>
+            </div>
+            <div class="principle-card secure">
+                <div class="p-title">Prompts Are Not Security</div>
+                <div class="p-desc">Data isolation, code immutability, and execution sandboxing are enforced by IAM/infrastructure, never by instructions to the LLM.</div>
+            </div>
+            <div class="principle-card">
+                <div class="p-title">Run Isolation by Construction</div>
+                <div class="p-desc">Every artifact resolves under {client_id}/{run_id}. The storage interface makes cross-access structurally impossible.</div>
+            </div>
+            <div class="principle-card warn">
+                <div class="p-title">Methodology Guides, Doesn't Cage</div>
+                <div class="p-desc">Playbooks preserve reasoning space. They are not rigid DAGs. The agent retains judgment within bounded scope.</div>
+            </div>
+            <div class="principle-card green">
+                <div class="p-title">Reproducible Provenance</div>
+                <div class="p-desc">Every report stamps: run_id, client_id, methodology version, code version, model ID, timestamps.</div>
+            </div>
+            <div class="principle-card">
+                <div class="p-title">Infrastructure as Code</div>
+                <div class="p-desc">All durable resources defined in CloudFormation. No manual console-only resources. Drift-free by design.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Timeline -->
+    <section>
+        <div class="section-header">
+            <h2>Build Timeline</h2>
+            <p class="section-desc">Git commits representing progressive V0 milestones</p>
+        </div>
+        <div class="timeline">
+            <div class="timeline-item complete">
+                <div class="tl-title">Initial Local Thin Slice</div>
+                <div class="tl-hash">e322104</div>
+                <div class="tl-desc">RunContext, workforce analysis tool, chart, HTML report template, 6 passing tests, synthetic data</div>
+            </div>
+            <div class="timeline-item complete">
+                <div class="tl-title">Bedrock Model + Storage Abstraction</div>
+                <div class="tl-hash">1237cba</div>
+                <div class="tl-desc">Configurable model wrapper, LocalStorage + S3Storage, run isolation tests, real Bedrock narrative</div>
+            </div>
+            <div class="timeline-item complete">
+                <div class="tl-title">S3 Infrastructure</div>
+                <div class="tl-hash">2832c7f</div>
+                <div class="tl-desc">CloudFormation stack for encrypted/versioned/private S3 bucket with lifecycle policy</div>
+            </div>
+            <div class="timeline-item complete">
+                <div class="tl-title">DynamoDB State + Checkpoints</div>
+                <div class="tl-hash">d908c2b</div>
+                <div class="tl-desc">Run lifecycle management, checkpoint approval mechanism, operator status command</div>
+            </div>
+            <div class="timeline-item complete">
+                <div class="tl-title">Methodology-Driven Agent Engine</div>
+                <div class="tl-hash">397f24a</div>
+                <div class="tl-desc">Agent reads playbook, reasons via tool-use API, structured logging with run_id correlation</div>
+            </div>
+            <div class="timeline-item complete">
+                <div class="tl-title">Documentation</div>
+                <div class="tl-hash">8cfe30a</div>
+                <div class="tl-desc">Architecture, decisions, build status, roadmap — all synchronized to deployed reality</div>
+            </div>
+            <div class="timeline-item complete">
+                <div class="tl-title">Bedrock Usage Monitoring</div>
+                <div class="tl-hash">9ceb6b5</div>
+                <div class="tl-desc">CloudWatch dashboard, usage CLI script, optional detailed logging infrastructure</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Future -->
+    <section>
+        <div class="section-header">
+            <h2>Migration Path to Production</h2>
+            <p class="section-desc">V0 architecture is designed to port cleanly to AgentCore Runtime</p>
+        </div>
+        <div class="principle-grid">
+            <div class="principle-card">
+                <div class="p-title">V0 &rarr; AgentCore Runtime</div>
+                <div class="p-desc">Tool definitions map directly to AgentCore tool schemas. Agent loop parallels AgentCore's managed runtime. No rearchitecting needed.</div>
+            </div>
+            <div class="principle-card">
+                <div class="p-title">V0 &rarr; Code Interpreter</div>
+                <div class="p-desc">Dynamic code execution sandboxing. Currently tools are static; Code Interpreter adds safe ad-hoc computation within runs.</div>
+            </div>
+            <div class="principle-card warn">
+                <div class="p-title">Sandbox &rarr; Production</div>
+                <div class="p-desc">Review provider_data_share, create least-privilege execution roles, disable detailed logging, validate IAM scoping per client.</div>
+            </div>
+            <div class="principle-card green">
+                <div class="p-title">V0 &rarr; Real Methodology</div>
+                <div class="p-desc">Replace thin_slice.md with full consulting playbook. Add more tools. Quality evaluators layer on without redesign.</div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>Intelligence Engine V0 Architecture Report &mdash; Generated August 2026</p>
+        <p style="margin-top:0.5rem">Built with: Python 3.12 &middot; Amazon Bedrock (Claude Sonnet 4.6) &middot; S3 &middot; DynamoDB &middot; CloudFormation &middot; CloudWatch</p>
+    </footer>
+
+</div>
+</body>
+</html>
