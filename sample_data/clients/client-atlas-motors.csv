@@ -1,0 +1,201 @@
+employee_id,name,department,title,age,tenure_years,turnover_risk
+E0001,Wren Yamamoto,Manufacturing,Quality Inspector,53,11.4,High
+E0002,Reese Torres,Manufacturing,Quality Inspector,37,5.1,Low
+E0003,Remy King,Manufacturing,Plant Manager,49,24.9,Low
+E0004,Hayden Harris,Manufacturing,Plant Manager,41,5.3,Medium
+E0005,Charlie Garcia,Manufacturing,Line Technician,56,23.8,Low
+E0006,Charlie Burke,Manufacturing,Quality Inspector,39,13.1,Low
+E0007,Tatum Green,Manufacturing,Plant Manager,28,5.9,Medium
+E0008,Logan Campbell,Manufacturing,Plant Manager,22,0.8,High
+E0009,Casey Santos,Manufacturing,Plant Manager,30,5.8,Low
+E0010,Quinn Chen,Manufacturing,Plant Manager,52,12.1,Low
+E0011,Taylor Clarke,Manufacturing,Quality Inspector,29,6.6,Low
+E0012,Morgan Wright,Manufacturing,Line Technician,31,1.7,Medium
+E0013,Peyton Johnson,Manufacturing,Shift Supervisor,29,4.6,Low
+E0014,August Baker,Manufacturing,Shift Supervisor,55,9.7,Low
+E0015,Peyton Scott,Manufacturing,Quality Inspector,41,11.5,Medium
+E0016,Keegan Rivera,Manufacturing,Shift Supervisor,62,5.5,Low
+E0017,Skyler Yamamoto,Manufacturing,Shift Supervisor,57,2.2,High
+E0018,Marley Green,Manufacturing,Quality Inspector,40,0.9,High
+E0019,Reese Harris,Manufacturing,Line Technician,36,13.9,Low
+E0020,Cypress Scott,Manufacturing,Shift Supervisor,49,3.1,Medium
+E0021,Jamie Okafor,Manufacturing,Shift Supervisor,26,0.6,Medium
+E0022,August Wright,Manufacturing,Plant Manager,50,3.4,Low
+E0023,Haven Brown,Manufacturing,Plant Manager,54,13.6,Low
+E0024,August Kim,Manufacturing,Quality Inspector,42,12.8,High
+E0025,Finley Wright,Manufacturing,Line Technician,39,10.5,Low
+E0026,Rowan Lewis,Engineering,Engineering Director,50,22.9,Medium
+E0027,Oakley Jackson,Engineering,Engineering Director,53,24.2,Low
+E0028,River Anderson,Engineering,Senior Engineer,28,6.0,Low
+E0029,Haven Walker,Engineering,Senior Engineer,47,20.4,Low
+E0030,Lennon Johnson,Engineering,Senior Engineer,38,5.7,Low
+E0031,Kai Hall,Engineering,Mechanical Engineer,56,11.7,Medium
+E0032,Tatum Martinez,Engineering,Engineering Director,53,15.7,Low
+E0033,Emerson Okafor,Engineering,Engineering Director,30,8.4,Low
+E0034,Haven Walker,Engineering,Mechanical Engineer,23,2.0,Medium
+E0035,Harper Davis,Engineering,Senior Engineer,57,0.6,High
+E0036,Finley Fischer,Engineering,Senior Engineer,29,5.3,Medium
+E0037,Indigo Morrison,Engineering,Engineering Director,39,7.7,Low
+E0038,Remy Yamamoto,Engineering,Senior Engineer,57,3.9,Medium
+E0039,August Hall,Engineering,Engineering Director,30,7.8,Medium
+E0040,River Anderson,Engineering,Engineering Director,39,14.8,Medium
+E0041,Peyton Scott,Engineering,Engineering Director,53,21.7,Low
+E0042,Remy Lee,Engineering,Senior Engineer,57,19.1,Low
+E0043,Drew Thompson,Engineering,Engineering Director,37,9.3,Medium
+E0044,Marlowe Wilson,Engineering,Mechanical Engineer,42,15.7,Low
+E0045,Parker Taylor,Engineering,Engineering Director,31,5.1,High
+E0046,Ellis Scott,Engineering,Senior Engineer,28,6.2,Low
+E0047,Tatum Harris,Engineering,Mechanical Engineer,31,4.3,Low
+E0048,Jamie Williams,Engineering,Senior Engineer,38,6.0,Low
+E0049,Dalton Johnson,Engineering,Senior Engineer,56,9.7,Low
+E0050,Indigo Walker,Engineering,Engineering Director,24,2.0,Medium
+E0051,Greer Morrison,R&D,Research Scientist,27,2.8,High
+E0052,Cypress Rivera,R&D,EV Battery Specialist,32,7.7,Low
+E0053,Casey Garcia,R&D,Research Scientist,40,7.0,Low
+E0054,Harper Allen,R&D,EV Battery Specialist,58,17.1,Medium
+E0055,Rowan Johnson,R&D,R&D Manager,46,15.6,Medium
+E0056,Oakley Nguyen,R&D,Research Scientist,51,16.1,Low
+E0057,Everett Chen,R&D,EV Battery Specialist,40,13.0,Medium
+E0058,Marley Lee,R&D,R&D Manager,41,12.9,Low
+E0059,Sage Harris,R&D,EV Battery Specialist,34,13.0,Low
+E0060,Quinn Yamamoto,R&D,EV Battery Specialist,58,9.2,Medium
+E0061,Haven Morrison,R&D,Research Scientist,47,7.1,Low
+E0062,Greer Santos,R&D,R&D Manager,53,20.9,Low
+E0063,Marlowe Torres,R&D,R&D Manager,44,5.3,Medium
+E0064,Sage Park,R&D,R&D Manager,28,6.4,Low
+E0065,Peyton White,R&D,Research Scientist,59,9.3,Medium
+E0066,Reese Garcia,R&D,R&D Manager,48,4.6,Medium
+E0067,Shiloh Martinez,R&D,R&D Manager,54,22.9,Low
+E0068,Sage Lewis,R&D,EV Battery Specialist,43,17.8,Low
+E0069,Morgan Nguyen,R&D,Research Scientist,47,24.2,Low
+E0070,Logan Johnson,R&D,EV Battery Specialist,22,0.5,High
+E0071,Logan Clarke,R&D,R&D Manager,46,20.6,Low
+E0072,Quinn Torres,R&D,EV Battery Specialist,23,1.4,Low
+E0073,Drew Baker,R&D,Research Scientist,26,3.3,Medium
+E0074,Haven Zhang,R&D,R&D Manager,48,3.2,High
+E0075,Casey Zhang,R&D,EV Battery Specialist,29,1.0,Low
+E0076,Dakota Taylor,Supply Chain,Procurement Manager,45,16.2,Low
+E0077,Shiloh Wilson,Supply Chain,VP Supply Chain,31,8.9,Low
+E0078,Aspen Baker,Supply Chain,Procurement Manager,39,0.9,High
+E0079,Marley White,Supply Chain,Logistics Coordinator,45,2.7,Low
+E0080,Shiloh Lee,Supply Chain,Logistics Coordinator,47,7.1,Low
+E0081,Lennon Johnson,Supply Chain,VP Supply Chain,35,9.1,Low
+E0082,Jordan Santos,Supply Chain,Procurement Manager,37,15.8,Low
+E0083,Emerson Williams,Supply Chain,VP Supply Chain,35,8.3,Low
+E0084,Finley Anderson,Supply Chain,Logistics Coordinator,60,0.4,Low
+E0085,Jamie Park,Supply Chain,VP Supply Chain,38,13.6,Medium
+E0086,Jordan Park,Supply Chain,Logistics Coordinator,44,18.2,Medium
+E0087,Drew Patel,Supply Chain,Logistics Coordinator,38,1.2,Medium
+E0088,Tatum Fischer,Supply Chain,VP Supply Chain,26,2.5,Low
+E0089,Ellis Scott,Supply Chain,Logistics Coordinator,50,12.7,Low
+E0090,Casey Allen,Supply Chain,Procurement Manager,51,16.2,High
+E0091,Remy Brown,Supply Chain,Procurement Manager,28,3.6,Low
+E0092,Morgan Johnson,Supply Chain,Procurement Manager,60,4.0,Medium
+E0093,Briar Scott,Supply Chain,VP Supply Chain,42,8.2,Low
+E0094,Reese Harris,Supply Chain,VP Supply Chain,60,10.9,Low
+E0095,Avery King,Supply Chain,VP Supply Chain,35,6.2,Low
+E0096,River Anderson,Supply Chain,Procurement Manager,47,10.6,Medium
+E0097,Phoenix Garcia,Supply Chain,VP Supply Chain,38,6.6,Medium
+E0098,Remy Williams,Supply Chain,Logistics Coordinator,27,0.8,High
+E0099,Keegan Martinez,Supply Chain,Logistics Coordinator,57,1.8,Low
+E0100,Wren Anderson,Supply Chain,VP Supply Chain,29,3.5,Low
+E0101,Landry Jackson,Sales,VP Sales,25,3.9,Medium
+E0102,Hayden Rivera,Sales,VP Sales,54,5.6,Low
+E0103,Finley Rivera,Sales,Regional Sales Director,57,9.4,Low
+E0104,Sutton Torres,Sales,Regional Sales Director,57,24.4,Low
+E0105,Briar King,Sales,Dealer Relations Manager,60,23.2,Low
+E0106,Blair Patel,Sales,Dealer Relations Manager,39,12.7,Low
+E0107,Cameron Lee,Sales,Dealer Relations Manager,33,10.5,Low
+E0108,Kai Williams,Sales,Dealer Relations Manager,62,24.3,Medium
+E0109,Tatum Burke,Sales,Regional Sales Director,48,11.5,Medium
+E0110,Peyton Garcia,Sales,VP Sales,60,2.4,High
+E0111,Skyler Baker,Sales,Dealer Relations Manager,27,1.9,Low
+E0112,Aspen Green,Sales,Regional Sales Director,48,7.0,Low
+E0113,Avery Lee,Sales,Regional Sales Director,29,2.5,Low
+E0114,Aspen Allen,Sales,VP Sales,41,1.2,High
+E0115,August Santos,Sales,Dealer Relations Manager,35,4.4,Medium
+E0116,Dakota Clarke,Sales,Regional Sales Director,42,2.8,Medium
+E0117,Phoenix Campbell,Sales,Dealer Relations Manager,46,13.5,Medium
+E0118,Wren Lee,Sales,Dealer Relations Manager,47,21.6,High
+E0119,Jordan Harris,Sales,Dealer Relations Manager,42,12.2,Low
+E0120,Indigo Wilson,Sales,Regional Sales Director,29,3.4,Low
+E0121,Skyler Baker,Sales,Regional Sales Director,45,2.4,Low
+E0122,Harper Jackson,Sales,VP Sales,47,13.2,Low
+E0123,Peyton Anderson,Sales,Dealer Relations Manager,43,17.2,Medium
+E0124,Cypress Fischer,Sales,VP Sales,54,5.1,Low
+E0125,Hayden Nguyen,Sales,Dealer Relations Manager,28,1.3,High
+E0126,August Nguyen,HR,VP People,26,1.1,Medium
+E0127,Aspen Harris,HR,VP People,59,11.4,Low
+E0128,Sutton Baker,HR,Talent Acquisition Lead,62,8.1,Low
+E0129,Remy White,HR,VP People,41,16.0,Low
+E0130,Hayden Hall,HR,HR Generalist,41,9.4,High
+E0131,Logan Morrison,HR,HR Generalist,27,3.8,Medium
+E0132,Lennon Scott,HR,VP People,24,1.5,Low
+E0133,Dalton Thompson,HR,Talent Acquisition Lead,60,12.0,Medium
+E0134,Taylor White,HR,HR Generalist,43,21.6,Medium
+E0135,Dalton Campbell,HR,HR Generalist,37,11.4,Low
+E0136,Tatum Allen,HR,VP People,32,4.2,Low
+E0137,Parker Wilson,HR,Talent Acquisition Lead,60,1.6,Medium
+E0138,Cameron Williams,HR,Talent Acquisition Lead,28,4.0,Low
+E0139,Sage Green,HR,HR Generalist,43,2.1,Low
+E0140,Hayden Zhang,HR,VP People,47,3.5,Low
+E0141,Riley Zhang,HR,VP People,46,16.2,Low
+E0142,Dakota Allen,HR,HR Generalist,49,12.9,High
+E0143,Peyton Campbell,HR,HR Generalist,43,20.9,Low
+E0144,Finley Park,HR,HR Generalist,26,1.7,Low
+E0145,Ellis Young,HR,VP People,55,1.2,High
+E0146,Marlowe Baker,HR,HR Generalist,60,9.6,Medium
+E0147,Haven Baker,HR,HR Generalist,50,1.4,High
+E0148,Jules Yamamoto,HR,Talent Acquisition Lead,61,7.3,Low
+E0149,Marley Torres,HR,VP People,37,5.2,Low
+E0150,Remy Thompson,HR,Talent Acquisition Lead,58,24.6,Low
+E0151,Reese Taylor,Finance,CFO,55,10.6,Medium
+E0152,Charlie Green,Finance,Financial Analyst,38,1.2,High
+E0153,Logan King,Finance,Financial Analyst,55,21.3,Medium
+E0154,Landry Davis,Finance,Cost Accountant,50,22.7,Medium
+E0155,Phoenix Johnson,Finance,Financial Analyst,50,22.2,Low
+E0156,River Santos,Finance,Cost Accountant,54,9.5,Low
+E0157,Riley Martinez,Finance,Financial Analyst,23,0.8,High
+E0158,Indigo Anderson,Finance,Financial Analyst,30,0.6,Low
+E0159,Remy Park,Finance,CFO,52,11.4,High
+E0160,Riley Patel,Finance,Cost Accountant,35,11.7,Low
+E0161,Jules Green,Finance,CFO,49,3.0,Medium
+E0162,Peyton Fischer,Finance,Financial Analyst,37,6.9,Low
+E0163,Lennon Williams,Finance,Financial Analyst,53,15.0,High
+E0164,Ellis Wright,Finance,Financial Analyst,31,3.1,High
+E0165,Hayden Yamamoto,Finance,CFO,48,4.9,Low
+E0166,Tatum Martinez,Finance,Financial Analyst,55,13.7,Low
+E0167,Ellis King,Finance,Financial Analyst,46,21.9,High
+E0168,Parker Martinez,Finance,Cost Accountant,23,0.9,High
+E0169,Harper Rivera,Finance,CFO,43,3.2,Medium
+E0170,Cameron Campbell,Finance,CFO,51,24.5,Low
+E0171,Rowan Park,Finance,Financial Analyst,51,1.2,High
+E0172,Charlie Kim,Finance,Cost Accountant,41,10.5,Low
+E0173,Shiloh Lewis,Finance,Cost Accountant,24,2.3,Medium
+E0174,Hayden Santos,Finance,CFO,43,6.2,Low
+E0175,Phoenix Brown,Finance,CFO,50,22.4,Low
+E0176,Rowan Walker,EV Division,EV Program Director,53,9.4,Low
+E0177,Blair Johnson,EV Division,EV Program Director,49,2.2,Medium
+E0178,Rowan Young,EV Division,Charging Infrastructure Lead,42,2.4,Medium
+E0179,Reese Zhang,EV Division,Charging Infrastructure Lead,60,18.0,Medium
+E0180,Marley Lee,EV Division,Charging Infrastructure Lead,24,2.3,Low
+E0181,Briar Jackson,EV Division,Charging Infrastructure Lead,62,24.5,Low
+E0182,Morgan Brown,EV Division,Charging Infrastructure Lead,54,20.1,Low
+E0183,Jordan Nguyen,EV Division,EV Program Director,50,1.2,High
+E0184,Marlowe Martinez,EV Division,Charging Infrastructure Lead,46,23.8,High
+E0185,Jamie White,EV Division,Charging Infrastructure Lead,45,10.8,Medium
+E0186,Dakota Allen,EV Division,Charging Infrastructure Lead,47,8.1,Medium
+E0187,Avery Patel,EV Division,EV Program Director,33,6.1,Low
+E0188,Wren Fischer,EV Division,Charging Infrastructure Lead,38,12.1,Medium
+E0189,Briar Morrison,EV Division,EV Program Director,53,5.2,Medium
+E0190,Morgan White,EV Division,EV Systems Engineer,50,24.9,Low
+E0191,Drew Lee,EV Division,EV Program Director,26,2.9,Medium
+E0192,Peyton Davis,EV Division,EV Program Director,62,4.6,Low
+E0193,Finley Fischer,EV Division,EV Systems Engineer,30,2.4,Medium
+E0194,Logan King,EV Division,EV Program Director,45,11.4,Low
+E0195,Dakota Baker,EV Division,EV Systems Engineer,26,1.8,Low
+E0196,Jules Lewis,EV Division,EV Program Director,48,19.3,Low
+E0197,Morgan Park,EV Division,Charging Infrastructure Lead,26,2.4,Low
+E0198,Hayden Park,EV Division,EV Program Director,62,14.8,Low
+E0199,Dakota Jackson,EV Division,EV Program Director,25,3.4,Medium
+E0200,Peyton Davis,EV Division,EV Systems Engineer,42,19.6,Medium

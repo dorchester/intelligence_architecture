@@ -1,0 +1,16 @@
+{
+  "client_id": "client-velocity-logistics",
+  "client_name": "Velocity Logistics International",
+  "industry": "Logistics / Transportation",
+  "headcount": 250,
+  "departments": [
+    "Operations",
+    "Drivers",
+    "Warehouse",
+    "Technology",
+    "Sales",
+    "HR",
+    "Finance",
+    "Safety"
+  ]
+}

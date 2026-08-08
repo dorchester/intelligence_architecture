@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelligence Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0c10;
+            --surface: #12151c;
+            --card: #161921;
+            --border: #262d3d;
+            --text: #f1f3f5;
+            --text-secondary: #a1a9bc;
+            --text-muted: #6b7280;
+            --blue: #3b82f6;
+            --green: #10b981;
+            --purple: #8b5cf6;
+            --orange: #f59e0b;
+            --cyan: #06b6d4;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+        .shell {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 3rem 2rem;
+        }
+        header {
+            margin-bottom: 3rem;
+        }
+        header h1 {
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 0.25rem;
+        }
+        header p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+        .section-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+        .client-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+            margin-bottom: 3rem;
+        }
+        .client-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.15s ease;
+            cursor: pointer;
+        }
+        .client-card:hover {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 1px var(--blue), 0 4px 20px rgba(59,130,246,0.08);
+            transform: translateY(-1px);
+        }
+        .client-info h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.15rem;
+        }
+        .client-info .industry {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        .start-btn {
+            background: var(--blue);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.55rem 1.2rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+            font-family: inherit;
+        }
+        .start-btn:hover { background: #2563eb; }
+        .recent-runs {
+            margin-top: 2rem;
+        }
+        .run-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+        .run-row:last-child { border-bottom: none; }
+        .run-row a {
+            color: var(--blue);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .run-row a:hover { text-decoration: underline; }
+        .run-row .client-name { color: var(--text); flex: 1; }
+        .status-pill {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 100px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .status-pill.completed { background: rgba(16,185,129,0.12); color: var(--green); }
+        .status-pill.running { background: rgba(59,130,246,0.12); color: var(--blue); }
+        .status-pill.waiting { background: rgba(245,158,11,0.12); color: var(--orange); }
+        .status-pill.rejected { background: rgba(239,68,68,0.12); color: #ef4444; }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <header>
+        <h1>Intelligence Engine</h1>
+        <p>Select a client to begin a workforce intelligence engagement</p>
+    </header>
+
+    <div class="section-title">Clients</div>
+    <div class="client-grid">
+        {% for client in clients %}
+        <form action="/run/start" method="POST" class="client-card" onclick="this.submit()">
+            <input type="hidden" name="client_id" value="{{ client.client_id }}">
+            <div class="client-info">
+                <h3>{{ client.client_name }}</h3>
+                <span class="industry">{{ client.industry }}</span>
+            </div>
+            <button type="submit" class="start-btn">Start Run</button>
+        </form>
+        {% endfor %}
+    </div>
+
+    {% if recent_runs %}
+    <div class="recent-runs">
+        <div class="section-title">Recent Runs</div>
+        {% for run in recent_runs %}
+        <div class="run-row">
+            <a href="/run/{{ run.run_id }}">{{ run.run_id[:8] }}</a>
+            <span class="client-name">{{ run.client_name }}</span>
+            <span class="status-pill {{ run.stage.replace('_', '-') }}
+                {%- if run.stage == 'completed' %} completed
+                {%- elif run.stage == 'waiting_for_approval' %} waiting
+                {%- elif run.stage == 'rejected' %} rejected
+                {%- else %} running{% endif %}">
+                {{ run.stage.replace('_', ' ') }}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+</body>
+</html>

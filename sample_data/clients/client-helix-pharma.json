@@ -1,0 +1,16 @@
+{
+  "client_id": "client-helix-pharma",
+  "client_name": "Helix Pharmaceuticals",
+  "industry": "Pharmaceuticals / Life Sciences",
+  "headcount": 150,
+  "departments": [
+    "Research",
+    "Clinical Trials",
+    "Regulatory",
+    "Manufacturing",
+    "Commercial",
+    "IT",
+    "HR",
+    "Medical Affairs"
+  ]
+}

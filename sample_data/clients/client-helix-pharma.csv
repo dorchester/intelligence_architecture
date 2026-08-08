@@ -1,0 +1,151 @@
+employee_id,name,department,title,age,tenure_years,turnover_risk
+E0001,Tatum Morrison,Research,Research Scientist,38,3.6,Low
+E0002,Blair Park,Research,VP Research,41,12.4,Medium
+E0003,Dalton Davis,Research,VP Research,59,4.1,Low
+E0004,Jules Green,Research,Principal Scientist,58,1.3,Low
+E0005,Riley Kim,Research,VP Research,58,6.8,Medium
+E0006,Sutton Wilson,Research,VP Research,62,1.0,Low
+E0007,Shiloh Morrison,Research,VP Research,41,9.8,Low
+E0008,Greer Brown,Research,Principal Scientist,51,2.1,High
+E0009,Marley Wilson,Research,Principal Scientist,51,5.3,Low
+E0010,Drew Garcia,Research,VP Research,44,22.4,Medium
+E0011,Logan Hall,Research,VP Research,28,2.4,Medium
+E0012,Blair White,Research,Research Scientist,31,1.2,High
+E0013,Parker Baker,Research,Principal Scientist,37,15.4,Low
+E0014,Drew Wright,Research,VP Research,42,4.2,Medium
+E0015,Ellis Harris,Research,Principal Scientist,41,10.1,Medium
+E0016,Kai Hall,Research,Principal Scientist,37,3.7,Medium
+E0017,Taylor Morrison,Research,Principal Scientist,60,22.1,Low
+E0018,Remy Morrison,Research,VP Research,22,0.9,High
+E0019,Sage Martinez,Research,Principal Scientist,45,1.4,High
+E0020,Wren Thompson,Clinical Trials,Trial Manager,57,7.4,Low
+E0021,Marley King,Clinical Trials,Trial Manager,61,17.1,Medium
+E0022,Quinn Brown,Clinical Trials,Trial Manager,43,12.4,Low
+E0023,Jamie Thompson,Clinical Trials,VP Clinical,54,10.2,High
+E0024,Casey Park,Clinical Trials,VP Clinical,43,17.7,Low
+E0025,Jamie Green,Clinical Trials,VP Clinical,30,3.2,Medium
+E0026,Skyler Brown,Clinical Trials,VP Clinical,41,12.0,Low
+E0027,Ellis Young,Clinical Trials,Trial Manager,58,7.7,Low
+E0028,Logan Anderson,Clinical Trials,VP Clinical,29,7.8,Low
+E0029,Jules Patel,Clinical Trials,VP Clinical,52,6.9,Low
+E0030,Marlowe Scott,Clinical Trials,VP Clinical,36,10.9,Low
+E0031,Skyler Allen,Clinical Trials,VP Clinical,61,19.4,Low
+E0032,Greer Yamamoto,Clinical Trials,Clinical Research Associate,58,23.7,Medium
+E0033,Jordan White,Clinical Trials,Trial Manager,48,4.0,Low
+E0034,River Hall,Clinical Trials,VP Clinical,52,21.9,Low
+E0035,Taylor Park,Clinical Trials,VP Clinical,35,8.0,Low
+E0036,Remy Allen,Clinical Trials,Trial Manager,42,20.1,Low
+E0037,Shiloh Anderson,Clinical Trials,VP Clinical,44,15.6,Low
+E0038,Greer Clarke,Clinical Trials,VP Clinical,52,5.0,Medium
+E0039,Wren Zhang,Regulatory,Regulatory Affairs Specialist,41,15.5,Low
+E0040,Haven Walker,Regulatory,Regulatory Director,52,8.9,Low
+E0041,Jules Okafor,Regulatory,Regulatory Director,29,4.7,Low
+E0042,Kai Lee,Regulatory,Regulatory Affairs Specialist,40,1.1,Low
+E0043,Riley Lee,Regulatory,Regulatory Director,38,12.8,Medium
+E0044,Shiloh Okafor,Regulatory,Regulatory Director,30,1.3,Medium
+E0045,Harper Yamamoto,Regulatory,Regulatory Affairs Specialist,55,5.9,Medium
+E0046,Quinn Wilson,Regulatory,Regulatory Director,52,2.8,Low
+E0047,Alex King,Regulatory,Regulatory Affairs Specialist,48,16.4,Low
+E0048,Remy Lewis,Regulatory,Regulatory Affairs Specialist,40,6.3,Low
+E0049,Marlowe Johnson,Regulatory,Regulatory Affairs Specialist,56,18.5,Low
+E0050,Casey Campbell,Regulatory,Regulatory Director,33,11.2,High
+E0051,Kai Walker,Regulatory,Regulatory Affairs Specialist,40,16.7,High
+E0052,Sutton Green,Regulatory,Regulatory Affairs Specialist,43,6.5,Low
+E0053,Shiloh Allen,Regulatory,Regulatory Director,30,7.7,Low
+E0054,Charlie Fischer,Regulatory,Regulatory Director,32,8.1,Low
+E0055,Indigo Campbell,Regulatory,Regulatory Affairs Specialist,43,17.5,Low
+E0056,Landry Thompson,Regulatory,Regulatory Affairs Specialist,61,21.4,Low
+E0057,Phoenix Hall,Regulatory,Regulatory Director,27,2.6,High
+E0058,Dakota Lewis,Manufacturing,QA Manager,37,0.4,High
+E0059,Marley Okafor,Manufacturing,QA Manager,41,11.8,Low
+E0060,Sage Martinez,Manufacturing,Plant Director,37,1.3,High
+E0061,Peyton Davis,Manufacturing,QA Manager,54,23.1,Low
+E0062,Marlowe Zhang,Manufacturing,Plant Director,29,5.2,Low
+E0063,Logan Baker,Manufacturing,Process Engineer,36,14.4,Low
+E0064,Lennon Green,Manufacturing,QA Manager,48,17.6,Low
+E0065,Landry Young,Manufacturing,Plant Director,35,10.7,Low
+E0066,August Johnson,Manufacturing,Plant Director,50,13.3,Low
+E0067,Sutton Fischer,Manufacturing,Process Engineer,57,22.6,Medium
+E0068,Shiloh Nguyen,Manufacturing,Process Engineer,42,18.0,Low
+E0069,Greer Burke,Manufacturing,Plant Director,59,12.4,Low
+E0070,Marley Santos,Manufacturing,QA Manager,30,4.8,Low
+E0071,Taylor King,Manufacturing,QA Manager,41,14.5,Low
+E0072,Alex Burke,Manufacturing,Plant Director,26,0.5,High
+E0073,Morgan Young,Manufacturing,Process Engineer,26,4.9,Low
+E0074,Reese Wilson,Manufacturing,Process Engineer,30,7.0,Low
+E0075,Dalton Wilson,Manufacturing,QA Manager,46,11.4,Low
+E0076,Parker Taylor,Manufacturing,Process Engineer,56,3.6,Low
+E0077,Avery Campbell,Commercial,VP Commercial,47,13.4,Low
+E0078,Finley Chen,Commercial,Sales Representative,41,9.4,Low
+E0079,Phoenix Young,Commercial,Marketing Manager,36,3.9,Medium
+E0080,Blair Thompson,Commercial,VP Commercial,29,0.5,Medium
+E0081,Briar Patel,Commercial,Sales Representative,35,1.2,Medium
+E0082,Marley Green,Commercial,VP Commercial,25,1.2,High
+E0083,Marley Torres,Commercial,VP Commercial,35,10.6,Low
+E0084,Dakota Hall,Commercial,Marketing Manager,36,12.3,Low
+E0085,Drew Wright,Commercial,VP Commercial,42,5.2,Low
+E0086,Everett Allen,Commercial,Sales Representative,48,7.7,Medium
+E0087,Oakley Campbell,Commercial,VP Commercial,49,14.0,High
+E0088,Hayden Taylor,Commercial,VP Commercial,42,14.7,Low
+E0089,Peyton Taylor,Commercial,Sales Representative,56,12.0,Low
+E0090,Peyton Nguyen,Commercial,Marketing Manager,25,2.4,Low
+E0091,Wren Allen,Commercial,Sales Representative,46,6.3,Medium
+E0092,Dalton Johnson,Commercial,Marketing Manager,45,2.5,Low
+E0093,Charlie Santos,Commercial,Marketing Manager,46,16.9,Low
+E0094,Morgan Thompson,Commercial,VP Commercial,57,5.7,Medium
+E0095,Cameron Zhang,Commercial,Sales Representative,35,13.1,Low
+E0096,Avery Lewis,IT,Data Scientist,60,17.7,Low
+E0097,Harper King,IT,Software Engineer,40,7.4,Low
+E0098,Hayden Zhang,IT,Software Engineer,45,12.5,Low
+E0099,Quinn Lewis,IT,Software Engineer,35,5.4,Low
+E0100,Sutton Torres,IT,CTO,31,0.5,Medium
+E0101,Oakley Scott,IT,CTO,48,7.6,Medium
+E0102,Finley Taylor,IT,CTO,37,8.1,Low
+E0103,Greer Anderson,IT,Software Engineer,53,24.2,Low
+E0104,Aspen Harris,IT,Data Scientist,44,4.1,Low
+E0105,Aspen Campbell,IT,CTO,25,2.2,Low
+E0106,Morgan Santos,IT,Data Scientist,48,3.7,Medium
+E0107,Morgan Nguyen,IT,Data Scientist,35,7.2,Low
+E0108,Briar Baker,IT,Software Engineer,53,0.7,Medium
+E0109,River Chen,IT,Data Scientist,55,18.1,Low
+E0110,Reese Patel,IT,CTO,49,20.2,Low
+E0111,Quinn Rivera,IT,CTO,31,2.6,Medium
+E0112,Sage Lee,IT,Software Engineer,47,2.3,Low
+E0113,Lennon Wright,IT,Data Scientist,36,4.7,Low
+E0114,Riley Kim,IT,Data Scientist,47,9.7,Low
+E0115,Taylor Chen,HR,CHRO,32,1.2,Medium
+E0116,Dalton Anderson,HR,CHRO,28,6.3,Low
+E0117,Finley Burke,HR,CHRO,58,12.0,High
+E0118,Morgan Okafor,HR,CHRO,58,16.6,Medium
+E0119,Drew Patel,HR,HR Business Partner,59,3.9,Low
+E0120,Kai Williams,HR,Talent Development Manager,32,6.3,Low
+E0121,Parker Young,HR,Talent Development Manager,46,19.0,Medium
+E0122,Haven Johnson,HR,CHRO,44,1.5,Medium
+E0123,Morgan Anderson,HR,CHRO,61,23.9,Low
+E0124,Marlowe Garcia,HR,HR Business Partner,62,7.1,Low
+E0125,Aspen Torres,HR,Talent Development Manager,57,23.5,Low
+E0126,Greer Scott,HR,CHRO,46,2.4,Medium
+E0127,Harper Williams,HR,HR Business Partner,39,3.0,Low
+E0128,Cypress Nguyen,HR,CHRO,46,8.1,Medium
+E0129,Alex Zhang,HR,Talent Development Manager,45,18.3,Medium
+E0130,Riley Campbell,HR,Talent Development Manager,50,14.1,Low
+E0131,Quinn Patel,HR,HR Business Partner,44,12.9,Low
+E0132,Drew Taylor,HR,HR Business Partner,40,8.0,Low
+E0133,Jules King,Medical Affairs,Medical Science Liaison,58,13.2,Low
+E0134,Skyler Park,Medical Affairs,Medical Director,41,5.6,Medium
+E0135,Skyler Jackson,Medical Affairs,Medical Director,48,7.7,Low
+E0136,Logan Clarke,Medical Affairs,Medical Science Liaison,62,12.5,Low
+E0137,Lennon Rivera,Medical Affairs,Medical Science Liaison,41,0.4,High
+E0138,Briar Taylor,Medical Affairs,Medical Director,50,8.6,Low
+E0139,Dalton Green,Medical Affairs,Medical Science Liaison,41,6.6,Low
+E0140,Charlie Lewis,Medical Affairs,Medical Director,33,11.6,Low
+E0141,Reese Walker,Medical Affairs,Medical Science Liaison,42,8.1,Low
+E0142,Kai Martinez,Medical Affairs,Medical Science Liaison,58,5.2,Low
+E0143,Rowan King,Medical Affairs,Medical Science Liaison,51,23.6,Medium
+E0144,Reese Williams,Medical Affairs,Medical Director,53,3.7,Medium
+E0145,Sage Nguyen,Medical Affairs,Medical Director,46,2.1,Low
+E0146,Remy Scott,Medical Affairs,Medical Director,56,12.8,Low
+E0147,Haven Wilson,Medical Affairs,Medical Science Liaison,45,16.9,Low
+E0148,August Johnson,Medical Affairs,Medical Science Liaison,37,10.6,Low
+E0149,Dalton Baker,Medical Affairs,Medical Science Liaison,58,24.6,Low
+E0150,Kai Anderson,Medical Affairs,Medical Director,28,0.4,High

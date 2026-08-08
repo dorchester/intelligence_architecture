@@ -1,0 +1,16 @@
+{
+  "client_id": "client-summit-hospitality",
+  "client_name": "Summit Hospitality Group",
+  "industry": "Hospitality / Hotels",
+  "headcount": 180,
+  "departments": [
+    "Front Desk",
+    "Food & Beverage",
+    "Housekeeping",
+    "Management",
+    "Sales",
+    "HR",
+    "Finance",
+    "IT"
+  ]
+}

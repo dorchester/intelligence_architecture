@@ -1,0 +1,121 @@
+employee_id,name,department,title,age,tenure_years,turnover_risk
+E0001,Cypress Fischer,Actuarial,Actuary,39,4.6,Medium
+E0002,Quinn Young,Actuarial,Actuary,59,10.7,High
+E0003,Emerson Torres,Actuarial,Actuary,57,5.2,Low
+E0004,Shiloh Wilson,Actuarial,Senior Actuary,50,14.9,Low
+E0005,Alex Davis,Actuarial,Actuarial Analyst,43,6.3,Medium
+E0006,Landry Anderson,Actuarial,Actuary,27,2.5,Medium
+E0007,Hayden Green,Actuarial,Chief Actuary,24,2.3,Medium
+E0008,Parker Johnson,Actuarial,Chief Actuary,62,15.6,Low
+E0009,Sutton Thompson,Actuarial,Actuary,24,2.1,Low
+E0010,Riley Torres,Actuarial,Actuary,46,7.2,Low
+E0011,Logan Davis,Actuarial,Chief Actuary,44,5.1,Medium
+E0012,Greer Williams,Actuarial,Senior Actuary,56,18.3,Medium
+E0013,Parker Okafor,Actuarial,Senior Actuary,42,17.7,Low
+E0014,Finley Kim,Actuarial,Chief Actuary,47,6.9,Medium
+E0015,Sutton Garcia,Actuarial,Senior Actuary,53,10.1,Low
+E0016,Lennon Nguyen,Underwriting,Senior Underwriter,30,2.4,Medium
+E0017,Sage Scott,Underwriting,Senior Underwriter,59,10.2,Medium
+E0018,Dakota Hall,Underwriting,Senior Underwriter,27,4.6,Low
+E0019,Jamie Davis,Underwriting,Underwriting Manager,49,15.0,Low
+E0020,August Harris,Underwriting,Underwriting Manager,38,16.5,Low
+E0021,Alex Fischer,Underwriting,Underwriting Manager,56,18.8,Low
+E0022,Cameron Fischer,Underwriting,Senior Underwriter,49,4.2,High
+E0023,Jules Clarke,Underwriting,Underwriting Manager,33,6.2,Medium
+E0024,Cypress Zhang,Underwriting,Underwriting Manager,54,15.3,Medium
+E0025,Landry Davis,Underwriting,Underwriting Manager,55,23.0,Low
+E0026,Aspen Patel,Underwriting,Underwriter,45,21.1,Low
+E0027,Peyton Yamamoto,Underwriting,Underwriter,37,14.1,Low
+E0028,Riley Walker,Underwriting,Underwriter,56,19.2,Medium
+E0029,Remy King,Underwriting,Underwriter,38,9.1,Low
+E0030,Emerson Young,Underwriting,Underwriting Manager,34,9.4,Low
+E0031,Everett Martinez,Claims,Claims Supervisor,55,11.5,Medium
+E0032,Morgan Anderson,Claims,Claims Adjuster,59,14.0,Low
+E0033,Alex Williams,Claims,Claims Director,62,1.8,High
+E0034,Casey Anderson,Claims,Claims Adjuster,54,6.2,Low
+E0035,Emerson Young,Claims,Claims Adjuster,58,14.5,Medium
+E0036,Remy Wilson,Claims,Claims Adjuster,28,0.9,High
+E0037,Phoenix Wilson,Claims,Claims Supervisor,25,2.8,Low
+E0038,Quinn Santos,Claims,Claims Supervisor,43,17.7,Medium
+E0039,Charlie Thompson,Claims,Claims Director,50,3.8,Medium
+E0040,Lennon Yamamoto,Claims,Claims Adjuster,50,20.3,Low
+E0041,Quinn Santos,Claims,Claims Director,56,20.9,Low
+E0042,Landry Yamamoto,Claims,Claims Adjuster,48,12.3,Medium
+E0043,Kai Santos,Claims,Claims Adjuster,46,0.4,High
+E0044,Lennon Morrison,Claims,Claims Supervisor,57,16.6,Low
+E0045,Charlie Morrison,Claims,Claims Adjuster,25,2.4,Medium
+E0046,Keegan Garcia,IT,Software Engineer,25,2.5,Medium
+E0047,Tatum Davis,IT,Software Engineer,54,2.3,Medium
+E0048,August Williams,IT,Senior Engineer,47,3.3,Low
+E0049,Harper Scott,IT,Software Engineer,61,2.3,Low
+E0050,Sutton Allen,IT,IT Manager,38,3.7,Low
+E0051,Harper Clarke,IT,Data Engineer,30,6.1,Medium
+E0052,Drew Williams,IT,Software Engineer,51,15.6,Low
+E0053,Quinn Williams,IT,Senior Engineer,54,6.9,Low
+E0054,Morgan Yamamoto,IT,IT Manager,40,3.2,Low
+E0055,Indigo Zhang,IT,Software Engineer,57,7.7,Low
+E0056,Dakota Clarke,IT,Software Engineer,28,5.3,Medium
+E0057,Reese Green,IT,Senior Engineer,43,4.7,Low
+E0058,Sage Hall,IT,Data Engineer,38,15.4,Low
+E0059,Riley Jackson,IT,IT Manager,24,0.3,Medium
+E0060,Cypress Clarke,IT,Senior Engineer,50,13.9,Low
+E0061,Alex Fischer,Sales,Account Executive,31,5.6,Low
+E0062,Oakley King,Sales,Account Executive,49,3.4,Medium
+E0063,Casey Lee,Sales,Account Executive,37,10.8,Low
+E0064,Wren Wilson,Sales,VP Sales,31,9.3,Medium
+E0065,Skyler Campbell,Sales,Regional Sales Manager,23,0.6,Low
+E0066,River Yamamoto,Sales,Regional Sales Manager,32,8.7,Medium
+E0067,Casey Lewis,Sales,Account Executive,34,10.7,Low
+E0068,Peyton Torres,Sales,Account Executive,23,1.4,High
+E0069,Blair Williams,Sales,Regional Sales Manager,44,14.9,Low
+E0070,Shiloh Anderson,Sales,Account Executive,29,7.1,Medium
+E0071,Oakley Clarke,Sales,Account Executive,28,4.3,Low
+E0072,Drew Jackson,Sales,VP Sales,54,3.2,Low
+E0073,Charlie Clarke,Sales,Account Executive,49,0.3,Low
+E0074,Shiloh Thompson,Sales,Regional Sales Manager,49,2.0,Low
+E0075,Cameron Baker,Sales,Regional Sales Manager,29,5.8,Low
+E0076,Peyton Wilson,HR,HR Business Partner,47,17.5,Low
+E0077,Charlie Wilson,HR,CHRO,46,17.0,Low
+E0078,Briar Wright,HR,HR Business Partner,47,13.8,High
+E0079,Reese Burke,HR,HR Business Partner,59,15.3,Low
+E0080,Marley White,HR,CHRO,35,7.3,Low
+E0081,Keegan Davis,HR,CHRO,27,1.9,Low
+E0082,Briar Anderson,HR,HR Generalist,37,10.9,Medium
+E0083,Charlie Nguyen,HR,HR Generalist,24,1.0,High
+E0084,Marlowe Williams,HR,HR Business Partner,48,22.2,Low
+E0085,Indigo Taylor,HR,HR Business Partner,47,6.3,Low
+E0086,Alex Rivera,HR,HR Business Partner,36,2.9,Low
+E0087,Tatum Harris,HR,HR Generalist,57,6.5,Low
+E0088,Lennon Park,HR,HR Business Partner,55,24.7,Low
+E0089,Landry White,HR,CHRO,54,10.8,Low
+E0090,Marley Davis,HR,CHRO,52,11.4,Low
+E0091,Cypress Okafor,Finance,CFO,53,15.8,Medium
+E0092,Morgan Morrison,Finance,Financial Analyst,39,6.2,Low
+E0093,Riley Park,Finance,Financial Analyst,36,5.9,Medium
+E0094,Emerson Williams,Finance,Controller,48,8.5,Low
+E0095,Taylor Burke,Finance,Controller,46,22.6,Low
+E0096,Haven Patel,Finance,CFO,46,12.1,Low
+E0097,Peyton Taylor,Finance,Controller,56,18.8,Low
+E0098,August Torres,Finance,Controller,36,4.3,Low
+E0099,Parker Anderson,Finance,CFO,47,18.2,Low
+E0100,Dakota Baker,Finance,CFO,23,1.8,Medium
+E0101,Everett Patel,Finance,Financial Analyst,49,3.7,Medium
+E0102,Taylor Clarke,Finance,Controller,42,4.7,Low
+E0103,Landry Taylor,Finance,Controller,48,6.5,Medium
+E0104,Jordan Young,Finance,Financial Analyst,44,5.4,Medium
+E0105,Dalton Kim,Finance,Financial Analyst,37,3.4,High
+E0106,Jamie Yamamoto,Legal,Corporate Counsel,52,16.8,Low
+E0107,Emerson Harris,Legal,General Counsel,38,13.1,Medium
+E0108,August Fischer,Legal,Corporate Counsel,41,2.4,High
+E0109,Peyton Wright,Legal,General Counsel,46,10.1,Low
+E0110,Morgan Scott,Legal,General Counsel,62,6.3,Low
+E0111,Peyton Green,Legal,Corporate Counsel,58,19.6,Low
+E0112,Phoenix Martinez,Legal,Corporate Counsel,54,16.3,High
+E0113,River Walker,Legal,Corporate Counsel,49,24.0,Low
+E0114,Lennon Nguyen,Legal,Compliance Officer,33,8.9,Low
+E0115,Blair Baker,Legal,General Counsel,52,11.8,Low
+E0116,Oakley Okafor,Legal,Compliance Officer,37,13.3,Medium
+E0117,Marley Yamamoto,Legal,Compliance Officer,58,15.4,Low
+E0118,Jordan Walker,Legal,Compliance Officer,33,6.0,Low
+E0119,Sage Anderson,Legal,Compliance Officer,60,17.6,Medium
+E0120,Alex Allen,Legal,Corporate Counsel,27,1.7,Medium

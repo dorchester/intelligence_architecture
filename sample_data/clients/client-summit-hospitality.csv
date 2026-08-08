@@ -1,0 +1,181 @@
+employee_id,name,department,title,age,tenure_years,turnover_risk
+E0001,Reese White,Front Desk,Front Desk Agent,30,3.9,Low
+E0002,Keegan Hall,Front Desk,Guest Services Manager,57,21.6,Low
+E0003,Wren Burke,Front Desk,Front Desk Agent,35,8.9,Medium
+E0004,Hayden Park,Front Desk,Front Office Director,33,6.2,Low
+E0005,Drew Fischer,Front Desk,Guest Services Manager,57,12.2,Low
+E0006,Everett Wilson,Front Desk,Front Office Director,56,7.4,Low
+E0007,Alex Allen,Front Desk,Front Desk Agent,23,0.9,High
+E0008,Taylor Thompson,Front Desk,Guest Services Manager,32,10.8,Low
+E0009,Jamie Santos,Front Desk,Front Office Director,40,4.1,Low
+E0010,Hayden White,Front Desk,Front Desk Agent,61,21.7,Low
+E0011,Finley King,Front Desk,Guest Services Manager,37,8.3,Low
+E0012,Haven Morrison,Front Desk,Front Office Director,25,3.7,Medium
+E0013,Greer Garcia,Front Desk,Front Office Director,25,0.3,High
+E0014,Briar White,Front Desk,Front Desk Agent,62,17.7,Low
+E0015,Landry Scott,Front Desk,Front Office Director,60,5.2,Low
+E0016,Charlie Morrison,Front Desk,Guest Services Manager,33,11.8,Medium
+E0017,Rowan Hall,Front Desk,Front Desk Agent,46,1.3,High
+E0018,Sage Park,Front Desk,Front Desk Agent,59,21.2,High
+E0019,Lennon Nguyen,Front Desk,Front Desk Agent,31,9.3,Low
+E0020,Marlowe Baker,Front Desk,Front Office Director,41,10.0,Low
+E0021,Hayden Williams,Front Desk,Front Office Director,42,11.2,Low
+E0022,Tatum Williams,Front Desk,Front Office Director,32,4.8,Low
+E0023,Riley Lee,Front Desk,Front Desk Agent,35,9.4,Low
+E0024,Reese Burke,Food & Beverage,Executive Chef,57,20.6,Low
+E0025,Alex Fischer,Food & Beverage,F&B Manager,50,6.2,Low
+E0026,Briar Yamamoto,Food & Beverage,Server,42,8.2,Low
+E0027,Avery Taylor,Food & Beverage,F&B Manager,56,18.2,High
+E0028,Tatum Martinez,Food & Beverage,Executive Chef,53,1.4,Low
+E0029,Charlie Garcia,Food & Beverage,Server,28,1.4,Low
+E0030,Shiloh Young,Food & Beverage,Server,62,1.9,Low
+E0031,Marlowe Burke,Food & Beverage,Executive Chef,28,1.7,Low
+E0032,Keegan Jackson,Food & Beverage,Server,31,0.5,Medium
+E0033,Casey Johnson,Food & Beverage,Server,25,1.0,High
+E0034,Morgan Wright,Food & Beverage,Chef,38,7.1,Low
+E0035,Kai Jackson,Food & Beverage,F&B Manager,23,1.0,High
+E0036,Alex Baker,Food & Beverage,Server,59,1.4,Medium
+E0037,Hayden Hall,Food & Beverage,Server,40,15.0,Low
+E0038,Riley Morrison,Food & Beverage,Executive Chef,46,10.1,Low
+E0039,Remy Davis,Food & Beverage,Chef,30,6.8,Low
+E0040,Shiloh Morrison,Food & Beverage,Chef,41,13.6,Low
+E0041,Jules Martinez,Food & Beverage,Server,57,21.9,Medium
+E0042,Casey Chen,Food & Beverage,Executive Chef,56,13.8,Medium
+E0043,Emerson Lee,Food & Beverage,Chef,48,22.7,Low
+E0044,Jamie Davis,Food & Beverage,Chef,36,9.4,Medium
+E0045,Avery Campbell,Food & Beverage,Server,57,11.7,Low
+E0046,Reese Williams,Food & Beverage,F&B Manager,28,1.6,Medium
+E0047,Cameron Lee,Housekeeping,Room Attendant,37,1.9,Medium
+E0048,Charlie Garcia,Housekeeping,Housekeeping Supervisor,50,8.4,Low
+E0049,Haven Scott,Housekeeping,Room Attendant,58,14.3,Low
+E0050,Phoenix Davis,Housekeeping,Room Attendant,42,5.4,Medium
+E0051,Keegan Jackson,Housekeeping,Housekeeping Supervisor,45,3.5,Low
+E0052,Remy Harris,Housekeeping,Housekeeping Supervisor,44,17.9,Low
+E0053,Quinn Campbell,Housekeeping,Executive Housekeeper,60,2.3,Medium
+E0054,Dakota Young,Housekeeping,Room Attendant,38,12.6,Low
+E0055,Jules Williams,Housekeeping,Room Attendant,54,15.9,Low
+E0056,Oakley Brown,Housekeeping,Executive Housekeeper,35,12.7,Low
+E0057,Shiloh Young,Housekeeping,Housekeeping Supervisor,31,3.8,Medium
+E0058,Marlowe Scott,Housekeeping,Executive Housekeeper,40,2.8,Medium
+E0059,Riley Brown,Housekeeping,Housekeeping Supervisor,54,0.6,High
+E0060,Briar Davis,Housekeeping,Executive Housekeeper,30,4.2,Medium
+E0061,Sutton Nguyen,Housekeeping,Executive Housekeeper,52,23.5,High
+E0062,Landry Walker,Housekeeping,Room Attendant,26,1.5,Medium
+E0063,Everett Burke,Housekeeping,Executive Housekeeper,45,9.5,Low
+E0064,Casey Kim,Housekeeping,Executive Housekeeper,42,2.4,Low
+E0065,Cypress Okafor,Housekeeping,Executive Housekeeper,38,10.0,Low
+E0066,Parker Taylor,Housekeeping,Housekeeping Supervisor,59,16.4,Low
+E0067,Tatum Clarke,Housekeeping,Housekeeping Supervisor,36,7.9,Low
+E0068,Hayden Walker,Housekeeping,Housekeeping Supervisor,60,0.5,Low
+E0069,Marley Davis,Housekeeping,Room Attendant,26,2.7,Medium
+E0070,Jamie Campbell,Management,General Manager,45,14.6,Low
+E0071,Everett Torres,Management,Assistant GM,43,15.9,Low
+E0072,Remy Lewis,Management,General Manager,59,4.3,Low
+E0073,Jordan Yamamoto,Management,General Manager,30,5.3,Medium
+E0074,Cypress Hall,Management,General Manager,58,3.9,Medium
+E0075,Rowan Allen,Management,Assistant GM,60,24.2,Low
+E0076,Jules Morrison,Management,General Manager,35,6.5,Low
+E0077,Remy Davis,Management,General Manager,48,15.1,Low
+E0078,Marlowe Campbell,Management,Regional VP,54,6.8,Low
+E0079,Cameron Harris,Management,Regional VP,59,2.0,Medium
+E0080,Dakota Rivera,Management,General Manager,34,6.9,Low
+E0081,Greer Wilson,Management,General Manager,60,2.7,Medium
+E0082,Briar Green,Management,General Manager,56,12.7,Medium
+E0083,Remy Park,Management,Regional VP,56,20.7,Low
+E0084,Marlowe Jackson,Management,Regional VP,48,9.4,High
+E0085,Tatum Jackson,Management,General Manager,52,19.8,Low
+E0086,Oakley Wright,Management,General Manager,49,3.6,Medium
+E0087,Finley Johnson,Management,Assistant GM,60,22.0,Low
+E0088,Charlie Chen,Management,Regional VP,22,0.7,High
+E0089,Alex Taylor,Management,Regional VP,35,9.7,Low
+E0090,Logan Rivera,Management,General Manager,49,16.4,Medium
+E0091,Shiloh Jackson,Management,Regional VP,45,14.8,Low
+E0092,Kai Burke,Management,Assistant GM,57,19.7,Low
+E0093,Logan King,Sales,VP Revenue,52,6.6,Low
+E0094,Hayden Brown,Sales,VP Revenue,30,7.7,Low
+E0095,Keegan Torres,Sales,Group Sales Manager,32,1.4,Medium
+E0096,Cameron King,Sales,VP Revenue,25,0.9,Low
+E0097,Alex Johnson,Sales,Event Sales Coordinator,52,23.2,Low
+E0098,Morgan Clarke,Sales,Event Sales Coordinator,45,2.2,High
+E0099,Parker Brown,Sales,VP Revenue,55,7.4,Low
+E0100,Taylor Campbell,Sales,VP Revenue,53,11.1,Medium
+E0101,Everett Allen,Sales,Group Sales Manager,34,0.7,Medium
+E0102,Tatum Torres,Sales,VP Revenue,32,7.5,Low
+E0103,Dalton Chen,Sales,Event Sales Coordinator,27,6.0,Low
+E0104,Hayden Brown,Sales,Group Sales Manager,59,5.2,High
+E0105,Indigo Williams,Sales,Event Sales Coordinator,57,7.3,Low
+E0106,Oakley Lee,Sales,Group Sales Manager,39,4.3,Low
+E0107,Lennon Brown,Sales,VP Revenue,22,0.5,High
+E0108,Quinn King,Sales,Event Sales Coordinator,54,7.6,Low
+E0109,Ellis Clarke,Sales,VP Revenue,58,6.5,Low
+E0110,Parker Wright,Sales,Group Sales Manager,37,12.2,Low
+E0111,Lennon Harris,Sales,VP Revenue,23,1.1,High
+E0112,Parker Torres,Sales,VP Revenue,36,12.1,Low
+E0113,Hayden Allen,Sales,VP Revenue,22,0.8,High
+E0114,Reese Johnson,Sales,Group Sales Manager,43,1.9,Low
+E0115,Remy Garcia,HR,Training Manager,35,12.6,Medium
+E0116,Keegan Thompson,HR,Training Manager,34,3.3,Medium
+E0117,Sage Burke,HR,HR Coordinator,34,10.9,Low
+E0118,Hayden Nguyen,HR,HR Coordinator,29,7.4,Low
+E0119,Everett Walker,HR,VP People,22,0.8,Medium
+E0120,Casey Lewis,HR,Training Manager,61,8.1,Low
+E0121,Sutton Okafor,HR,Training Manager,33,11.8,Low
+E0122,Blair Brown,HR,HR Coordinator,58,3.5,Medium
+E0123,Phoenix Lewis,HR,VP People,24,1.7,Medium
+E0124,Greer Campbell,HR,Training Manager,29,5.7,Low
+E0125,Haven Chen,HR,HR Coordinator,35,5.5,Medium
+E0126,Logan Baker,HR,Training Manager,33,6.7,Medium
+E0127,Remy Baker,HR,Training Manager,45,4.7,Low
+E0128,River Martinez,HR,Training Manager,47,7.2,Medium
+E0129,Dakota Wright,HR,VP People,36,12.3,Low
+E0130,Harper King,HR,Training Manager,46,5.1,Low
+E0131,Keegan Nguyen,HR,Training Manager,22,0.4,High
+E0132,Cypress Allen,HR,VP People,42,16.6,Low
+E0133,Wren Wright,HR,HR Coordinator,47,2.7,Medium
+E0134,Emerson Clarke,HR,Training Manager,62,2.7,Low
+E0135,Sage Martinez,HR,Training Manager,57,14.1,Low
+E0136,Hayden Patel,HR,Training Manager,29,3.0,Low
+E0137,August Thompson,Finance,Controller,58,16.4,Low
+E0138,Marlowe Morrison,Finance,Financial Analyst,42,14.2,Low
+E0139,Keegan White,Finance,Night Auditor,46,15.5,Low
+E0140,Jamie Davis,Finance,Controller,43,9.5,Low
+E0141,Kai Williams,Finance,Night Auditor,32,4.0,Low
+E0142,Dalton Morrison,Finance,Controller,39,11.0,Low
+E0143,Marley Martinez,Finance,Controller,59,13.2,Low
+E0144,Skyler Campbell,Finance,Night Auditor,30,6.6,Low
+E0145,Keegan Johnson,Finance,Night Auditor,32,4.5,Medium
+E0146,Remy King,Finance,Night Auditor,23,1.6,Medium
+E0147,Riley Rivera,Finance,Financial Analyst,61,4.1,Low
+E0148,Parker Zhang,Finance,Night Auditor,37,11.9,Low
+E0149,Dakota Park,Finance,Controller,32,0.6,Medium
+E0150,Drew Lewis,Finance,Financial Analyst,56,23.4,Low
+E0151,Dakota Young,Finance,Night Auditor,59,15.1,Low
+E0152,Cypress Wright,Finance,Financial Analyst,55,16.1,Low
+E0153,Hayden Lewis,Finance,Controller,36,12.1,Low
+E0154,Logan Wilson,Finance,Financial Analyst,31,3.2,High
+E0155,Landry Park,Finance,Financial Analyst,40,9.1,High
+E0156,Aspen Lewis,Finance,Financial Analyst,22,0.8,Medium
+E0157,August Torres,Finance,Night Auditor,57,9.5,Low
+E0158,Wren Jackson,Finance,Financial Analyst,37,2.9,Low
+E0159,Parker Taylor,IT,Systems Administrator,38,1.6,Medium
+E0160,Tatum Baker,IT,VP Technology,39,5.3,Low
+E0161,Blair Wilson,IT,Systems Administrator,26,1.2,High
+E0162,Cypress Harris,IT,VP Technology,50,7.0,Low
+E0163,Charlie Garcia,IT,Systems Administrator,31,0.8,Medium
+E0164,Rowan Rivera,IT,IT Manager,39,2.5,Medium
+E0165,Alex Torres,IT,Systems Administrator,31,0.4,High
+E0166,River Zhang,IT,IT Manager,45,11.3,Low
+E0167,Cameron Johnson,IT,Systems Administrator,25,1.3,High
+E0168,Shiloh Lewis,IT,Systems Administrator,34,11.7,Medium
+E0169,Parker Chen,IT,Systems Administrator,37,6.3,Low
+E0170,Harper Kim,IT,Systems Administrator,51,18.5,Medium
+E0171,Everett Burke,IT,IT Manager,46,17.1,Low
+E0172,Drew Davis,IT,VP Technology,24,2.3,Medium
+E0173,Avery Clarke,IT,IT Manager,62,7.7,Low
+E0174,Taylor Burke,IT,Systems Administrator,37,10.2,Low
+E0175,Skyler Okafor,IT,VP Technology,29,3.3,Medium
+E0176,Casey Scott,IT,VP Technology,52,17.3,Medium
+E0177,Marlowe Johnson,IT,Systems Administrator,32,5.6,Low
+E0178,Cameron Santos,IT,Systems Administrator,44,14.9,Low
+E0179,Quinn Park,IT,IT Manager,36,5.0,Low
+E0180,Dalton Lee,IT,IT Manager,34,0.6,High

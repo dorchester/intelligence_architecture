@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run {{ run.run_id[:8] }} — {{ run.client_name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0c10;
+            --surface: #12151c;
+            --card: #161921;
+            --border: #262d3d;
+            --text: #f1f3f5;
+            --text-secondary: #a1a9bc;
+            --text-muted: #6b7280;
+            --blue: #3b82f6;
+            --green: #10b981;
+            --purple: #8b5cf6;
+            --orange: #f59e0b;
+            --cyan: #06b6d4;
+            --red: #ef4444;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+        .shell {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2.5rem 2rem;
+        }
+        .back-link {
+            display: inline-block;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+            transition: color 0.15s;
+        }
+        .back-link:hover { color: var(--text); }
+        .run-header {
+            margin-bottom: 2rem;
+        }
+        .run-header h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 0.25rem;
+        }
+        .run-meta {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .run-meta code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--cyan);
+            background: var(--surface);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+        }
+        .status-banner {
+            padding: 1rem 1.25rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .status-banner.running {
+            background: rgba(59,130,246,0.08);
+            border: 1px solid rgba(59,130,246,0.2);
+            color: var(--blue);
+        }
+        .status-banner.waiting {
+            background: rgba(245,158,11,0.08);
+            border: 1px solid rgba(245,158,11,0.2);
+            color: var(--orange);
+        }
+        .status-banner.completed {
+            background: rgba(16,185,129,0.08);
+            border: 1px solid rgba(16,185,129,0.2);
+            color: var(--green);
+        }
+        .status-banner.rejected {
+            background: rgba(239,68,68,0.08);
+            border: 1px solid rgba(239,68,68,0.2);
+            color: var(--red);
+        }
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse-dot 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .status-banner.completed .status-dot,
+        .status-banner.rejected .status-dot { animation: none; }
+
+        /* Checkpoint card */
+        .checkpoint-card {
+            background: var(--card);
+            border: 1px solid var(--orange);
+            border-radius: 14px;
+            padding: 1.75rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 0 30px rgba(245,158,11,0.06);
+        }
+        .checkpoint-card h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--orange);
+            margin-bottom: 0.75rem;
+        }
+        .checkpoint-card .description {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            white-space: pre-wrap;
+            margin-bottom: 1.25rem;
+        }
+        .checkpoint-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+        }
+        .checkpoint-actions form {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .btn {
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1.25rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+        }
+        .btn-approve {
+            background: var(--green);
+            color: #fff;
+        }
+        .btn-approve:hover { background: #059669; }
+        .btn-reject {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+        .btn-reject:hover { border-color: var(--red); color: var(--red); }
+        .feedback-input {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+            color: var(--text);
+            font-family: inherit;
+            width: 220px;
+        }
+        .feedback-input::placeholder { color: var(--text-muted); }
+        .feedback-input:focus { outline: none; border-color: var(--blue); }
+
+        /* Activity log */
+        .activity-log {
+            margin-top: 2rem;
+        }
+        .activity-log h3 {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+        .log-entry {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.6rem 0;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            border-bottom: 1px solid rgba(38,45,61,0.5);
+        }
+        .log-entry:last-child { border-bottom: none; }
+        .log-bullet {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--border);
+            margin-top: 0.4rem;
+            flex-shrink: 0;
+        }
+        .log-entry.checkpoint .log-bullet { background: var(--orange); }
+        .log-entry.success .log-bullet { background: var(--green); }
+
+        /* Report link */
+        .report-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--green);
+            color: #fff;
+            text-decoration: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-top: 1rem;
+            transition: background 0.15s;
+        }
+        .report-link:hover { background: #059669; }
+
+        /* Progress bar */
+        .progress-container {
+            margin-bottom: 2rem;
+        }
+        .progress-steps {
+            display: flex;
+            gap: 0;
+        }
+        .progress-step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+        .progress-step::before {
+            content: '';
+            position: absolute;
+            top: 12px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--border);
+        }
+        .progress-step:first-child::before { left: 50%; }
+        .progress-step:last-child::before { right: 50%; }
+        .progress-step.done::before { background: var(--green); }
+        .progress-step.active::before { background: linear-gradient(90deg, var(--green), var(--orange)); }
+        .step-dot {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            background: var(--surface);
+            border: 2px solid var(--border);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+        .progress-step.done .step-dot {
+            background: var(--green);
+            border-color: var(--green);
+            color: #fff;
+        }
+        .progress-step.active .step-dot {
+            border-color: var(--orange);
+            color: var(--orange);
+            box-shadow: 0 0 12px rgba(245,158,11,0.3);
+        }
+        .step-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 0.4rem;
+        }
+        .progress-step.done .step-label { color: var(--green); }
+        .progress-step.active .step-label { color: var(--orange); }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <a href="/" class="back-link">&larr; Back to clients</a>
+
+    <div class="run-header">
+        <h1>{{ run.client_name }}</h1>
+        <div class="run-meta">
+            <span>Run <code>{{ run.run_id[:8] }}</code></span>
+            <span>{{ run.created_at }}</span>
+            <span>{{ run.industry }}</span>
+        </div>
+    </div>
+
+    <!-- Progress -->
+    {% set stages = ['data_loaded', 'analyzing', 'charting', 'generating_narrative', 'rendering'] %}
+    {% set stage_labels = ['Load', 'Analyze', 'Chart', 'Narrative', 'Report'] %}
+    {% set checkpoint_names = ['scope_confirmation', 'analysis_review', 'visualization_review', 'narrative_review', 'final_review'] %}
+    <div class="progress-container">
+        <div class="progress-steps">
+            {% for label in stage_labels %}
+            {% set completed_checkpoints = run.checkpoints | length %}
+            <div class="progress-step
+                {%- if loop.index <= completed_checkpoints %} done
+                {%- elif loop.index == completed_checkpoints + 1 and run.stage == 'waiting_for_approval' %} active
+                {%- elif run.stage == 'completed' %} done{% endif %}">
+                <div class="step-dot">{{ loop.index }}</div>
+                <div class="step-label">{{ label }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Status banner -->
+    <div class="status-banner
+        {%- if run.stage == 'completed' %} completed
+        {%- elif run.stage == 'waiting_for_approval' %} waiting
+        {%- elif run.stage == 'rejected' %} rejected
+        {%- else %} running{% endif %}">
+        <div class="status-dot"></div>
+        {% if run.stage == 'completed' %}
+            Run completed successfully
+        {% elif run.stage == 'waiting_for_approval' %}
+            Waiting for your approval
+        {% elif run.stage == 'rejected' %}
+            Run was rejected
+        {% else %}
+            Processing: {{ run.stage.replace('_', ' ') }}...
+        {% endif %}
+    </div>
+
+    <!-- Checkpoint card -->
+    {% if run.current_checkpoint %}
+    <div class="checkpoint-card">
+        <h3>{{ run.current_checkpoint.title }}</h3>
+        <div class="description">{{ run.current_checkpoint.description }}</div>
+        <div class="checkpoint-actions">
+            <form action="/run/{{ run.run_id }}/approve" method="POST">
+                <input type="text" name="feedback" class="feedback-input" placeholder="Optional feedback...">
+                <button type="submit" class="btn btn-approve">Approve</button>
+            </form>
+            <form action="/run/{{ run.run_id }}/reject" method="POST">
+                <input type="hidden" name="reason" value="Operator rejected at this checkpoint">
+                <button type="submit" class="btn btn-reject">Reject</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Report link -->
+    {% if run.stage == 'completed' and run.output_path %}
+    <a href="/run/{{ run.run_id }}/report" class="report-link" target="_blank">
+        View Report &rarr;
+    </a>
+    {% endif %}
+
+    <!-- Activity log -->
+    <div class="activity-log">
+        <h3>Activity</h3>
+        {% for entry in run.log %}
+        <div class="log-entry {% if 'Checkpoint' in entry %}checkpoint{% elif 'complete' in entry.lower() or 'generated' in entry.lower() %}success{% endif %}">
+            <div class="log-bullet"></div>
+            <span>{{ entry }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% if run.stage not in ['completed', 'rejected'] %}
+<script>
+    // Auto-refresh while running
+    setTimeout(() => location.reload(), 2000);
+</script>
+{% endif %}
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "client_id": "client-meridian-ins",
+  "client_name": "Meridian Insurance Group",
+  "industry": "Insurance / Financial Services",
+  "headcount": 120,
+  "departments": [
+    "Actuarial",
+    "Underwriting",
+    "Claims",
+    "IT",
+    "Sales",
+    "HR",
+    "Finance",
+    "Legal"
+  ]
+}

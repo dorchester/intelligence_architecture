@@ -1,0 +1,27 @@
+[
+  {
+    "client_id": "client-meridian-ins",
+    "client_name": "Meridian Insurance Group",
+    "industry": "Insurance / Financial Services"
+  },
+  {
+    "client_id": "client-atlas-motors",
+    "client_name": "Atlas Motors Corporation",
+    "industry": "Automotive / Manufacturing"
+  },
+  {
+    "client_id": "client-helix-pharma",
+    "client_name": "Helix Pharmaceuticals",
+    "industry": "Pharmaceuticals / Life Sciences"
+  },
+  {
+    "client_id": "client-velocity-logistics",
+    "client_name": "Velocity Logistics International",
+    "industry": "Logistics / Transportation"
+  },
+  {
+    "client_id": "client-summit-hospitality",
+    "client_name": "Summit Hospitality Group",
+    "industry": "Hospitality / Hotels"
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "client_id": "client-atlas-motors",
+  "client_name": "Atlas Motors Corporation",
+  "industry": "Automotive / Manufacturing",
+  "headcount": 200,
+  "departments": [
+    "Manufacturing",
+    "Engineering",
+    "R&D",
+    "Supply Chain",
+    "Sales",
+    "HR",
+    "Finance",
+    "EV Division"
+  ]
+}
