@@ -1,6 +1,6 @@
 # Roadmap
 
-## V0 — Local Thin Slice (current)
+## V0 — AWS Thin Slice (complete)
 
 - [x] Repository skeleton and architecture documentation.
 - [x] RunContext with stage tracking.
@@ -8,45 +8,46 @@
 - [x] Chart generation.
 - [x] HTML report rendering from template.
 - [x] Synthetic sample data.
-- [x] Tests for deterministic analysis.
-- [ ] Local end-to-end run produces report.html.
-
-## V0.1 — Bedrock Narrative
-
-- [ ] Replace stub narrative with Bedrock Claude call.
-- [ ] Wire system prompt and report_narrative prompt.
-- [ ] Store raw LLM response in working/ for audit.
-- [ ] Test with synthetic data (no real client data).
-
-## V0.2 — S3 Integration
-
-- [ ] Abstract storage behind an interface (local filesystem / S3).
-- [ ] Runs write input/working/output to S3 under run prefix.
-- [ ] Implement run_id-scoped IAM policy pattern.
-
-## V0.3 — State and Checkpoints
-
-- [ ] DynamoDB table for run state.
-- [ ] Implement checkpoint pause/resume pattern.
-- [ ] Operator can approve/reject at each checkpoint.
+- [x] Tests for deterministic analysis and run isolation.
+- [x] Local end-to-end run produces report.html.
+- [x] Bedrock model abstraction (configurable, inference profiles).
+- [x] Narrative generation via Bedrock Claude.
+- [x] Storage abstraction (LocalStorage + S3Storage).
+- [x] S3 bucket with encryption, versioning, private access (CloudFormation).
+- [x] DynamoDB run state table with client GSI (CloudFormation).
+- [x] Checkpoint approval mechanism (pause/resume).
+- [x] Agent engine with methodology-driven tool-use reasoning.
+- [x] Structured logging with run_id correlation.
+- [x] Full orchestrator integrating all components.
+- [x] Cross-run/client isolation verified on S3.
+- [x] End-to-end synthetic run verified.
 
 ## V1 — AgentCore Runtime
 
 - [ ] Deploy agent to Bedrock AgentCore Runtime.
 - [ ] Wire Code Interpreter for sandboxed dynamic execution.
 - [ ] Promote recurring dynamic operations to named tools.
-- [ ] Full methodology playbook execution.
-- [ ] Observability via AgentCore/CloudWatch.
+- [ ] Full methodology playbook execution (beyond thin slice).
+- [ ] Observability via AgentCore/CloudWatch integration.
+- [ ] Project-specific IAM execution roles (least privilege).
 
 ## V1.x — Operator Interface
 
-- [ ] Web UI for starting runs and viewing status.
-- [ ] Checkpoint approval UI.
-- [ ] Report viewer/download.
+- [ ] Web UI or CLI improvements for starting runs and viewing status.
+- [ ] Checkpoint approval UI (not stdin-based).
+- [ ] Report viewer/download via presigned URLs.
+- [ ] Async checkpoint notification (email/webhook).
+
+## V2 — Evaluation and Quality
+
+- [ ] Automated evaluation dimensions (methodology compliance, evidence grounding).
+- [ ] Regression tests against known-good reports.
+- [ ] Quantitative reconciliation validation.
+- [ ] CI/CD pipeline for tool/methodology deployment.
 
 ## Future
 
-- [ ] Redshift integration for historical analytics.
 - [ ] Multi-client concurrent runs.
-- [ ] CI/CD pipeline for tool/methodology deployment.
-- [ ] Automated regression tests against known-good reports.
+- [ ] Historical analytics (Redshift or equivalent).
+- [ ] Real methodology migration from existing workflow.
+- [ ] provider_data_share review for production environment.

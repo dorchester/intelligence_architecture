@@ -1,55 +1,53 @@
 # Infrastructure
 
-This directory will contain infrastructure-as-code for the Intelligence Engine's
-AWS deployment. **No deployable infrastructure exists yet.**
+All AWS infrastructure is managed via CloudFormation templates in the
+`cloudformation/` directory.
 
-## Planned AWS Components
+## Stacks
 
-### Amazon Bedrock
-- **Purpose**: LLM inference (Claude) for narrative generation and agent reasoning.
-- **Configuration**: Model access, inference profiles, guardrails.
+| Stack | Template | Resources |
+|-------|----------|-----------|
+| intelligence-engine-dev-storage | cloudformation/storage.yaml | S3 bucket for run artifacts |
+| intelligence-engine-dev-state | cloudformation/state.yaml | DynamoDB table for run state |
 
-### Amazon Bedrock AgentCore Runtime
-- **Purpose**: Production agent execution environment.
-- **Configuration**: Agent definition, tool bindings, session management.
-- **Key feature**: Manages long-running (30–60 min) asynchronous agent sessions
-  with human checkpoint support.
+## Deployment
 
-### AgentCore Code Interpreter
-- **Purpose**: Isolated sandbox for runtime-generated Python/shell execution.
-- **Configuration**: Ephemeral execution environment scoped to a single run.
-- **Constraint**: No network access, no persistent storage outside run prefix.
+```bash
+# Deploy storage (S3 bucket)
+aws cloudformation deploy \
+  --profile intelligence-dev \
+  --region us-east-1 \
+  --template-file infrastructure/cloudformation/storage.yaml \
+  --stack-name intelligence-engine-dev-storage \
+  --parameter-overrides Environment=dev \
+  --tags Application=intelligence-engine Environment=dev ManagedBy=cloudformation
 
-### Amazon S3
-- **Purpose**: Durable storage for run artifacts.
-- **Structure**:
-  ```
-  s3://{bucket}/runs/{run_id}/input/    — source data
-  s3://{bucket}/runs/{run_id}/working/  — intermediate artifacts
-  s3://{bucket}/runs/{run_id}/output/   — final report
-  ```
-- **Access**: IAM-scoped per run to enforce isolation.
+# Deploy state (DynamoDB)
+aws cloudformation deploy \
+  --profile intelligence-dev \
+  --region us-east-1 \
+  --template-file infrastructure/cloudformation/state.yaml \
+  --stack-name intelligence-engine-dev-state \
+  --parameter-overrides Environment=dev \
+  --tags Application=intelligence-engine Environment=dev ManagedBy=cloudformation
+```
 
-### Amazon DynamoDB
-- **Purpose**: Authoritative run and checkpoint state.
-- **Schema** (provisional):
-  - Partition key: `run_id`
-  - Attributes: client_id, stage, created_at, checkpoints, versions.
+## Tagging Convention
 
-### Amazon CloudWatch
-- **Purpose**: Observability — logs, metrics, traces.
-- **Integration**: AgentCore native logging plus custom metrics.
+All resources are tagged with:
+- `Application`: `intelligence-engine`
+- `Environment`: `dev` | `staging` | `prod`
+- `ManagedBy`: `cloudformation`
 
-## Deployment Approach (Future)
+## Cost Profile
 
-Infrastructure will be defined using either:
-- AWS CDK (Python), or
-- Terraform
+Both resources are pay-per-use with near-zero idle cost:
+- **S3**: standard storage pricing, Intelligent Tiering after 30 days
+- **DynamoDB**: on-demand (PAY_PER_REQUEST), no provisioned capacity
 
-Decision deferred until V0.2+ when we begin provisioning resources.
+## Future Components
 
-## What This Directory Does NOT Contain
-
-- No AWS credentials or account IDs.
-- No deployable CloudFormation/CDK/Terraform templates (yet).
-- No live configuration pointing to real environments.
+- **AgentCore Runtime**: production agent execution environment
+- **AgentCore Code Interpreter**: sandboxed dynamic code execution
+- **CloudWatch**: integrated observability (logs, metrics, traces)
+- **IAM Execution Roles**: least-privilege roles for agent runtime

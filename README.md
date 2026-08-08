@@ -9,39 +9,42 @@ The Intelligence Engine follows a methodology-driven workflow:
 
 1. **Ingest** structured data for a client.
 2. **Analyze** it using deterministic, tested Python tools.
-3. **Interpret** results using an LLM (Amazon Bedrock / Claude).
+3. **Interpret** results using an LLM agent (Amazon Bedrock / Claude).
 4. **Generate** a formatted HTML report with metrics, charts, and narrative.
 
-Each run is isolated, traceable, and reproducible at the deterministic layer.
+The agent reads a Markdown methodology playbook, reasons about each step, and
+invokes tools via the Bedrock tool-use API. Each run is isolated, traceable,
+and reproducible at the deterministic layer.
 
 ## Architecture (Summary)
 
 ```
 ┌──────────────┐     ┌───────────────────┐     ┌──────────────┐
-│  Methodology │────▶│   Agent (Claude)   │────▶│    Report    │
-│  Playbooks   │     │  orchestrates the  │     │   (HTML)     │
-└──────────────┘     │  analytical flow   │     └──────────────┘
+│  Methodology │────▶│   Agent Engine     │────▶│   Report     │
+│  Playbooks   │     │  (Bedrock Claude)  │     │  (S3 HTML)   │
+└──────────────┘     │  reasons + tools   │     └──────────────┘
                      └─────┬─────────┬────┘
                            │         │
-                     ┌─────▼───┐ ┌───▼────────────┐
-                     │  Tools  │ │  LLM Narrative  │
-                     │ (Python)│ │  (Bedrock)      │
-                     └─────────┘ └────────────────┘
+                     ┌─────▼───┐ ┌───▼──────────┐
+                     │  Tools  │ │  Run State   │
+                     │ (Python)│ │  (DynamoDB)  │
+                     └─────────┘ └──────────────┘
 ```
 
 - **Tools** are pure Python functions — deterministic, tested, versioned.
 - **Methodology** is version-controlled Markdown that guides agent reasoning.
-- **Agent** orchestrates the workflow, invoking tools and generating narrative.
-- **Reports** are rendered from Jinja2 templates with embedded metrics and charts.
+- **Agent** orchestrates the workflow via Bedrock tool-use API.
+- **State** is tracked in DynamoDB with checkpoint support.
+- **Artifacts** are stored in S3 with client/run isolation.
 
 See [docs/architecture.md](docs/architecture.md) for the full architectural breakdown.
 
-## Quick Start (Local V0)
+## Quick Start
 
 ### Prerequisites
 
 - Python 3.11+
-- pip or uv
+- AWS CLI configured with profile `intelligence-dev` (for AWS features)
 
 ### Install
 
@@ -49,58 +52,84 @@ See [docs/architecture.md](docs/architecture.md) for the full architectural brea
 pip install -e ".[dev]"
 ```
 
-### Run Tests
+### Run Tests (No AWS Required)
 
 ```bash
-pytest
+pytest -v
 ```
 
-### Run the Thin Slice
+### Run Locally (No AWS)
 
 ```bash
 python run_local.py
 ```
 
-This will:
-- Create a run directory under `runs/`.
-- Analyze the synthetic workforce data.
-- Generate a chart and HTML report.
-- Print the path to the output report.
+### Run with Bedrock Narrative (Requires AWS)
 
-Open the generated `report.html` in a browser to view results.
+```bash
+python run_local.py --use-bedrock
+```
+
+### Full AWS End-to-End
+
+```bash
+python orchestrator.py run --auto-approve
+```
+
+This will:
+- Create a unique run scoped by client_id and run_id
+- Upload synthetic input to S3
+- Pause at a checkpoint (auto-approved with flag)
+- Run the agent through the methodology playbook
+- Generate analysis, chart, narrative, and HTML report
+- Store all artifacts in S3
+- Track full lifecycle in DynamoDB
+
+### Check Status / Download
+
+```bash
+python orchestrator.py status <run_id>
+python orchestrator.py download <run_id>
+```
 
 ## Project Structure
 
 ```
 intelligence_architecture/
-├── agent/          — orchestration and run context
-├── methodology/    — workflow playbooks (Markdown)
-├── tools/          — deterministic analytical tools (Python)
-├── prompts/        — LLM prompt templates
-├── templates/      — HTML report templates (Jinja2)
-├── config/         — configuration (example only; real config gitignored)
-├── sample_data/    — synthetic/fictional data for testing
-├── tests/          — automated tests
-├── infrastructure/ — future AWS infrastructure docs
-├── docs/           — architecture and design documentation
-└── run_local.py    — local thin-slice runner
+├── agent/              — agent engine, model abstraction, run context
+├── methodology/        — workflow playbooks (Markdown)
+├── tools/              — deterministic analytical tools (Python)
+├── prompts/            — LLM prompt templates
+├── templates/          — HTML report templates (Jinja2)
+├── storage/            — storage abstraction (local + S3)
+├── state/              — DynamoDB run state management
+├── infrastructure/     — CloudFormation templates
+│   └── cloudformation/
+├── config/             — configuration (example only)
+├── sample_data/        — synthetic/fictional data for testing
+├── tests/              — automated tests
+├── docs/               — architecture and design documentation
+├── orchestrator.py     — full AWS orchestrator with checkpoints
+├── run_local.py        — local runner (optional Bedrock)
+└── run_s3.py           — S3-backed runner
 ```
 
 ## Key Design Decisions
 
 1. **Deterministic analysis is separated from LLM narrative.** Tools produce
-   reproducible metrics; the LLM interprets them. This makes the analytical
-   layer testable and auditable independently.
+   reproducible metrics; the LLM interprets them.
 
 2. **Methodology lives in Markdown, not rigid code.** Playbooks guide the agent's
-   reasoning without reducing it to a mechanical DAG. They are versioned and
-   the version is stamped on every report.
+   reasoning without reducing it to a mechanical DAG.
 
-3. **Run isolation is structural.** Each run has its own directory prefix.
-   In production, IAM policies enforce this boundary — it is never trust-based.
+3. **Run isolation is structural.** Client/run prefix in storage and state.
+   Never trust-based.
 
-4. **No agent framework dependency yet.** The V0 orchestrator is plain Python.
-   Framework selection (if needed) happens when we target AgentCore Runtime.
+4. **Agent uses tool-use API.** Maps directly to AgentCore Runtime's model.
+
+5. **Infrastructure is code.** CloudFormation stacks, not manual resources.
+
+See [docs/decisions.md](docs/decisions.md) for the full decision log.
 
 ## Security
 
@@ -112,9 +141,9 @@ instructions.
 
 ## Status
 
-**V0 — Local Thin Slice.** Runs entirely locally with synthetic data. No AWS
-resources are created or modified. See [docs/roadmap.md](docs/roadmap.md) for
-planned progression.
+**V0 — AWS Thin Slice Complete.** Full end-to-end with S3, DynamoDB, Bedrock
+agent reasoning, deterministic tools, checkpoint approval, and HTML report
+generation. See [docs/build-status.md](docs/build-status.md) for details.
 
 ## License
 
