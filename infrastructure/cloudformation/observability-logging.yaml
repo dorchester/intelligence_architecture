@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Intelligence Engine - Optional Bedrock invocation logging infrastructure.
+  WARNING: When enabled, invocation logs capture prompts and model responses.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+  RetentionDays:
+    Type: Number
+    Default: 7
+    Description: Log retention in days (short for cost/privacy)
+
+Resources:
+  BedrockInvocationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/bedrock/invocation-logs
+      RetentionInDays: !Ref RetentionDays
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  BedrockLoggingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-bedrock-logging
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudWatchLogsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt BedrockInvocationLogGroup.Arn
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+  BedrockLoggingRoleArn:
+    Value: !GetAtt BedrockLoggingRole.Arn
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-bedrock-logging-role-arn
+  LogGroupName:
+    Value: !Ref BedrockInvocationLogGroup
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-bedrock-log-group
