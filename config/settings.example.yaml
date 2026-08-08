@@ -1,0 +1,18 @@
+# Intelligence Engine — Example Configuration
+# Copy to settings.yaml and edit for your environment.
+# settings.yaml is gitignored and must never be committed.
+
+aws:
+  region: us-east-1
+  profile: intelligence-dev  # local AWS profile name
+  bedrock:
+    model_id: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+
+storage:
+  # In production these become S3 paths; locally they are filesystem paths.
+  base_path: ./runs
+
+engine:
+  methodology_version: "0.1.0"
+  max_run_duration_minutes: 60
+  checkpoints_enabled: false  # V0: no human checkpoints yet
