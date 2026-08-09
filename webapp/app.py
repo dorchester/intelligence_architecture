@@ -125,12 +125,12 @@ def approve_checkpoint(run_id: str):
     cp["resolved_at"] = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
 
     if feedback:
-        run["log"].append(f"Consultant direction: \"{feedback}\"")
+        _log(run, f"Consultant direction: \"{feedback}\"")
         run["feedback_history"].append({"checkpoint": cp["name"], "feedback": feedback})
 
     run["checkpoints"].append(cp)
     run["current_checkpoint"] = None
-    run["log"].append("Approved — continuing")
+    _log(run, "Approved - continuing")
 
     return redirect(url_for("run_status", run_id=run_id))
 
@@ -149,7 +149,7 @@ def reject_checkpoint(run_id: str):
     run["checkpoints"].append(cp)
     run["current_checkpoint"] = None
     run["stage"] = "rejected"
-    run["log"].append(f"Stopped: {reason}")
+    _log(run, f"Stopped: {reason}")
 
     return redirect(url_for("run_status", run_id=run_id))
 
@@ -182,6 +182,14 @@ def _execute_run(run: dict):
     3. Generate strategic recommendations
     4. Produce a formatted intelligence briefing
     """
+    try:
+        _execute_run_inner(run)
+    except Exception as e:
+        run["stage"] = "error"
+        _log(run, f"FATAL ERROR: {type(e).__name__}: {str(e).encode('ascii', 'replace').decode()}")
+
+
+def _execute_run_inner(run: dict):
     from storage.local import LocalStorage
     from agent.context import RunContext
 
@@ -203,13 +211,13 @@ def _execute_run(run: dict):
 
     # ===== PHASE 1: Company Research =====
     run["stage"] = "researching"
-    run["log"].append(f"Researching {company}...")
+    _log(run, f"Researching {company}...")
 
     research = _research_company(model, company, context)
     run["research"] = research
     ctx.write_artifact("working", "research.json", json.dumps(research, indent=2).encode())
     run["artifacts"].append("working/research.json")
-    run["log"].append(f"Research complete: {research.get('employee_count', 'Unknown')} employees, "
+    _log(run, f"Research complete: {research.get('employee_count', 'Unknown')} employees, "
                       f"{research.get('industry', 'Unknown')} sector")
 
     # ===== CHECKPOINT 1: Validate research =====
@@ -231,12 +239,12 @@ def _execute_run(run: dict):
 
     # ===== PHASE 2: Organizational Analysis =====
     run["stage"] = "analyzing_org"
-    run["log"].append("Analyzing organizational structure and workforce dynamics...")
+    _log(run, "Analyzing organizational structure and workforce dynamics...")
 
     org_analysis = _analyze_organization(model, company, research, context, corrections)
     ctx.write_artifact("working", "org_analysis.json", json.dumps(org_analysis, indent=2).encode())
     run["artifacts"].append("working/org_analysis.json")
-    run["log"].append("Organizational analysis complete")
+    _log(run, "Organizational analysis complete")
 
     # ===== CHECKPOINT 2: Review org analysis =====
     _wait_for_checkpoint(run, "org_review",
@@ -253,12 +261,12 @@ def _execute_run(run: dict):
 
     # ===== PHASE 3: Strategic Opportunities =====
     run["stage"] = "identifying_opportunities"
-    run["log"].append("Identifying strategic opportunities for engagement...")
+    _log(run, "Identifying strategic opportunities for engagement...")
 
     opportunities = _identify_opportunities(model, company, research, org_analysis, context, focus_direction)
     ctx.write_artifact("working", "opportunities.json", json.dumps(opportunities, indent=2).encode())
     run["artifacts"].append("working/opportunities.json")
-    run["log"].append(f"Identified {len(opportunities.get('opportunities', []))} potential engagement areas")
+    _log(run, f"Identified {len(opportunities.get('opportunities', []))} potential engagement areas")
 
     # ===== CHECKPOINT 3: Prioritize opportunities =====
     opps_text = ""
@@ -277,13 +285,13 @@ def _execute_run(run: dict):
 
     # ===== PHASE 4: Generate Intelligence Briefing =====
     run["stage"] = "generating_briefing"
-    run["log"].append("Generating intelligence briefing...")
+    _log(run, "Generating intelligence briefing...")
 
     briefing = _generate_briefing(model, company, research, org_analysis, opportunities, context,
                                   _get_all_feedback(run), priority_guidance)
     ctx.write_artifact("working", "briefing.md", briefing.encode())
     run["artifacts"].append("working/briefing.md")
-    run["log"].append(f"Briefing drafted ({len(briefing)} chars)")
+    _log(run, f"Briefing drafted ({len(briefing)} chars)")
 
     # ===== CHECKPOINT 4: Review briefing =====
     _wait_for_checkpoint(run, "briefing_review",
@@ -296,21 +304,21 @@ def _execute_run(run: dict):
 
     briefing_feedback = _get_feedback_for(run, "briefing_review")
     if briefing_feedback:
-        run["log"].append("Revising briefing based on feedback...")
+        _log(run, "Revising briefing based on feedback...")
         briefing = _revise_briefing(model, briefing, briefing_feedback)
         ctx.write_artifact("working", "briefing_revised.md", briefing.encode())
         run["artifacts"].append("working/briefing_revised.md")
-        run["log"].append("Briefing revised")
+        _log(run, "Briefing revised")
 
     # ===== PHASE 5: Render HTML Report =====
     run["stage"] = "rendering"
-    run["log"].append("Rendering HTML report...")
+    _log(run, "Rendering HTML report...")
 
     html_report = _render_intelligence_report(model, company, research, briefing)
     output_path = ctx.write_artifact("output", "intelligence_briefing.html", html_report.encode())
     run["output_path"] = output_path
     run["artifacts"].append("output/intelligence_briefing.html")
-    run["log"].append(f"Report saved: {output_path}")
+    _log(run, f"Report saved: {output_path}")
 
     # ===== CHECKPOINT 5: Final delivery =====
     _wait_for_checkpoint(run, "final_review",
@@ -322,7 +330,7 @@ def _execute_run(run: dict):
         return
 
     run["stage"] = "completed"
-    run["log"].append("Intelligence briefing complete and approved for use.")
+    _log(run, "Intelligence briefing complete and approved for use.")
 
 
 # ============ LLM CALLS ============
@@ -599,6 +607,16 @@ def _format_list(items: list) -> str:
     return "\n".join(f"  - {item}" for item in items)
 
 
+def _safe_str(s: str) -> str:
+    """Remove non-ASCII characters that crash Windows console threads."""
+    return s.encode("ascii", "replace").decode("ascii")
+
+
+def _log(run: dict, msg: str):
+    """Append a safe log entry."""
+    run["log"].append(_safe_str(msg))
+
+
 def _wait_for_checkpoint(run: dict, name: str, title: str, description: str):
     run["stage"] = "waiting_for_approval"
     run["current_checkpoint"] = {
@@ -608,7 +626,7 @@ def _wait_for_checkpoint(run: dict, name: str, title: str, description: str):
         "status": "pending",
         "requested_at": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
     }
-    run["log"].append(f"Awaiting review: {title}")
+    _log(run, f"Awaiting review: {title}")
     while run["current_checkpoint"] is not None and run["stage"] != "rejected":
         time.sleep(0.3)
 
