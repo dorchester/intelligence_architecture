@@ -192,6 +192,58 @@ Resources:
                 "period": 3600,
                 "title": "Output Tokens by Model (Hourly)"
               }
+            },
+            {
+              "type": "text",
+              "x": 0, "y": 17, "width": 24, "height": 1,
+              "properties": {
+                "markdown": "# Hosted Console — App Runner | ${Environment}\nEmpty until the app stack is deployed with --with-app."
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 18, "width": 8, "height": 5,
+              "properties": {
+                "metrics": [
+                  ["AWS/AppRunner", "Requests", "ServiceName", "intelligence-engine-${Environment}-console", {"stat": "Sum"}],
+                  ["AWS/AppRunner", "2xxStatusResponses", "ServiceName", "intelligence-engine-${Environment}-console", {"stat": "Sum"}],
+                  ["AWS/AppRunner", "4xxStatusResponses", "ServiceName", "intelligence-engine-${Environment}-console", {"stat": "Sum"}],
+                  ["AWS/AppRunner", "5xxStatusResponses", "ServiceName", "intelligence-engine-${Environment}-console", {"stat": "Sum"}]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 300,
+                "title": "Requests and Status Codes"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 8, "y": 18, "width": 8, "height": 5,
+              "properties": {
+                "metrics": [
+                  ["AWS/AppRunner", "RequestLatency", "ServiceName", "intelligence-engine-${Environment}-console", {"stat": "p50", "label": "p50"}],
+                  ["AWS/AppRunner", "RequestLatency", "ServiceName", "intelligence-engine-${Environment}-console", {"stat": "p99", "label": "p99"}]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 300,
+                "title": "Request Latency (ms)"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 16, "y": 18, "width": 8, "height": 5,
+              "properties": {
+                "metrics": [
+                  ["AWS/AppRunner", "CPUUtilization", "ServiceName", "intelligence-engine-${Environment}-console", {"stat": "Average"}],
+                  ["AWS/AppRunner", "MemoryUtilization", "ServiceName", "intelligence-engine-${Environment}-console", {"stat": "Average"}],
+                  ["AWS/AppRunner", "ActiveInstances", "ServiceName", "intelligence-engine-${Environment}-console", {"stat": "Maximum", "label": "Active instances (pinned to 1)"}]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "period": 300,
+                "title": "Utilisation and Instance Count"
+              }
             }
           ]
         }
