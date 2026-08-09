@@ -106,6 +106,27 @@ Resources:
                   - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/us.anthropic.*
                   - !Sub arn:aws:bedrock:*:${AWS::AccountId}:application-inference-profile/*
                   - arn:aws:bedrock:*::foundation-model/anthropic.*
+              # Stage configuration and vendor credentials resolve from one
+              # enumerated SSM path. Granting the namespace is an
+              # infrastructure decision; what is allowed to go into it is a
+              # licensing and privacy decision, made elsewhere. The path is
+              # empty of credentials until those land, so this grant reaches
+              # nothing sensitive today - it exists so a stage can read config
+              # without the harness needing a redeploy later.
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/intelligence-engine/${Environment}/stages/*
+              # SecureString values under that path decrypt with the
+              # AWS-managed SSM key, and only when the call comes via SSM.
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
       Tags:
         - Key: Application
           Value: intelligence-engine
