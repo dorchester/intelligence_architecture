@@ -7,7 +7,10 @@
 # Built in-account by CodeBuild (never on a laptop) and pushed to the
 # stages ECR repository. See infrastructure/cloudformation/workflow.yaml.
 
-FROM public.ecr.aws/docker/library/python:3.12-slim
+# bookworm pinned deliberately: playwright's --with-deps resolves its apt
+# package list against Debian 12; trixie renamed the font packages and the
+# browser install fails there.
+FROM public.ecr.aws/docker/library/python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
