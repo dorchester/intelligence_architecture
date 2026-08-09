@@ -63,11 +63,16 @@ Resources:
                 Resource: '*'
               - Effect: Allow
                 Action:
+                  # Push
                   - ecr:BatchCheckLayerAvailability
                   - ecr:CompleteLayerUpload
                   - ecr:InitiateLayerUpload
                   - ecr:PutImage
                   - ecr:UploadLayerPart
+                  # Pull — for layer caching and for running the image as a
+                  # post-build smoke test.
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
                 Resource: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/intelligence-engine-${Environment}-console
       Tags:
         - Key: Application
