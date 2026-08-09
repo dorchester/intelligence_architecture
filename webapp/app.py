@@ -135,21 +135,28 @@ def approve_checkpoint(run_id: str):
     return redirect(url_for("run_status", run_id=run_id))
 
 
-@app.route("/run/<run_id>/reject", methods=["POST"])
-def reject_checkpoint(run_id: str):
+@app.route("/run/<run_id>/revise", methods=["POST"])
+def revise_checkpoint(run_id: str):
+    """Send the current phase back for revision with feedback."""
     run = runs.get(run_id)
     if not run or not run["current_checkpoint"]:
         return redirect(url_for("run_status", run_id=run_id))
 
-    reason = request.form.get("reason", "").strip() or "Stopped by consultant"
+    feedback = request.form.get("feedback", "").strip()
+    if not feedback:
+        feedback = "Please revise this section."
+
     cp = run["current_checkpoint"]
-    cp["status"] = "rejected"
-    cp["reason"] = reason
+    cp["status"] = "revision_requested"
+    cp["feedback"] = feedback
     cp["resolved_at"] = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
+
+    _log(run, f"Revision requested: \"{feedback}\"")
+    run["feedback_history"].append({"checkpoint": cp["name"], "feedback": feedback, "action": "revise"})
     run["checkpoints"].append(cp)
     run["current_checkpoint"] = None
-    run["stage"] = "rejected"
-    _log(run, f"Stopped: {reason}")
+    # Signal the execution thread to revise (not reject)
+    run["_revision_requested"] = {"checkpoint": cp["name"], "feedback": feedback}
 
     return redirect(url_for("run_status", run_id=run_id))
 
@@ -221,20 +228,26 @@ def _execute_run_inner(run: dict):
                       f"{research.get('industry', 'Unknown')} sector")
 
     # ===== CHECKPOINT 1: Validate research =====
-    _wait_for_checkpoint(run, "research_validation",
-        "Validate Company Research",
-        f"Company: {research.get('full_name', company)}\n"
-        f"Industry: {research.get('industry', 'Unknown')}\n"
-        f"Headquarters: {research.get('headquarters', 'Unknown')}\n"
-        f"Employees: {research.get('employee_count', 'Unknown')}\n"
-        f"Revenue: {research.get('revenue', 'Unknown')}\n\n"
-        f"Key business segments:\n{_format_list(research.get('segments', []))}\n\n"
-        f"Recent developments:\n{_format_list(research.get('recent_developments', []))}\n\n"
-        f"Does this look accurate? Add corrections or additional context in the feedback box.")
-    if run["stage"] == "rejected":
-        return
+    while True:
+        revision = _wait_for_checkpoint(run, "research_validation",
+            "Validate Company Research",
+            f"Company: {research.get('full_name', company)}\n"
+            f"Industry: {research.get('industry', 'Unknown')}\n"
+            f"Headquarters: {research.get('headquarters', 'Unknown')}\n"
+            f"Employees: {research.get('employee_count', 'Unknown')}\n"
+            f"Revenue: {research.get('revenue', 'Unknown')}\n\n"
+            f"Key business segments:\n{_format_list(research.get('segments', []))}\n\n"
+            f"Recent developments:\n{_format_list(research.get('recent_developments', []))}\n\n"
+            f"Approve if accurate, or request revision with corrections.")
+        if not revision:
+            break
+        _log(run, f"Revising research with feedback...")
+        run["stage"] = "researching"
+        research = _revise_research(model, company, research, revision)
+        run["research"] = research
+        ctx.write_artifact("working", "research.json", json.dumps(research, indent=2).encode())
+        _log(run, "Research revised")
 
-    # Incorporate any corrections
     corrections = _get_feedback_for(run, "research_validation")
 
     # ===== PHASE 2: Organizational Analysis =====
@@ -247,15 +260,21 @@ def _execute_run_inner(run: dict):
     _log(run, "Organizational analysis complete")
 
     # ===== CHECKPOINT 2: Review org analysis =====
-    _wait_for_checkpoint(run, "org_review",
-        "Review Organizational Analysis",
-        f"Organizational Structure:\n{org_analysis.get('structure_summary', '')}\n\n"
-        f"Workforce Composition:\n{org_analysis.get('workforce_summary', '')}\n\n"
-        f"Key Organizational Challenges:\n{_format_list(org_analysis.get('challenges', []))}\n\n"
-        f"Talent & Workforce Risks:\n{_format_list(org_analysis.get('workforce_risks', []))}\n\n"
-        f"Provide direction if you want the analysis to focus on specific areas.")
-    if run["stage"] == "rejected":
-        return
+    while True:
+        revision = _wait_for_checkpoint(run, "org_review",
+            "Review Organizational Analysis",
+            f"Organizational Structure:\n{org_analysis.get('structure_summary', '')}\n\n"
+            f"Workforce Composition:\n{org_analysis.get('workforce_summary', '')}\n\n"
+            f"Key Organizational Challenges:\n{_format_list(org_analysis.get('challenges', []))}\n\n"
+            f"Talent & Workforce Risks:\n{_format_list(org_analysis.get('workforce_risks', []))}\n\n"
+            f"Approve to continue, or request revision with direction.")
+        if not revision:
+            break
+        _log(run, f"Revising org analysis...")
+        run["stage"] = "analyzing_org"
+        org_analysis = _revise_org_analysis(model, company, research, org_analysis, revision)
+        ctx.write_artifact("working", "org_analysis.json", json.dumps(org_analysis, indent=2).encode())
+        _log(run, "Org analysis revised")
 
     focus_direction = _get_feedback_for(run, "org_review")
 
@@ -269,17 +288,22 @@ def _execute_run_inner(run: dict):
     _log(run, f"Identified {len(opportunities.get('opportunities', []))} potential engagement areas")
 
     # ===== CHECKPOINT 3: Prioritize opportunities =====
-    opps_text = ""
-    for i, opp in enumerate(opportunities.get("opportunities", []), 1):
-        opps_text += f"{i}. {opp.get('title', '')}\n   {opp.get('description', '')}\n   Impact: {opp.get('impact', '')}\n\n"
+    while True:
+        opps_text = ""
+        for i, opp in enumerate(opportunities.get("opportunities", []), 1):
+            opps_text += f"{i}. {opp.get('title', '')}\n   {opp.get('description', '')}\n   Impact: {opp.get('impact', '')}\n\n"
 
-    _wait_for_checkpoint(run, "opportunity_review",
-        "Review & Prioritize Opportunities",
-        f"Potential Engagement Areas:\n\n{opps_text}"
-        f"Indicate which opportunities to emphasize in the final briefing, "
-        f"or add areas the analysis missed.")
-    if run["stage"] == "rejected":
-        return
+        revision = _wait_for_checkpoint(run, "opportunity_review",
+            "Review & Prioritize Opportunities",
+            f"Potential Engagement Areas:\n\n{opps_text}"
+            f"Approve to continue, or request revision with guidance on what to change.")
+        if not revision:
+            break
+        _log(run, f"Revising opportunities...")
+        run["stage"] = "identifying_opportunities"
+        opportunities = _revise_opportunities(model, company, research, org_analysis, opportunities, revision)
+        ctx.write_artifact("working", "opportunities.json", json.dumps(opportunities, indent=2).encode())
+        _log(run, "Opportunities revised")
 
     priority_guidance = _get_feedback_for(run, "opportunity_review")
 
@@ -294,20 +318,17 @@ def _execute_run_inner(run: dict):
     _log(run, f"Briefing drafted ({len(briefing)} chars)")
 
     # ===== CHECKPOINT 4: Review briefing =====
-    _wait_for_checkpoint(run, "briefing_review",
-        "Review Intelligence Briefing",
-        f"{briefing[:3000]}{'...' if len(briefing) > 3000 else ''}\n\n"
-        f"---\nApprove to render the final HTML report. "
-        f"Add feedback to adjust tone, emphasis, or missing points.")
-    if run["stage"] == "rejected":
-        return
-
-    briefing_feedback = _get_feedback_for(run, "briefing_review")
-    if briefing_feedback:
-        _log(run, "Revising briefing based on feedback...")
-        briefing = _revise_briefing(model, briefing, briefing_feedback)
-        ctx.write_artifact("working", "briefing_revised.md", briefing.encode())
-        run["artifacts"].append("working/briefing_revised.md")
+    while True:
+        revision = _wait_for_checkpoint(run, "briefing_review",
+            "Review Intelligence Briefing",
+            f"{briefing[:3000]}{'...' if len(briefing) > 3000 else ''}\n\n"
+            f"---\nApprove to render the final report, or request revision with feedback.")
+        if not revision:
+            break
+        _log(run, f"Revising briefing...")
+        run["stage"] = "generating_briefing"
+        briefing = _revise_briefing(model, briefing, revision)
+        ctx.write_artifact("working", "briefing.md", briefing.encode())
         _log(run, "Briefing revised")
 
     # ===== PHASE 5: Render HTML Report =====
@@ -321,13 +342,21 @@ def _execute_run_inner(run: dict):
     _log(run, f"Report saved: {output_path}")
 
     # ===== CHECKPOINT 5: Final delivery =====
-    _wait_for_checkpoint(run, "final_review",
-        "Approve for Delivery",
-        "The intelligence briefing is ready.\n\n"
-        "Click 'View Report' below to review the formatted output.\n"
-        "Approve to mark this engagement intelligence as complete.")
-    if run["stage"] == "rejected":
-        return
+    while True:
+        revision = _wait_for_checkpoint(run, "final_review",
+            "Approve for Delivery",
+            "The intelligence briefing is ready.\n\n"
+            "Click 'View Report' below to review the formatted output.\n"
+            "Approve to complete, or request revision for final adjustments.")
+        if not revision:
+            break
+        _log(run, f"Revising final report...")
+        run["stage"] = "generating_briefing"
+        briefing = _revise_briefing(model, briefing, revision)
+        html_report = _render_intelligence_report(model, company, research, briefing)
+        output_path = ctx.write_artifact("output", "intelligence_briefing.html", html_report.encode())
+        run["output_path"] = output_path
+        _log(run, "Report revised")
 
     run["stage"] = "completed"
     _log(run, "Intelligence briefing complete and approved for use.")
@@ -514,6 +543,72 @@ Revise accordingly. Maintain the same structure and professional tone."""
     )
 
 
+def _revise_research(model, company: str, research: dict, feedback: str) -> dict:
+    """Re-run research incorporating consultant corrections."""
+    prompt = f"""You previously researched {company} and produced this:
+{json.dumps(research, indent=2)}
+
+The reviewing consultant provided this correction/feedback:
+"{feedback}"
+
+Revise the research to address this feedback. Return the SAME JSON structure with corrected information.
+Return ONLY valid JSON."""
+
+    response = model.invoke(
+        messages=[{"role": "user", "content": prompt}],
+        system="You are revising company research based on consultant corrections. Return only valid JSON.",
+        max_tokens=2000,
+    )
+    revised = _parse_json_response(response)
+    if "error" not in revised:
+        return revised
+    return research
+
+
+def _revise_org_analysis(model, company: str, research: dict, org_analysis: dict, feedback: str) -> dict:
+    """Revise organizational analysis based on feedback."""
+    prompt = f"""You analyzed {company}'s organization and produced:
+{json.dumps(org_analysis, indent=2)}
+
+The consultant provided this direction:
+"{feedback}"
+
+Revise the analysis accordingly. Return the SAME JSON structure.
+Return ONLY valid JSON."""
+
+    response = model.invoke(
+        messages=[{"role": "user", "content": prompt}],
+        system="You are revising organizational analysis. Return only valid JSON.",
+        max_tokens=2500,
+    )
+    revised = _parse_json_response(response)
+    if "error" not in revised:
+        return revised
+    return org_analysis
+
+
+def _revise_opportunities(model, company: str, research: dict, org_analysis: dict, opportunities: dict, feedback: str) -> dict:
+    """Revise engagement opportunities based on feedback."""
+    prompt = f"""You identified engagement opportunities for {company}:
+{json.dumps(opportunities, indent=2)}
+
+The consultant provided this guidance:
+"{feedback}"
+
+Revise the opportunities accordingly. Return the SAME JSON structure.
+Return ONLY valid JSON."""
+
+    response = model.invoke(
+        messages=[{"role": "user", "content": prompt}],
+        system="You are revising consulting engagement opportunities. Return only valid JSON.",
+        max_tokens=3000,
+    )
+    revised = _parse_json_response(response)
+    if "error" not in revised:
+        return revised
+    return opportunities
+
+
 def _render_intelligence_report(model, company: str, research: dict, briefing: str) -> str:
     """Render the briefing as a professional HTML document."""
     import re
@@ -617,7 +712,8 @@ def _log(run: dict, msg: str):
     run["log"].append(_safe_str(msg))
 
 
-def _wait_for_checkpoint(run: dict, name: str, title: str, description: str):
+def _wait_for_checkpoint(run: dict, name: str, title: str, description: str) -> str | None:
+    """Wait for consultant response. Returns revision feedback if revision requested, None if approved."""
     run["stage"] = "waiting_for_approval"
     run["current_checkpoint"] = {
         "name": name,
@@ -627,8 +723,14 @@ def _wait_for_checkpoint(run: dict, name: str, title: str, description: str):
         "requested_at": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
     }
     _log(run, f"Awaiting review: {title}")
-    while run["current_checkpoint"] is not None and run["stage"] != "rejected":
+    while run["current_checkpoint"] is not None:
         time.sleep(0.3)
+
+    # Check if a revision was requested
+    revision = run.pop("_revision_requested", None)
+    if revision and revision["checkpoint"] == name:
+        return revision["feedback"]
+    return None
 
 
 def _get_feedback_for(run: dict, checkpoint_name: str) -> str | None:

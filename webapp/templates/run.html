@@ -97,7 +97,7 @@
         .btn-approve { background: var(--green); color: #fff; }
         .btn-approve:hover { background: #059669; transform: translateY(-1px); }
         .btn-reject { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
-        .btn-reject:hover { border-color: var(--red); color: var(--red); }
+        .btn-reject:hover { border-color: var(--orange); color: var(--orange); }
 
         /* Report link */
         .report-link {
@@ -192,16 +192,24 @@
         <div class="checkpoint-actions">
             <form action="/run/{{ run.run_id }}/approve" method="POST" id="approve-form">
                 <div class="feedback-row">
-                    <textarea name="feedback" class="feedback-input" placeholder="Add feedback or guidance (optional)..." rows="2"></textarea>
+                    <textarea name="feedback" class="feedback-input" id="feedback-input" placeholder="Add direction for the next phase (optional)..." rows="2"></textarea>
                 </div>
                 <div class="btn-row" style="margin-top: 0.6rem;">
                     <button type="submit" class="btn btn-approve">Approve &amp; Continue</button>
-                    <button type="button" class="btn btn-reject" onclick="document.getElementById('reject-form').submit()">Reject</button>
+                    <button type="button" class="btn btn-reject" onclick="submitRevision()">Revise This</button>
                 </div>
             </form>
-            <form action="/run/{{ run.run_id }}/reject" method="POST" id="reject-form" style="display:none;">
-                <input type="hidden" name="reason" value="Rejected by consultant">
+            <form action="/run/{{ run.run_id }}/revise" method="POST" id="revise-form" style="display:none;">
+                <input type="hidden" name="feedback" id="revise-feedback" value="">
             </form>
+            <script>
+            function submitRevision() {
+                var fb = document.getElementById('feedback-input').value.trim();
+                if (!fb) { fb = 'Please revise this section.'; }
+                document.getElementById('revise-feedback').value = fb;
+                document.getElementById('revise-form').submit();
+            }
+            </script>
         </div>
     </div>
     {% endif %}
