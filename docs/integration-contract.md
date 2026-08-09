@@ -200,6 +200,29 @@ This split is the point: a stage that can read microdata **cannot rewrite
 it**. Widening the stage runner instead would have made "read-only"
 meaningless.
 
+### 1.5a Prompt caching has a threshold, and it is not the documented one
+
+Marking a shared prefix `cache_control` is how batched extraction becomes
+affordable — the prefix is billed once at write cost and then at roughly a
+tenth. A prefix below the model's minimum is **accepted and silently
+ignored**: no error, no warning, `usage` simply reports zero.
+
+Measured on this account, Haiku 4.5 through an application inference profile:
+
+| Prefix | Result |
+|---|---|
+| 2,233 tokens | no cache |
+| 4,082 tokens | no cache |
+| 4,887 tokens | **cached** (write, then read on the next call) |
+
+**The real boundary is 4,096 tokens — twice the published 2,048 for Haiku.**
+A prompt sized against the documentation looks cached, bills in full, and on
+a ten-call batch is roughly a 10× overspend that nothing surfaces.
+
+`stages/_bedrock.py` warns when a prefix is marked cacheable and falls below
+the threshold. Re-measure when changing model or region rather than trusting
+either the docs or this table.
+
 ### 1.5 LLM access
 
 Application inference profiles wrap the foundation models so usage is

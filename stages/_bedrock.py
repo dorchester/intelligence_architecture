@@ -35,8 +35,16 @@ MAX_ATTEMPTS = 5
 # and then silently ignored - no error, no warning, and usage simply reports
 # zero cache activity. That is the worst failure shape available: the code
 # looks correct, the cost saving never arrives, and nothing points at why.
-# Haiku requires 2048 tokens; Sonnet 1024. Assume the stricter bound.
-MIN_CACHEABLE_TOKENS = 2048
+#
+# The number below is measured, not documented. Anthropic publishes a 2,048
+# token minimum for Haiku, but bisecting Haiku 4.5 through a Bedrock
+# application inference profile puts the real boundary at 4,096: a 4,082
+# token prefix does not cache and a 4,887 token one does. Trusting the
+# published figure buys a prompt that looks cached, bills in full, and is
+# roughly a 10x overspend on a batched extraction.
+#
+# Re-measure when changing model or region rather than assuming this holds.
+MIN_CACHEABLE_TOKENS = 4096
 _warned_short_prefix = set()
 
 _sem = threading.Semaphore(MAX_CONCURRENCY)
