@@ -50,6 +50,17 @@ def read_jsonl(bucket: str, key: str) -> list[dict]:
     return [json.loads(line) for line in body.decode().splitlines() if line.strip()]
 
 
+def read_parquet(bucket: str, key: str):
+    """Read a parquet object into a DataFrame.
+
+    Fetched through boto3 rather than an s3:// path so the stage needs only
+    the enumerated GetObject grant - no s3fs, no bucket-level listing.
+    """
+    import pandas as pd
+    body = session().client("s3").get_object(Bucket=bucket, Key=key)["Body"].read()
+    return pd.read_parquet(io.BytesIO(body))
+
+
 def put_bytes(bucket: str, key: str, data: bytes, content_type: str) -> None:
     session().client("s3").put_object(
         Bucket=bucket, Key=key, Body=data, ContentType=content_type

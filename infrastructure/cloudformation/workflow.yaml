@@ -202,14 +202,20 @@ Resources:
                   - ecr:GetDownloadUrlForLayer
                   - ecr:BatchCheckLayerAvailability
                 Resource: !GetAtt StagesRepository.Arn
-              # Landing-side source. Read-only, and only the dataset prefix.
+              # Landing-side source data, plus the packaged repository
+              # CodeBuild downloads to get the stage code. Two enumerated
+              # prefixes, not the bucket.
               - Effect: Allow
                 Action: s3:GetObject
                 Resource:
-                  Fn::Sub:
-                    - '${B}/datasets/*'
-                    - B:
-                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+                  - Fn::Sub:
+                      - '${B}/datasets/*'
+                      - B:
+                          Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+                  - Fn::Sub:
+                      - '${B}/build/*'
+                      - B:
+                          Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
               - Effect: Allow
                 Action: s3:ListBucket
                 Resource:
@@ -394,13 +400,31 @@ Resources:
           Value: cloudformation
       DefinitionString: !Sub |
         {
-          "Comment": "Episodic report build: stages, approval, stages, approval, done. Suspended approvals hold zero compute.",
-          "StartAt": "PreApprovalStages",
+          "Comment": "Episodic report build. Approvals carry a decision AND feedback: revising re-runs the phase with that feedback, bounded by max_revisions. Suspended approvals hold zero compute.",
+          "StartAt": "Init",
           "States": {
+            "Init": {
+              "Type": "Pass",
+              "Comment": "Seed revision counters so callers need not supply them.",
+              "Parameters": {
+                "run_label.$": "$.run_label",
+                "pre_approval_stages.$": "$.pre_approval_stages",
+                "post_approval_stages.$": "$.post_approval_stages",
+                "max_revisions": 2,
+                "midpoint_revisions": {"count": 0},
+                "final_revisions": {"count": 0}
+              },
+              "Next": "PreApprovalStages"
+            },
+
             "PreApprovalStages": {
               "Type": "Map",
               "ItemsPath": "$.pre_approval_stages",
               "MaxConcurrency": 1,
+              "ItemSelector": {
+                "buildspec.$": "$$.Map.Item.Value.buildspec",
+                "feedback": ""
+              },
               "ResultPath": null,
               "ItemProcessor": {
                 "ProcessorConfig": {"Mode": "INLINE"},
@@ -411,7 +435,10 @@ Resources:
                     "Resource": "arn:aws:states:::codebuild:startBuild.sync",
                     "Parameters": {
                       "ProjectName": "${StageRunnerProject}",
-                      "BuildspecOverride.$": "$.buildspec"
+                      "BuildspecOverride.$": "$.buildspec",
+                      "EnvironmentVariablesOverride": [
+                        {"Name": "REVISION_FEEDBACK", "Value.$": "$.feedback", "Type": "PLAINTEXT"}
+                      ]
                     },
                     "ResultPath": null,
                     "End": true
@@ -420,6 +447,7 @@ Resources:
               },
               "Next": "MidpointApproval"
             },
+
             "MidpointApproval": {
               "Type": "Task",
               "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
@@ -432,14 +460,73 @@ Resources:
                   "run_label.$": "$.run_label"
                 }
               },
-              "ResultPath": "$.midpoint_approval",
+              "ResultPath": "$.midpoint",
               "TimeoutSeconds": 604800,
-              "Next": "PostApprovalStages"
+              "Next": "MidpointDecision"
             },
+
+            "MidpointDecision": {
+              "Type": "Choice",
+              "Comment": "Revision is a loop, not a dead end - but a bounded one.",
+              "Choices": [
+                {
+                  "And": [
+                    {"Variable": "$.midpoint.decision", "StringEquals": "revise"},
+                    {"Variable": "$.midpoint_revisions.count", "NumericLessThanPath": "$.max_revisions"}
+                  ],
+                  "Next": "CountMidpointRevision"
+                },
+                {"Variable": "$.midpoint.decision", "StringEquals": "reject", "Next": "Rejected"}
+              ],
+              "Default": "PostApprovalStages"
+            },
+
+            "CountMidpointRevision": {
+              "Type": "Pass",
+              "Parameters": {"count.$": "States.MathAdd($.midpoint_revisions.count, 1)"},
+              "ResultPath": "$.midpoint_revisions",
+              "Next": "ReviseMidpointStages"
+            },
+
+            "ReviseMidpointStages": {
+              "Type": "Map",
+              "ItemsPath": "$.pre_approval_stages",
+              "MaxConcurrency": 1,
+              "ItemSelector": {
+                "buildspec.$": "$$.Map.Item.Value.buildspec",
+                "feedback.$": "$.midpoint.feedback"
+              },
+              "ResultPath": null,
+              "ItemProcessor": {
+                "ProcessorConfig": {"Mode": "INLINE"},
+                "StartAt": "RerunStage",
+                "States": {
+                  "RerunStage": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::codebuild:startBuild.sync",
+                    "Parameters": {
+                      "ProjectName": "${StageRunnerProject}",
+                      "BuildspecOverride.$": "$.buildspec",
+                      "EnvironmentVariablesOverride": [
+                        {"Name": "REVISION_FEEDBACK", "Value.$": "$.feedback", "Type": "PLAINTEXT"}
+                      ]
+                    },
+                    "ResultPath": null,
+                    "End": true
+                  }
+                }
+              },
+              "Next": "MidpointApproval"
+            },
+
             "PostApprovalStages": {
               "Type": "Map",
               "ItemsPath": "$.post_approval_stages",
               "MaxConcurrency": 1,
+              "ItemSelector": {
+                "buildspec.$": "$$.Map.Item.Value.buildspec",
+                "feedback": ""
+              },
               "ResultPath": null,
               "ItemProcessor": {
                 "ProcessorConfig": {"Mode": "INLINE"},
@@ -450,7 +537,10 @@ Resources:
                     "Resource": "arn:aws:states:::codebuild:startBuild.sync",
                     "Parameters": {
                       "ProjectName": "${StageRunnerProject}",
-                      "BuildspecOverride.$": "$.buildspec"
+                      "BuildspecOverride.$": "$.buildspec",
+                      "EnvironmentVariablesOverride": [
+                        {"Name": "REVISION_FEEDBACK", "Value.$": "$.feedback", "Type": "PLAINTEXT"}
+                      ]
                     },
                     "ResultPath": null,
                     "End": true
@@ -459,6 +549,7 @@ Resources:
               },
               "Next": "FinalApproval"
             },
+
             "FinalApproval": {
               "Type": "Task",
               "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
@@ -471,10 +562,70 @@ Resources:
                   "run_label.$": "$.run_label"
                 }
               },
-              "ResultPath": "$.final_approval",
+              "ResultPath": "$.final",
               "TimeoutSeconds": 604800,
-              "Next": "Done"
+              "Next": "FinalDecision"
             },
+
+            "FinalDecision": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "And": [
+                    {"Variable": "$.final.decision", "StringEquals": "revise"},
+                    {"Variable": "$.final_revisions.count", "NumericLessThanPath": "$.max_revisions"}
+                  ],
+                  "Next": "CountFinalRevision"
+                },
+                {"Variable": "$.final.decision", "StringEquals": "reject", "Next": "Rejected"}
+              ],
+              "Default": "Done"
+            },
+
+            "CountFinalRevision": {
+              "Type": "Pass",
+              "Parameters": {"count.$": "States.MathAdd($.final_revisions.count, 1)"},
+              "ResultPath": "$.final_revisions",
+              "Next": "ReviseFinalStages"
+            },
+
+            "ReviseFinalStages": {
+              "Type": "Map",
+              "ItemsPath": "$.post_approval_stages",
+              "MaxConcurrency": 1,
+              "ItemSelector": {
+                "buildspec.$": "$$.Map.Item.Value.buildspec",
+                "feedback.$": "$.final.feedback"
+              },
+              "ResultPath": null,
+              "ItemProcessor": {
+                "ProcessorConfig": {"Mode": "INLINE"},
+                "StartAt": "RerunPostStage",
+                "States": {
+                  "RerunPostStage": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::codebuild:startBuild.sync",
+                    "Parameters": {
+                      "ProjectName": "${StageRunnerProject}",
+                      "BuildspecOverride.$": "$.buildspec",
+                      "EnvironmentVariablesOverride": [
+                        {"Name": "REVISION_FEEDBACK", "Value.$": "$.feedback", "Type": "PLAINTEXT"}
+                      ]
+                    },
+                    "ResultPath": null,
+                    "End": true
+                  }
+                }
+              },
+              "Next": "FinalApproval"
+            },
+
+            "Rejected": {
+              "Type": "Fail",
+              "Error": "RejectedByReviewer",
+              "Cause": "A reviewer rejected this build at a checkpoint."
+            },
+
             "Done": {"Type": "Succeed"}
           }
         }
