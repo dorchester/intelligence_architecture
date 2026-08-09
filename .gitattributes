@@ -1,0 +1,6 @@
+# Shell scripts and the Dockerfile must keep LF endings. They run inside Linux
+# containers and CodeBuild; CRLF makes bash fail with "$'\r': command not found".
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
