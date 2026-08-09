@@ -73,7 +73,9 @@ Resources:
                   # post-build smoke test.
                   - ecr:BatchGetImage
                   - ecr:GetDownloadUrlForLayer
-                Resource: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/intelligence-engine-${Environment}-console
+                # All project repositories: the same builder produces the
+                # console image and the workflow stage image.
+                Resource: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/intelligence-engine-${Environment}-*
       Tags:
         - Key: Application
           Value: intelligence-engine

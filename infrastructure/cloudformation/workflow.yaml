@@ -1,0 +1,437 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - episodic workflow harness (Step Functions)
+
+# The orchestration substrate for episodic report builds: a short batch of
+# containerized stages with durable human approvals between them. The private
+# workflow repository supplies the stages; this template supplies the harness
+# they drop into.
+#
+#   stages (Map -> CodeBuild)  ->  approval  ->  stages  ->  approval  ->  done
+#
+# Approvals use waitForTaskToken: the execution suspends holding NOTHING -
+# no compute, no container, no poller - for up to seven days per checkpoint.
+# A tiny Lambda records the token in the runs table; approving calls
+# SendTaskSuccess with that token.
+#
+# Stages run in CodeBuild from the stage base image (python + node +
+# playwright, so render checks are blocking gates). Each stage's buildspec
+# arrives in the execution input - the harness is generic; the workflow
+# repository owns stage content.
+#
+# Cost: pay-per-use only. Standard state transitions (~$0.0005/run),
+# CodeBuild minutes per stage, zero while suspended at approvals.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+Resources:
+
+  # ---------- stage image registry ----------
+
+  StagesRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub intelligence-engine-${Environment}-stages
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules": [
+            {"rulePriority": 1, "description": "Expire untagged after 1 day",
+             "selection": {"tagStatus": "untagged", "countType": "sinceImagePushed",
+                           "countUnit": "days", "countNumber": 1},
+             "action": {"type": "expire"}},
+            {"rulePriority": 2, "description": "Keep 5 tagged",
+             "selection": {"tagStatus": "any", "countType": "imageCountMoreThan",
+                           "countNumber": 5},
+             "action": {"type": "expire"}}
+          ]}
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # ---------- stage runner ----------
+
+  StageRunnerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-stage-runner
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      # The enumerated-grant pattern from the data plane: stages read
+      # row-level silver and publish artifacts because these policies say so,
+      # not because of blanket access.
+      ManagedPolicyArns:
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-silver-read
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-artifacts-publish
+      Policies:
+        - PolicyName: stage-execution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/intelligence-engine-${Environment}-stage*
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchCheckLayerAvailability
+                Resource: !GetAtt StagesRepository.Arn
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/us.anthropic.*
+                  - !Sub arn:aws:bedrock:*:${AWS::AccountId}:application-inference-profile/*
+                  - arn:aws:bedrock:*::foundation-model/anthropic.*
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  StageRunnerProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub intelligence-engine-${Environment}-stage-runner
+      Description: Runs one workflow stage; buildspec arrives from the state machine
+      ServiceRole: !GetAtt StageRunnerRole.Arn
+      TimeoutInMinutes: 30
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - echo "No stage buildspec provided - the harness expects an override"
+                - exit 1
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/intelligence-engine-${Environment}-stages:latest
+        ImagePullCredentialsType: SERVICE_ROLE
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # ---------- approval recorder ----------
+
+  ApprovalFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-wf-approval
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: record-approval
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: dynamodb:PutItem
+                Resource:
+                  Fn::ImportValue: !Sub intelligence-engine-${Environment}-table-arn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/intelligence-engine-${Environment}-wf-approval*
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  ApprovalFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub intelligence-engine-${Environment}-wf-approval
+      Description: Records a pending workflow approval with its task token
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 10
+      MemorySize: 128
+      Role: !GetAtt ApprovalFunctionRole.Arn
+      Environment:
+        Variables:
+          TABLE:
+            Fn::ImportValue: !Sub intelligence-engine-${Environment}-table-name
+      Code:
+        ZipFile: |
+          import json, os, boto3, datetime
+
+          def handler(event, context):
+              table = boto3.resource("dynamodb").Table(os.environ["TABLE"])
+              key = f"wf#{event['execution']}#{event['checkpoint']}"
+              table.put_item(Item={
+                  "run_id": key,
+                  "client_id": "workflow",
+                  "stage": "waiting_for_approval",
+                  "company_name": event.get("run_label", ""),
+                  "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                  "checkpoint": event["checkpoint"],
+                  "task_token": event["task_token"],
+              })
+              return {"recorded": key}
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # ---------- the state machine ----------
+
+  WorkflowRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-workflow
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: orchestrate
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:StopBuild
+                  - codebuild:BatchGetBuilds
+                Resource: !GetAtt StageRunnerProject.Arn
+              # Required by the .sync integration to observe build completion
+              - Effect: Allow
+                Action:
+                  - events:PutRule
+                  - events:PutTargets
+                  - events:DescribeRule
+                Resource: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/StepFunctionsGetEventForCodeBuildStartBuildRule
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt ApprovalFunction.Arn
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  ReportWorkflow:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: !Sub intelligence-engine-${Environment}-report-build
+      StateMachineType: STANDARD
+      RoleArn: !GetAtt WorkflowRole.Arn
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+      DefinitionString: !Sub |
+        {
+          "Comment": "Episodic report build: stages, approval, stages, approval, done. Suspended approvals hold zero compute.",
+          "StartAt": "PreApprovalStages",
+          "States": {
+            "PreApprovalStages": {
+              "Type": "Map",
+              "ItemsPath": "$.pre_approval_stages",
+              "MaxConcurrency": 1,
+              "ResultPath": null,
+              "ItemProcessor": {
+                "ProcessorConfig": {"Mode": "INLINE"},
+                "StartAt": "RunStage",
+                "States": {
+                  "RunStage": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::codebuild:startBuild.sync",
+                    "Parameters": {
+                      "ProjectName": "${StageRunnerProject}",
+                      "BuildspecOverride.$": "$.buildspec"
+                    },
+                    "ResultPath": null,
+                    "End": true
+                  }
+                }
+              },
+              "Next": "MidpointApproval"
+            },
+            "MidpointApproval": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+              "Parameters": {
+                "FunctionName": "${ApprovalFunction}",
+                "Payload": {
+                  "task_token.$": "$$.Task.Token",
+                  "execution.$": "$$.Execution.Name",
+                  "checkpoint": "midpoint_review",
+                  "run_label.$": "$.run_label"
+                }
+              },
+              "ResultPath": "$.midpoint_approval",
+              "TimeoutSeconds": 604800,
+              "Next": "PostApprovalStages"
+            },
+            "PostApprovalStages": {
+              "Type": "Map",
+              "ItemsPath": "$.post_approval_stages",
+              "MaxConcurrency": 1,
+              "ResultPath": null,
+              "ItemProcessor": {
+                "ProcessorConfig": {"Mode": "INLINE"},
+                "StartAt": "RunPostStage",
+                "States": {
+                  "RunPostStage": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::codebuild:startBuild.sync",
+                    "Parameters": {
+                      "ProjectName": "${StageRunnerProject}",
+                      "BuildspecOverride.$": "$.buildspec"
+                    },
+                    "ResultPath": null,
+                    "End": true
+                  }
+                }
+              },
+              "Next": "FinalApproval"
+            },
+            "FinalApproval": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+              "Parameters": {
+                "FunctionName": "${ApprovalFunction}",
+                "Payload": {
+                  "task_token.$": "$$.Task.Token",
+                  "execution.$": "$$.Execution.Name",
+                  "checkpoint": "final_review",
+                  "run_label.$": "$.run_label"
+                }
+              },
+              "ResultPath": "$.final_approval",
+              "TimeoutSeconds": 604800,
+              "Next": "Done"
+            },
+            "Done": {"Type": "Succeed"}
+          }
+        }
+
+  # ---------- golden replay: in-account regression, not hosted runners ----------
+
+  GoldenReplayRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-golden-replay
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: replay
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/intelligence-engine-${Environment}-golden-replay*
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  Fn::Sub:
+                    - '${B}/build/*'
+                    - B:
+                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  GoldenReplayProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub intelligence-engine-${Environment}-golden-replay
+      Description: Full regression in-account - the suite the workflow trusts
+      ServiceRole: !GetAtt GoldenReplayRole.Arn
+      TimeoutInMinutes: 20
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Source:
+        Type: S3
+        Location:
+          Fn::Sub:
+            - '${Bucket}/build/source.zip'
+            - Bucket:
+                Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-name
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.12
+            build:
+              commands:
+                - pip install -q -e ".[dev]"
+                - pytest -q
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+  StateMachineArn:
+    Value: !Ref ReportWorkflow
+  StageRunnerProjectName:
+    Value: !Ref StageRunnerProject
+  StagesRepositoryUri:
+    Value: !GetAtt StagesRepository.RepositoryUri
+  GoldenReplayProjectName:
+    Value: !Ref GoldenReplayProject
+  ApproveCommand:
+    Description: Approve a suspended checkpoint (token from the runs table)
+    Value: aws stepfunctions send-task-success --task-token <token> --task-output '{"approved":true}'
