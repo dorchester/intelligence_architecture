@@ -63,7 +63,7 @@
                         <td>{{ '{:,}'.format(c.headcount) }}</td>
                         <td>{{ '{:,}'.format(c.profile_count) }}</td>
                         <td>{{ '{:,}'.format(c.posting_count) }}</td>
-                        <td><a class="link" href="/engineer/datasets/{{ c.company_id }}">inspect</a></td>
+                        <td><a class="link" href="{{ url_for('engineer.dataset_detail', company_id=c.company_id) }}">inspect</a></td>
                     </tr>
                 {% endfor %}
                 </tbody>

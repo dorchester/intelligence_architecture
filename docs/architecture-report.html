@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Intelligence Engine — Architecture &amp; Implementation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#0a0c10;--surface:#0f1218;--card:#14181f;--elevated:#1a1f28;
+--border:#232936;--border-soft:#1a1f2b;
+--text:#eef1f5;--text-2:#9aa3b5;--text-3:#5f6878;
+--blue:#4d8df7;--purple:#9b6dff;--cyan:#22d3ee;--green:#34d399;
+--amber:#fbbf24;--orange:#fb923c;--red:#f87171;--pink:#f472b6;
+--mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+background:var(--bg);color:var(--text);line-height:1.7;
+-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 2rem}
+
+/* ---------- hero ---------- */
+.hero{padding:5rem 0 3rem;position:relative;overflow:hidden}
+.hero::before{
+content:'';position:absolute;top:-40%;left:50%;transform:translateX(-50%);
+width:900px;height:600px;pointer-events:none;
+background:radial-gradient(ellipse at center,rgba(77,141,247,.07),rgba(155,109,255,.04) 45%,transparent 70%);
+}
+.eyebrow{
+position:relative;font-size:.7rem;font-weight:700;letter-spacing:.14em;
+text-transform:uppercase;color:var(--cyan);margin-bottom:.85rem;
+}
+.hero h1{
+position:relative;font-size:clamp(2rem,5vw,3.1rem);font-weight:900;
+letter-spacing:-.035em;line-height:1.05;margin-bottom:.7rem;
+background:linear-gradient(120deg,#4d8df7,#9b6dff 45%,#22d3ee);
+-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero .lede{
+position:relative;font-size:1.05rem;color:var(--text-2);max-width:64ch;line-height:1.75;
+}
+.chips{position:relative;display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1.6rem}
+.chip{
+padding:.3rem .85rem;border:1px solid var(--border);border-radius:100px;
+font-size:.73rem;font-weight:600;color:var(--text-2);background:var(--card);
+}
+.chip.live{color:var(--green);border-color:rgba(52,211,153,.3)}
+.chip.aws{color:var(--orange);border-color:rgba(251,146,60,.3)}
+
+/* ---------- toc ---------- */
+.toc{
+display:flex;gap:.4rem;flex-wrap:wrap;padding:1rem 0;margin:2rem 0 0;
+border-top:1px solid var(--border-soft);border-bottom:1px solid var(--border-soft);
+position:sticky;top:0;background:rgba(10,12,16,.92);backdrop-filter:blur(12px);z-index:20;
+}
+.toc a{
+font-size:.74rem;font-weight:600;color:var(--text-3);text-decoration:none;
+padding:.3rem .7rem;border-radius:6px;transition:all .15s;
+}
+.toc a:hover{color:var(--text);background:var(--card)}
+
+/* ---------- sections ---------- */
+section{padding:3.5rem 0;border-bottom:1px solid var(--border-soft)}
+section:last-of-type{border-bottom:none}
+.sec-head{margin-bottom:2rem}
+.sec-num{
+font-family:var(--mono);font-size:.72rem;color:var(--cyan);
+font-weight:600;letter-spacing:.1em;
+}
+.sec-head h2{font-size:1.7rem;font-weight:800;letter-spacing:-.025em;margin:.25rem 0 .4rem}
+.sec-head p{font-size:.94rem;color:var(--text-2);max-width:72ch}
+h3{font-size:1.05rem;font-weight:700;margin:2rem 0 .8rem;letter-spacing:-.015em}
+h4{font-size:.88rem;font-weight:700;margin:1.4rem 0 .5rem}
+p{margin-bottom:.9rem;color:var(--text-2);font-size:.92rem}
+p strong{color:var(--text);font-weight:600}
+ul{margin:0 0 1rem 1.2rem}
+li{color:var(--text-2);font-size:.9rem;margin-bottom:.35rem}
+li strong{color:var(--text)}
+code{font-family:var(--mono);font-size:.84em;color:var(--cyan);
+background:var(--surface);padding:.12em .4em;border-radius:4px}
+a.ref{color:var(--blue);text-decoration:none;font-weight:600}
+a.ref:hover{text-decoration:underline}
+
+/* ---------- stats ---------- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.8rem;margin:1.5rem 0}
+.stat{background:var(--card);border:1px solid var(--border-soft);border-radius:12px;
+padding:1.25rem 1rem;text-align:center;transition:all .18s}
+.stat:hover{border-color:var(--border);transform:translateY(-2px)}
+.stat-v{font-size:1.9rem;font-weight:800;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+.stat-l{font-size:.66rem;font-weight:700;color:var(--text-3);text-transform:uppercase;
+letter-spacing:.09em;margin-top:.45rem}
+.stat:nth-child(1) .stat-v{color:var(--green)}
+.stat:nth-child(2) .stat-v{color:var(--blue)}
+.stat:nth-child(3) .stat-v{color:var(--purple)}
+.stat:nth-child(4) .stat-v{color:var(--cyan)}
+.stat:nth-child(5) .stat-v{color:var(--amber)}
+.stat:nth-child(6) .stat-v{color:var(--pink)}
+
+/* ---------- diagram ---------- */
+.diagram{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+padding:2rem 1.5rem;margin:1.5rem 0}
+.diagram svg{display:block;width:100%;height:auto;max-width:1000px;margin:0 auto}
+.dg-cap{font-size:.76rem;color:var(--text-3);text-align:center;margin-top:1rem;font-style:italic}
+
+/* ---------- phase list ---------- */
+.phases{display:flex;flex-direction:column;gap:.55rem;margin:1.5rem 0}
+.phase{display:flex;gap:1.1rem;padding:1.15rem 1.4rem;background:var(--card);
+border:1px solid var(--border-soft);border-radius:12px;transition:border-color .18s}
+.phase:hover{border-color:var(--border)}
+.ph-n{width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;
+align-items:center;justify-content:center;font-size:.72rem;font-weight:800}
+.phase:nth-child(1) .ph-n{background:rgba(155,109,255,.15);color:var(--purple)}
+.phase:nth-child(2) .ph-n{background:rgba(77,141,247,.15);color:var(--blue)}
+.phase:nth-child(3) .ph-n{background:rgba(34,211,238,.15);color:var(--cyan)}
+.phase:nth-child(4) .ph-n{background:rgba(52,211,153,.15);color:var(--green)}
+.phase:nth-child(5) .ph-n{background:rgba(251,191,36,.15);color:var(--amber)}
+.phase:nth-child(6) .ph-n{background:rgba(251,146,60,.15);color:var(--orange)}
+.phase:nth-child(7) .ph-n{background:rgba(244,114,182,.15);color:var(--pink)}
+.ph-body{flex:1;min-width:0}
+.ph-t{font-size:.92rem;font-weight:700;margin-bottom:.15rem}
+.ph-d{font-size:.85rem;color:var(--text-2);line-height:1.6}
+.ph-m{font-family:var(--mono);font-size:.71rem;color:var(--text-3);margin-top:.35rem}
+.ph-cp{display:inline-block;font-size:.63rem;font-weight:700;padding:.13rem .45rem;
+border-radius:4px;background:rgba(251,191,36,.13);color:var(--amber);
+text-transform:uppercase;letter-spacing:.05em;margin-left:.5rem;vertical-align:middle}
+
+/* ---------- tri columns ---------- */
+.tri{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:1.5rem 0}
+.tri-c{background:var(--card);border:1px solid var(--border-soft);border-radius:12px;padding:1.35rem}
+.tri-c h4{font-size:.74rem;text-transform:uppercase;letter-spacing:.08em;
+padding-bottom:.6rem;margin:0 0 .7rem;border-bottom:1px solid var(--border-soft)}
+.tri-c:nth-child(1) h4{color:var(--purple)}
+.tri-c:nth-child(2) h4{color:var(--blue)}
+.tri-c:nth-child(3) h4{color:var(--red)}
+.tri-c ul{margin:0;list-style:none}
+.tri-c li{font-size:.82rem;padding:.32rem 0;border-bottom:1px solid rgba(35,41,54,.5)}
+.tri-c li:last-child{border-bottom:none}
+
+/* ---------- table ---------- */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border-soft);border-radius:12px;margin:1.25rem 0}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:.85rem;min-width:560px}
+th{background:var(--surface);padding:.75rem 1rem;text-align:left;font-size:.66rem;
+font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);
+white-space:nowrap}
+td{padding:.72rem 1rem;border-top:1px solid var(--border-soft);color:var(--text-2);vertical-align:top}
+td strong{color:var(--text)}
+tbody tr:hover td{background:var(--surface)}
+
+/* ---------- cards ---------- */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:1rem;margin:1.5rem 0}
+.card{background:var(--card);border:1px solid var(--border-soft);border-radius:12px;
+padding:1.35rem;transition:all .18s}
+.card:hover{border-color:var(--border);transform:translateY(-2px)}
+.card-h{display:flex;align-items:center;gap:.7rem;margin-bottom:.6rem}
+.card-i{width:32px;height:32px;border-radius:8px;background:var(--elevated);
+display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.card-i svg{width:16px;height:16px}
+.card-t{font-size:.88rem;font-weight:700}
+.card-p{font-family:var(--mono);font-size:.68rem;color:var(--text-3)}
+.card-d{font-size:.83rem;color:var(--text-2);line-height:1.6}
+.tags{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.75rem}
+.tag{font-size:.63rem;font-weight:600;padding:.16rem .5rem;border-radius:5px;
+background:var(--surface);color:var(--text-3);border:1px solid var(--border-soft)}
+.tag.aws{color:var(--orange);border-color:rgba(251,146,60,.22)}
+.tag.py{color:var(--blue);border-color:rgba(77,141,247,.22)}
+.tag.g{color:var(--green);border-color:rgba(52,211,153,.22)}
+.tag.r{color:var(--red);border-color:rgba(248,113,113,.22)}
+
+/* ---------- callout ---------- */
+.callout{border-left:3px solid var(--blue);background:var(--card);
+border-radius:0 10px 10px 0;padding:1.05rem 1.3rem;margin:1.25rem 0}
+.callout.warn{border-left-color:var(--amber)}
+.callout.danger{border-left-color:var(--red)}
+.callout.good{border-left-color:var(--green)}
+.callout h4{margin:0 0 .3rem;font-size:.85rem}
+.callout p{margin:0;font-size:.85rem;line-height:1.65}
+
+/* ---------- code block ---------- */
+pre{background:var(--surface);border:1px solid var(--border-soft);border-radius:10px;
+padding:1.05rem 1.2rem;overflow-x:auto;margin:1rem 0}
+pre code{background:none;padding:0;font-size:.76rem;line-height:1.75;color:var(--text-2)}
+.cmt{color:var(--text-3)}
+.kw{color:var(--purple)}
+.str{color:var(--green)}
+
+/* ---------- guardrail grid ---------- */
+.gr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:.7rem;margin:1.25rem 0}
+.gr{background:var(--card);border:1px solid var(--border-soft);border-radius:10px;padding:.95rem 1.1rem}
+.gr-h{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.35rem}
+.gr-n{font-family:var(--mono);font-size:.76rem;font-weight:600}
+.sev{font-size:.6rem;font-weight:700;padding:.12rem .42rem;border-radius:4px;
+text-transform:uppercase;letter-spacing:.05em}
+.sev.block{background:rgba(248,113,113,.14);color:var(--red)}
+.sev.warn{background:rgba(251,191,36,.14);color:var(--amber)}
+.gr-d{font-size:.78rem;color:var(--text-2);line-height:1.55}
+
+footer{padding:3rem 0;text-align:center}
+footer p{font-size:.76rem;color:var(--text-3);margin-bottom:.25rem}
+
+@media(max-width:820px){
+.tri{grid-template-columns:1fr}
+.wrap{padding:0 1.25rem}
+.toc{overflow-x:auto;flex-wrap:nowrap}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Reference Architecture</div>
+  <h1>Intelligence Engine</h1>
+  <p class="lede">
+    An agentic pre-engagement intelligence tool for management consultants working in
+    organization, workforce, and change. It researches a real company, grounds the
+    analysis in a workforce dataset, and produces a briefing — pausing at five
+    checkpoints where a consultant validates, corrects, and redirects the work.
+  </p>
+  <div class="chips">
+    <span class="chip live">Implemented &amp; running</span>
+    <span class="chip aws">Amazon Bedrock</span>
+    <span class="chip aws">S3 · DynamoDB · CloudWatch</span>
+    <span class="chip">Claude Sonnet 4.6</span>
+    <span class="chip">us-east-1</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#overview">Overview</a>
+  <a href="#personas">Two Consoles</a>
+  <a href="#workflow">Workflow</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#datasets">Datasets</a>
+  <a href="#guardrails">Guardrails</a>
+  <a href="#isolation">Isolation</a>
+  <a href="#separation">Separation of Concerns</a>
+  <a href="#components">Components</a>
+  <a href="#aws">AWS Resources</a>
+  <a href="#running">Running It</a>
+  <a href="#corporate">Corporate Path</a>
+  <a href="#limits">Known Limits</a>
+</nav>
+
+<!-- ============ OVERVIEW ============ -->
+<section id="overview">
+  <div class="sec-head">
+    <div class="sec-num">01</div>
+    <h2>What It Actually Does</h2>
+    <p>Not a demo harness — a working tool with real LLM research, real AWS storage, and enforced guardrails.</p>
+  </div>
+
+  <p>
+    A consultant enters a company name. The engine verifies the company is real, loads a
+    workforce dataset if one exists for it, then runs four LLM phases — research,
+    organizational analysis, opportunity identification, briefing generation — before
+    rendering a formatted HTML report. Between each phase the run <strong>pauses</strong>
+    and waits for the consultant.
+  </p>
+  <p>
+    At every checkpoint the consultant can <strong>approve</strong> (optionally with
+    direction that carries into later phases) or <strong>request a revision</strong>,
+    which sends their feedback back to the model and regenerates that phase. Revision is
+    a loop, not a dead end — there is no "reject and start over."
+  </p>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-v">20</div><div class="stat-l">Client Datasets</div></div>
+    <div class="stat"><div class="stat-v">10k</div><div class="stat-l">Employee Profiles</div></div>
+    <div class="stat"><div class="stat-v">10k</div><div class="stat-l">Job Postings</div></div>
+    <div class="stat"><div class="stat-v">5</div><div class="stat-l">Checkpoints</div></div>
+    <div class="stat"><div class="stat-v">14</div><div class="stat-l">Guardrails</div></div>
+    <div class="stat"><div class="stat-v">46</div><div class="stat-l">Tests Passing</div></div>
+  </div>
+</section>
+
+<!-- ============ PERSONAS ============ -->
+<section id="personas">
+  <div class="sec-head">
+    <div class="sec-num">02</div>
+    <h2>Two Separate Consoles</h2>
+    <p>The consultant and the engineer use different interfaces. They are separate Flask blueprints in separate modules.</p>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-h">
+        <div class="card-i"><svg viewBox="0 0 24 24" fill="none" stroke="#9b6dff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>
+        <div><div class="card-t">Consultant Console</div><div class="card-p">/ · webapp/app.py</div></div>
+      </div>
+      <div class="card-d">
+        Pick a client or type any company. Watch progress. Approve or revise at each
+        checkpoint. Read the finished briefing. No infrastructure, no logs, no model IDs —
+        nothing that isn't a decision they need to make.
+      </div>
+      <div class="tags"><span class="tag py">Flask</span><span class="tag">5 checkpoints</span><span class="tag g">no engineer links</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">
+        <div class="card-i"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
+        <div><div class="card-t">Engineer Console</div><div class="card-p">/engineer · webapp/engineer.py</div></div>
+      </div>
+      <div class="card-d">
+        System state, every run's full trace, guardrail rules with a live YAML editor,
+        dataset inventory, and the exact context string the LLM receives. Mounted as a
+        blueprint that can be switched off with <code>ENGINEER_CONSOLE=0</code>.
+      </div>
+      <div class="tags"><span class="tag py">Blueprint</span><span class="tag">YAML editor</span><span class="tag r">separable</span></div>
+    </div>
+  </div>
+
+  <div class="callout good">
+    <h4>Structural, not cosmetic</h4>
+    <p>
+      The consultant templates contain zero links to <code>/engineer</code>. The engineer
+      blueprint lives in its own module with its own template family and its own base
+      layout. In a corporate deployment it would be served behind different auth, or not
+      registered at all in the consultant-facing process.
+    </p>
+  </div>
+</section>
+
+<!-- ============ WORKFLOW ============ -->
+<section id="workflow">
+  <div class="sec-head">
+    <div class="sec-num">03</div>
+    <h2>The Seven-Stage Workflow</h2>
+    <p>Two setup phases, then four LLM phases and a render — with five consultant checkpoints woven through.</p>
+  </div>
+
+  <div class="phases">
+    <div class="phase">
+      <div class="ph-n">0a</div>
+      <div class="ph-body">
+        <div class="ph-t">Entity Verification</div>
+        <div class="ph-d">
+          Before spending a single Sonnet token, a cheap Haiku call confirms the company is
+          real and identifiable. Gibberish, placeholders, and known-fictional companies are
+          blocked. Low-confidence names surface to the consultant for confirmation.
+        </div>
+        <div class="ph-m">guardrails.check_company_exists() · claude-haiku-4-5</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-n">0b</div>
+      <div class="ph-body">
+        <div class="ph-t">Workforce Dataset Load</div>
+        <div class="ph-d">
+          If the company has a dataset in S3, the query layer reads its profiles and
+          postings and computes roughly thirty signals — tenure and flight risk by
+          department, hiring velocity, hardest-to-fill roles, compensation bands. These are
+          rendered into a compact context block injected into every downstream prompt.
+        </div>
+        <div class="ph-m">datasets/query.py · DatasetQuery.summarize()</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-n">1</div>
+      <div class="ph-body">
+        <div class="ph-t">Company Research<span class="ph-cp">Checkpoint 1</span></div>
+        <div class="ph-d">
+          Claude returns structured facts: headcount, revenue, CEO, segments, recent
+          developments, workforce and organizational context. Completeness is checked and
+          the call retried if required fields are missing. Headcount is sanity-checked
+          against the dataset. The consultant validates and corrects.
+        </div>
+        <div class="ph-m">_research_company() → research.json</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-n">2</div>
+      <div class="ph-body">
+        <div class="ph-t">Organizational Analysis<span class="ph-cp">Checkpoint 2</span></div>
+        <div class="ph-d">
+          Structure, workforce composition, challenges, talent risks, culture signals, and
+          transformation readiness — grounded in the measured dataset figures rather than
+          recalled generalities. The consultant can redirect focus.
+        </div>
+        <div class="ph-m">_analyze_organization() → org_analysis.json</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-n">3</div>
+      <div class="ph-body">
+        <div class="ph-t">Engagement Opportunities<span class="ph-cp">Checkpoint 3</span></div>
+        <div class="ph-d">
+          Four to six specific consulting opportunities, each with a description, expected
+          impact, urgency, and service line. Sized against the workforce data. The
+          consultant prioritizes or adds what the analysis missed.
+        </div>
+        <div class="ph-m">_identify_opportunities() → opportunities.json</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-n">4</div>
+      <div class="ph-body">
+        <div class="ph-t">Briefing Generation<span class="ph-cp">Checkpoint 4</span></div>
+        <div class="ph-d">
+          An 800–1200 word briefing: executive summary, company overview, organizational
+          landscape, challenges, prioritized opportunities, and preparation notes covering
+          stakeholders to map and sensitive topics. All accumulated consultant feedback
+          feeds this prompt.
+        </div>
+        <div class="ph-m">_generate_briefing() → briefing.md</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="ph-n">5</div>
+      <div class="ph-body">
+        <div class="ph-t">Report Render<span class="ph-cp">Checkpoint 5</span></div>
+        <div class="ph-d">
+          The briefing becomes a formatted HTML document suitable for internal circulation.
+          The consultant reviews and approves for delivery, or requests final adjustments.
+        </div>
+        <div class="ph-m">_render_intelligence_report() → intelligence_briefing.html</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <h4>Feedback compounds forward</h4>
+    <p>
+      A correction at checkpoint 1 is passed into phases 2, 3, and 4. Feedback isn't
+      consumed and discarded — it accumulates into the context of every subsequent call,
+      and the full history is written to <code>feedback_log.json</code> alongside the report.
+    </p>
+  </div>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section id="architecture">
+  <div class="sec-head">
+    <div class="sec-num">04</div>
+    <h2>System Architecture</h2>
+    <p>Resource topology and data paths as deployed.</p>
+  </div>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1000 620" xmlns="http://www.w3.org/2000/svg" font-family="Inter,system-ui,sans-serif">
+      <defs>
+        <marker id="a-pu" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+          <path d="M1 1L9 5L1 9" fill="none" stroke="#9b6dff" stroke-width="1.5" stroke-linecap="round"/></marker>
+        <marker id="a-bl" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+          <path d="M1 1L9 5L1 9" fill="none" stroke="#4d8df7" stroke-width="1.5" stroke-linecap="round"/></marker>
+        <marker id="a-gr" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+          <path d="M1 1L9 5L1 9" fill="none" stroke="#34d399" stroke-width="1.5" stroke-linecap="round"/></marker>
+        <marker id="a-or" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+          <path d="M1 1L9 5L1 9" fill="none" stroke="#fb923c" stroke-width="1.5" stroke-linecap="round"/></marker>
+        <marker id="a-cy" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+          <path d="M1 1L9 5L1 9" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round"/></marker>
+        <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse">
+          <circle cx="2" cy="2" r=".7" fill="rgba(95,104,120,.18)"/></pattern>
+      </defs>
+      <rect width="1000" height="620" fill="url(#dots)"/>
+
+      <!-- consultant -->
+      <rect x="40" y="24" width="200" height="62" rx="11" fill="#14181f" stroke="#9b6dff" stroke-width="1.4"/>
+      <text x="140" y="50" text-anchor="middle" fill="#eef1f5" font-size="13" font-weight="700">Consultant Console</text>
+      <text x="140" y="70" text-anchor="middle" fill="#5f6878" font-size="10.5">webapp/app.py</text>
+
+      <!-- engineer -->
+      <rect x="270" y="24" width="200" height="62" rx="11" fill="#14181f" stroke="#22d3ee" stroke-width="1.4" stroke-dasharray="5 3"/>
+      <text x="370" y="50" text-anchor="middle" fill="#eef1f5" font-size="13" font-weight="700">Engineer Console</text>
+      <text x="370" y="70" text-anchor="middle" fill="#5f6878" font-size="10.5">webapp/engineer.py (blueprint)</text>
+
+      <path d="M140 86 L140 122" stroke="#9b6dff" stroke-width="1.5" marker-end="url(#a-pu)"/>
+      <path d="M370 86 C370 105, 300 105, 260 122" stroke="#22d3ee" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#a-cy)"/>
+
+      <!-- guardrails -->
+      <rect x="40" y="124" width="430" height="58" rx="11" fill="#14181f" stroke="#f87171" stroke-width="1.4"/>
+      <rect x="40" y="124" width="430" height="58" rx="11" fill="rgba(248,113,113,.04)"/>
+      <text x="255" y="148" text-anchor="middle" fill="#eef1f5" font-size="12.5" font-weight="700">Guardrail Engine</text>
+      <text x="255" y="167" text-anchor="middle" fill="#9aa3b5" font-size="10">input validation · entity verification · output checks · cost limits</text>
+
+      <path d="M255 182 L255 214" stroke="#9b6dff" stroke-width="1.5" marker-end="url(#a-pu)"/>
+
+      <!-- orchestrator -->
+      <rect x="40" y="216" width="430" height="104" rx="13" fill="#14181f" stroke="#4d8df7" stroke-width="1.4"/>
+      <rect x="40" y="216" width="430" height="104" rx="13" fill="rgba(77,141,247,.04)"/>
+      <text x="255" y="243" text-anchor="middle" fill="#eef1f5" font-size="14" font-weight="700">Run Orchestrator</text>
+      <text x="255" y="263" text-anchor="middle" fill="#9aa3b5" font-size="10.5">4 LLM phases · 5 checkpoints · revision loops</text>
+      <text x="255" y="284" text-anchor="middle" fill="#22d3ee" font-size="10" font-family="JetBrains Mono,monospace">_execute_run_inner()</text>
+      <text x="255" y="304" text-anchor="middle" fill="#5f6878" font-size="9.5">background thread per run · in-memory state</text>
+
+      <!-- dataset query -->
+      <rect x="40" y="352" width="205" height="96" rx="11" fill="#14181f" stroke="#34d399" stroke-width="1.4"/>
+      <rect x="40" y="352" width="205" height="96" rx="11" fill="rgba(52,211,153,.03)"/>
+      <text x="142" y="377" text-anchor="middle" fill="#eef1f5" font-size="12" font-weight="700">Dataset Query</text>
+      <text x="142" y="396" text-anchor="middle" fill="#9aa3b5" font-size="10">~30 workforce signals</text>
+      <text x="142" y="414" text-anchor="middle" fill="#9aa3b5" font-size="10">company-scoped keys</text>
+      <text x="142" y="435" text-anchor="middle" fill="#34d399" font-size="9.5">datasets/query.py</text>
+      <path d="M142 320 L142 350" stroke="#34d399" stroke-width="1.5" marker-end="url(#a-gr)"/>
+
+      <!-- methodology / prompts -->
+      <rect x="265" y="352" width="205" height="96" rx="11" fill="#14181f" stroke="#9b6dff" stroke-width="1.1" stroke-dasharray="5 3"/>
+      <text x="367" y="377" text-anchor="middle" fill="#eef1f5" font-size="12" font-weight="700">Prompts &amp; Methodology</text>
+      <text x="367" y="396" text-anchor="middle" fill="#9aa3b5" font-size="10">version-controlled Markdown</text>
+      <text x="367" y="414" text-anchor="middle" fill="#9aa3b5" font-size="10">guardrails/config.yaml</text>
+      <text x="367" y="435" text-anchor="middle" fill="#9b6dff" font-size="9.5">engineer-tunable</text>
+      <path d="M367 352 L367 322" stroke="#9b6dff" stroke-width="1.1" stroke-dasharray="4 3" marker-end="url(#a-pu)"/>
+
+      <!-- bedrock -->
+      <rect x="770" y="24" width="190" height="96" rx="12" fill="#14181f" stroke="#4d8df7" stroke-width="1.4"/>
+      <rect x="770" y="24" width="190" height="96" rx="12" fill="rgba(77,141,247,.04)"/>
+      <text x="865" y="50" text-anchor="middle" fill="#eef1f5" font-size="13" font-weight="700">Amazon Bedrock</text>
+      <text x="865" y="70" text-anchor="middle" fill="#9aa3b5" font-size="10">Claude Sonnet 4.6 — engine</text>
+      <text x="865" y="88" text-anchor="middle" fill="#9aa3b5" font-size="10">Claude Haiku 4.5 — verify</text>
+      <text x="865" y="107" text-anchor="middle" fill="#4d8df7" font-size="9.5">cross-region inference profiles</text>
+      <path d="M470 250 C560 250, 620 72, 730 72 L768 72" stroke="#4d8df7" stroke-width="1.5" stroke-dasharray="6 3" fill="none" marker-end="url(#a-bl)"/>
+      <text x="605" y="140" text-anchor="middle" fill="#4d8df7" font-size="9.5" font-weight="500">inference</text>
+
+      <!-- s3 -->
+      <rect x="540" y="200" width="240" height="190" rx="13" fill="#14181f" stroke="#fb923c" stroke-width="1.4"/>
+      <rect x="540" y="200" width="240" height="190" rx="13" fill="rgba(251,146,60,.03)"/>
+      <text x="660" y="226" text-anchor="middle" fill="#eef1f5" font-size="13.5" font-weight="700">Amazon S3</text>
+      <text x="660" y="245" text-anchor="middle" fill="#fb923c" font-size="9" font-family="JetBrains Mono,monospace">intelligence-engine-dev-runs-*</text>
+      <line x1="560" y1="258" x2="760" y2="258" stroke="#232936" stroke-width="1"/>
+      <text x="562" y="277" fill="#9aa3b5" font-size="10">datasets/{company_id}/</text>
+      <text x="574" y="295" fill="#9aa3b5" font-size="9.5">profiles.jsonl · postings.jsonl</text>
+      <text x="562" y="320" fill="#9aa3b5" font-size="10">runs/{client_id}/{run_id}/</text>
+      <text x="574" y="338" fill="#9aa3b5" font-size="9.5">input/ · working/</text>
+      <text x="574" y="355" fill="#34d399" font-size="9.5" font-weight="600">output/report.html</text>
+      <text x="660" y="378" text-anchor="middle" fill="#5f6878" font-size="8.8">versioned · AES-256 · TLS-only · private</text>
+      <path d="M470 268 L538 268" stroke="#fb923c" stroke-width="1.5" marker-end="url(#a-or)"/>
+      <path d="M245 396 C400 396, 460 320, 538 302" stroke="#34d399" stroke-width="1.3" fill="none" marker-end="url(#a-gr)"/>
+
+      <!-- dynamodb -->
+      <rect x="540" y="418" width="240" height="112" rx="13" fill="#14181f" stroke="#f87171" stroke-width="1.4"/>
+      <rect x="540" y="418" width="240" height="112" rx="13" fill="rgba(248,113,113,.03)"/>
+      <text x="660" y="444" text-anchor="middle" fill="#eef1f5" font-size="13.5" font-weight="700">Amazon DynamoDB</text>
+      <text x="660" y="463" text-anchor="middle" fill="#f87171" font-size="9" font-family="JetBrains Mono,monospace">intelligence-engine-dev-runs</text>
+      <text x="562" y="486" fill="#9aa3b5" font-size="10">PK run_id · GSI client_id</text>
+      <text x="562" y="504" fill="#9aa3b5" font-size="10">stage · checkpoints[] · timestamps</text>
+      <text x="660" y="522" text-anchor="middle" fill="#5f6878" font-size="8.8">PAY_PER_REQUEST · point-in-time recovery</text>
+      <path d="M300 320 L300 340 L510 340 L510 470 L538 470" stroke="#f87171" stroke-width="1.4" fill="none" marker-end="url(#a-or)"/>
+
+      <!-- cloudwatch -->
+      <rect x="770" y="150" width="190" height="96" rx="12" fill="#14181f" stroke="#22d3ee" stroke-width="1.4"/>
+      <rect x="770" y="150" width="190" height="96" rx="12" fill="rgba(34,211,238,.03)"/>
+      <text x="865" y="176" text-anchor="middle" fill="#eef1f5" font-size="13" font-weight="700">CloudWatch</text>
+      <text x="865" y="196" text-anchor="middle" fill="#9aa3b5" font-size="10">token · latency · cache</text>
+      <text x="865" y="214" text-anchor="middle" fill="#9aa3b5" font-size="10">errors · TTFT</text>
+      <text x="865" y="233" text-anchor="middle" fill="#22d3ee" font-size="9.5">usage dashboard</text>
+      <path d="M865 120 L865 148" stroke="#22d3ee" stroke-width="1.1" stroke-dasharray="3 2" marker-end="url(#a-cy)"/>
+
+      <!-- legend -->
+      <rect x="40" y="556" width="920" height="46" rx="10" fill="#0f1218" stroke="#232936" stroke-width="1"/>
+      <text x="64" y="578" fill="#5f6878" font-size="9.5" font-weight="700">LEGEND</text>
+      <line x1="132" y1="576" x2="160" y2="576" stroke="#9b6dff" stroke-width="2"/>
+      <text x="167" y="580" fill="#9aa3b5" font-size="9.5">control flow</text>
+      <line x1="252" y1="576" x2="280" y2="576" stroke="#fb923c" stroke-width="2"/>
+      <text x="287" y="580" fill="#9aa3b5" font-size="9.5">artifact write</text>
+      <line x1="378" y1="576" x2="406" y2="576" stroke="#4d8df7" stroke-width="2" stroke-dasharray="5 3"/>
+      <text x="413" y="580" fill="#9aa3b5" font-size="9.5">LLM inference</text>
+      <line x1="512" y1="576" x2="540" y2="576" stroke="#34d399" stroke-width="2"/>
+      <text x="547" y="580" fill="#9aa3b5" font-size="9.5">dataset read</text>
+      <line x1="648" y1="576" x2="676" y2="576" stroke="#f87171" stroke-width="2"/>
+      <text x="683" y="580" fill="#9aa3b5" font-size="9.5">state update</text>
+      <text x="800" y="580" fill="#5f6878" font-size="9">All infra via CloudFormation</text>
+    </svg>
+    <div class="dg-cap">Every durable resource is defined in CloudFormation. No account IDs are committed to the repository.</div>
+  </div>
+</section>
+
+<!-- ============ DATASETS ============ -->
+<section id="datasets">
+  <div class="sec-head">
+    <div class="sec-num">05</div>
+    <h2>Synthetic Workforce Datasets</h2>
+    <p>Twenty anonymized client archetypes, each with employee profiles and two years of hiring history, stored in S3.</p>
+  </div>
+
+  <h3>How they are generated</h3>
+  <p>
+    A hybrid approach keeps token cost bounded while producing industry-accurate data.
+    Bedrock generates each company's <strong>organizational template</strong> — departments,
+    five-rung title ladders, domain skills, typical degrees, tenure and turnover
+    characteristics, plus hiring categories with locations and remote ratios. Python then
+    generates <strong>volume</strong> from that template deterministically, seeded per
+    company so runs are reproducible.
+  </p>
+  <p>
+    The template call is split into two focused requests. A combined request reliably
+    exceeded the output token budget and returned truncated JSON; splitting it, plus a
+    retry that escalates <code>max_tokens</code> on a parse failure, made generation
+    reliable.
+  </p>
+
+  <div class="callout good">
+    <h4>The data is genuinely industry-specific</h4>
+    <p>
+      A pharmaceutical client yields departments like <em>Clinical Development &amp;
+      Medical Affairs</em>, roles like <em>Medical Monitor</em>, and required skills like
+      <em>GCP compliance</em>, <em>biostatistics</em>, and <em>regulatory submissions</em> —
+      not generic corporate placeholders.
+    </p>
+  </div>
+
+  <h3>What each record contains</h3>
+  <div class="cards">
+    <div class="card">
+      <div class="card-h">
+        <div class="card-i"><svg viewBox="0 0 24 24" fill="none" stroke="#4d8df7" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="7" r="4"/><path d="M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg></div>
+        <div><div class="card-t">Employee Profile</div><div class="card-p">profiles.jsonl</div></div>
+      </div>
+      <div class="card-d">
+        Name, title, department, seniority, location, tenure, age, education, skills,
+        connection count. Full job history distinguishing internal promotions from external
+        moves. Six months of social activity with post type, topic, and engagement counts.
+        A computed turnover risk score and an <code>open_to_opportunities</code> flag.
+      </div>
+      <div class="tags"><span class="tag g">500 per company</span><span class="tag">tenure-correlated risk</span></div>
+    </div>
+    <div class="card">
+      <div class="card-h">
+        <div class="card-i"><svg viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
+        <div><div class="card-t">Job Posting</div><div class="card-p">postings.jsonl</div></div>
+      </div>
+      <div class="card-d">
+        Title, department, location, work arrangement, seniority, posted date across a
+        24-month window, lifecycle status, salary band, applicant count, days to fill, and
+        required skills drawn from the matching department's skill pool.
+      </div>
+      <div class="tags"><span class="tag g">500 per company</span><span class="tag">24-month history</span></div>
+    </div>
+  </div>
+
+  <h3>Signals the query layer computes</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>Category</th><th>Signals</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Composition</strong></td><td>Department, seniority, and location distributions; top skills on hand; top universities</td></tr>
+      <tr><td><strong>Retention</strong></td><td>Average and median tenure; tenure by department; flight risk overall and by department; share signalling openness to opportunities</td></tr>
+      <tr><td><strong>Mobility</strong></td><td>External-hire vs internal-promotion ratio; average prior employers per person</td></tr>
+      <tr><td><strong>Hiring</strong></td><td>Postings by department and quarter; active roles; average days to fill overall and by department; hardest-to-fill titles; remote share; seniority demand mix</td></tr>
+      <tr><td><strong>Compensation</strong></td><td>Posted salary midpoint by seniority band</td></tr>
+      <tr><td><strong>Demand</strong></td><td>Most-requested skills across postings; hiring velocity trend quarter over quarter</td></tr>
+      <tr><td><strong>Social</strong></td><td>Share of profiles with recent activity; job-change post count; common discussion topics</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>
+    These are rendered by <code>DatasetSummary.to_agent_context()</code> into a compact text
+    block that is injected into the research, analysis, opportunity, and briefing prompts.
+    The engineer console shows this exact string, so what the model sees is never a mystery.
+  </p>
+</section>
+
+<!-- ============ GUARDRAILS ============ -->
+<section id="guardrails">
+  <div class="sec-head">
+    <div class="sec-num">06</div>
+    <h2>Guardrails</h2>
+    <p>Fourteen rules across four categories, configured in YAML and tunable from the engineer console without touching code.</p>
+  </div>
+
+  <p>
+    Every rule carries <code>enabled</code>, a <code>severity</code> of
+    <strong>block</strong>, <strong>warn</strong>, or <strong>log</strong>, and its own
+    parameters. Checks never raise on a policy failure — they return a result the caller
+    interprets. Severity decides behavior: block halts the run, warn annotates the UI and
+    logs, log records silently.
+  </p>
+
+  <h4>Input validation — before any token spend</h4>
+  <div class="gr-grid">
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">company_name_format</span><span class="sev block">block</span></div>
+      <div class="gr-d">Length bounds, alphabetic ratio, no-vowel token detection, repeated-character limit, keyboard-run patterns, and a placeholder blocklist.</div>
+    </div>
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">prompt_injection</span><span class="sev block">block</span></div>
+      <div class="gr-d">Scans the company and context fields for instruction-override patterns, role reassignment, and system-prompt extraction attempts.</div>
+    </div>
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">engagement_context_length</span><span class="sev warn">warn</span></div>
+      <div class="gr-d">Flags unusually long context that would inflate token cost across four downstream prompts.</div>
+    </div>
+  </div>
+
+  <h4>Entity verification</h4>
+  <div class="gr-grid">
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">company_exists</span><span class="sev block">block</span></div>
+      <div class="gr-d">A Haiku call confirms the organization is real. Fictional companies blocked by default; low-confidence names surface to the consultant rather than failing outright.</div>
+    </div>
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">company_size_sanity</span><span class="sev warn">warn</span></div>
+      <div class="gr-d">Parses headcount from formats like <code>~43,000</code> or <code>40,000-45,000</code> and flags implausible values or large deviation from the dataset.</div>
+    </div>
+  </div>
+
+  <h4>Output validation</h4>
+  <div class="gr-grid">
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">pii_leakage</span><span class="sev block">block</span></div>
+      <div class="gr-d">Blocks output containing SSN patterns, card numbers, or non-synthetic email addresses.</div>
+    </div>
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">hallucination_markers</span><span class="sev warn">warn</span></div>
+      <div class="gr-d">Flags hedging and placeholder language — "I don't have information", "XYZ Corp", "[insert", "for illustrative purposes".</div>
+    </div>
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">research_completeness</span><span class="sev warn">warn</span></div>
+      <div class="gr-d">Verifies downstream-required fields are present and retries the call before continuing.</div>
+    </div>
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">minimum_length</span><span class="sev warn">warn</span></div>
+      <div class="gr-d">Catches truncated or empty responses that would otherwise flow silently into the report.</div>
+    </div>
+  </div>
+
+  <h4>Cost and access controls</h4>
+  <div class="gr-grid">
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">max_tokens_per_run</span><span class="sev block">block</span></div>
+      <div class="gr-d">Hard ceiling on per-run token spend.</div>
+    </div>
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">max_revisions_per_checkpoint</span><span class="sev block">block</span></div>
+      <div class="gr-d">Bounds the revision loop so a checkpoint cannot cycle indefinitely.</div>
+    </div>
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">max_concurrent_runs</span><span class="sev block">block</span></div>
+      <div class="gr-d">Limits simultaneous runs to control burst cost.</div>
+    </div>
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">dataset_query_limits</span><span class="sev block">block</span></div>
+      <div class="gr-d">Bounds how many profiles and postings a single query returns.</div>
+    </div>
+    <div class="gr">
+      <div class="gr-h"><span class="gr-n">cross_company_isolation</span><span class="sev block">block</span></div>
+      <div class="gr-d">Asserts that a run scoped to one company never reads another's records.</div>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <h4>Tunable at runtime</h4>
+    <p>
+      The engineer console renders every rule with its live severity and parameters, shows
+      a violation feed across all runs, and offers a YAML editor that validates syntax
+      before writing and hot-reloads on save. Disabling a rule takes effect on the next run
+      without a restart.
+    </p>
+  </div>
+</section>
+
+<!-- ============ ISOLATION ============ -->
+<section id="isolation">
+  <div class="sec-head">
+    <div class="sec-num">07</div>
+    <h2>Client and Run Isolation</h2>
+    <p>Enforced by key construction, not by asking the model to behave.</p>
+  </div>
+
+  <div class="diagram">
+    <svg viewBox="0 0 860 230" xmlns="http://www.w3.org/2000/svg" font-family="Inter,system-ui,sans-serif">
+      <rect x="16" y="18" width="390" height="196" rx="12" fill="none" stroke="#4d8df7" stroke-width="1.4" stroke-dasharray="6 3"/>
+      <text x="34" y="42" fill="#4d8df7" font-size="11" font-weight="700">client-A</text>
+
+      <rect x="32" y="56" width="172" height="142" rx="8" fill="rgba(77,141,247,.05)" stroke="#232936"/>
+      <text x="44" y="77" fill="#eef1f5" font-size="10" font-weight="600">run-85fae774</text>
+      <text x="48" y="98" fill="#9aa3b5" font-size="9">input/source.csv</text>
+      <text x="48" y="115" fill="#9aa3b5" font-size="9">working/research.json</text>
+      <text x="48" y="132" fill="#9aa3b5" font-size="9">working/org_analysis.json</text>
+      <text x="48" y="149" fill="#9aa3b5" font-size="9">working/briefing.md</text>
+      <text x="48" y="170" fill="#34d399" font-size="9.5" font-weight="600">output/briefing.html</text>
+      <text x="48" y="188" fill="#5f6878" font-size="8">completed · 5 checkpoints</text>
+
+      <rect x="220" y="56" width="172" height="142" rx="8" fill="rgba(77,141,247,.05)" stroke="#232936"/>
+      <text x="232" y="77" fill="#eef1f5" font-size="10" font-weight="600">run-04665852</text>
+      <text x="236" y="98" fill="#9aa3b5" font-size="9">input/source.csv</text>
+      <text x="236" y="115" fill="#9aa3b5" font-size="9">working/research.json</text>
+      <text x="236" y="132" fill="#9aa3b5" font-size="9">working/org_analysis.json</text>
+      <text x="236" y="149" fill="#9aa3b5" font-size="9">working/briefing.md</text>
+      <text x="236" y="170" fill="#34d399" font-size="9.5" font-weight="600">output/briefing.html</text>
+      <text x="236" y="188" fill="#5f6878" font-size="8">completed · 5 checkpoints</text>
+
+      <circle cx="211" cy="127" r="13" fill="rgba(248,113,113,.1)" stroke="#f87171"/>
+      <text x="211" y="132" text-anchor="middle" fill="#f87171" font-size="13" font-weight="800">&#215;</text>
+
+      <rect x="432" y="18" width="200" height="196" rx="12" fill="none" stroke="#9b6dff" stroke-width="1.4" stroke-dasharray="6 3"/>
+      <text x="450" y="42" fill="#9b6dff" font-size="11" font-weight="700">client-B</text>
+      <rect x="448" y="56" width="168" height="142" rx="8" fill="rgba(155,109,255,.05)" stroke="#232936"/>
+      <text x="460" y="77" fill="#eef1f5" font-size="10" font-weight="600">run-aabbcc01</text>
+      <text x="464" y="98" fill="#9aa3b5" font-size="9">input/ …</text>
+      <text x="464" y="115" fill="#9aa3b5" font-size="9">working/ …</text>
+      <text x="464" y="170" fill="#34d399" font-size="9.5" font-weight="600">output/briefing.html</text>
+
+      <circle cx="419" cy="116" r="15" fill="rgba(248,113,113,.12)" stroke="#f87171" stroke-width="1.4"/>
+      <text x="419" y="122" text-anchor="middle" fill="#f87171" font-size="15" font-weight="800">&#215;</text>
+
+      <rect x="656" y="52" width="188" height="150" rx="9" fill="rgba(248,113,113,.04)" stroke="#f87171"/>
+      <text x="672" y="76" fill="#f87171" font-size="9.5" font-weight="700">ENFORCED BY</text>
+      <text x="672" y="97" fill="#9aa3b5" font-size="9.5">S3 key construction</text>
+      <text x="672" y="114" fill="#9aa3b5" font-size="9.5">storage interface signature</text>
+      <text x="672" y="131" fill="#9aa3b5" font-size="9.5">IAM prefix policy (prod)</text>
+      <text x="672" y="155" fill="#f87171" font-size="9.5" font-weight="700">NOT BY</text>
+      <text x="672" y="176" fill="#5f6878" font-size="9.5">prompt instructions</text>
+      <text x="672" y="192" fill="#5f6878" font-size="9.5">model self-restraint</text>
+    </svg>
+    <div class="dg-cap">Every storage call takes client_id and run_id as required arguments; the key is built from them.</div>
+  </div>
+
+  <p>
+    Dataset reads follow the same rule. <code>DatasetQuery</code> builds every S3 key from
+    the <code>company_id</code> passed in, so a query scoped to one company physically
+    cannot return another company's records — there is no code path that constructs a key
+    without it. Tests deliberately attempt cross-run and cross-client reads and assert they
+    fail.
+  </p>
+</section>
+
+<!-- ============ SEPARATION ============ -->
+<section id="separation">
+  <div class="sec-head">
+    <div class="sec-num">08</div>
+    <h2>Separation of Concerns</h2>
+    <p>What reasons, what computes, and what enforces are three different things.</p>
+  </div>
+
+  <div class="tri">
+    <div class="tri-c">
+      <h4>Reasoning — the model</h4>
+      <ul>
+        <li>Research a company from its knowledge</li>
+        <li>Interpret organizational dynamics</li>
+        <li>Identify engagement opportunities</li>
+        <li>Compose the briefing narrative</li>
+        <li>Incorporate consultant feedback</li>
+        <li>Non-deterministic by nature</li>
+      </ul>
+    </div>
+    <div class="tri-c">
+      <h4>Computation — the code</h4>
+      <ul>
+        <li>Aggregate workforce signals</li>
+        <li>Compute tenure and risk statistics</li>
+        <li>Rank hardest-to-fill roles</li>
+        <li>Derive hiring velocity trend</li>
+        <li>Render report templates</li>
+        <li>Same input, same output — tested</li>
+      </ul>
+    </div>
+    <div class="tri-c">
+      <h4>Enforcement — infrastructure</h4>
+      <ul>
+        <li>S3 prefix and key construction</li>
+        <li>IAM scoping in production</li>
+        <li>Bucket encryption and TLS-only policy</li>
+        <li>Guardrail severity decisions</li>
+        <li>Token and concurrency ceilings</li>
+        <li>Prompts are never the boundary</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ COMPONENTS ============ -->
+<section id="components">
+  <div class="sec-head">
+    <div class="sec-num">09</div>
+    <h2>Component Map</h2>
+    <p>Repository modules and what each owns.</p>
+  </div>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>Path</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      <tr><td><code>webapp/app.py</code></td><td><strong>Consultant console.</strong> Routes, run orchestration, the four LLM phase functions and their revision counterparts, checkpoint machinery.</td></tr>
+      <tr><td><code>webapp/engineer.py</code></td><td><strong>Engineer console blueprint.</strong> Dashboard, run inspection, guardrail editor, dataset browser. Registered conditionally.</td></tr>
+      <tr><td><code>webapp/runtime.py</code></td><td>Shared runtime state — run registry, guardrail engine, Bedrock and dataset accessors. Prevents a circular import between the two consoles.</td></tr>
+      <tr><td><code>guardrails/engine.py</code></td><td>Loads YAML config and enforces every rule. Returns structured results rather than raising.</td></tr>
+      <tr><td><code>guardrails/config.yaml</code></td><td>The tuning surface. Every rule's enabled flag, severity, and parameters.</td></tr>
+      <tr><td><code>datasets/query.py</code></td><td>S3-backed dataset access and the ~30-signal summarizer, plus the agent context renderer.</td></tr>
+      <tr><td><code>scripts/data_generation/</code></td><td>Company archetypes and the two-stage generator that produces and uploads all twenty datasets.</td></tr>
+      <tr><td><code>agent/model.py</code></td><td>Bedrock wrapper. Model ID, region, and profile are injected, never hardcoded in analytical code.</td></tr>
+      <tr><td><code>agent/context.py</code></td><td><code>RunContext</code> — per-run artifact access scoped by client and run.</td></tr>
+      <tr><td><code>storage/</code></td><td>Storage abstraction with local and S3 backends sharing one interface.</td></tr>
+      <tr><td><code>state/run_state.py</code></td><td>DynamoDB run lifecycle — create, stage transitions, checkpoint resolution, completion.</td></tr>
+      <tr><td><code>infrastructure/cloudformation/</code></td><td>Storage, state, and observability stacks, plus optional invocation-logging infrastructure.</td></tr>
+      <tr><td><code>scripts/bedrock_usage.py</code></td><td>CloudWatch token reporting and Cost Explorer queries across all tracked Claude models.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ AWS ============ -->
+<section id="aws">
+  <div class="sec-head">
+    <div class="sec-num">10</div>
+    <h2>AWS Resources</h2>
+    <p>Everything durable is CloudFormation-managed and consistently tagged.</p>
+  </div>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>Stack</th><th>Resource</th><th>Cost model</th><th>Key properties</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>…-dev-storage</code></td>
+        <td><strong>S3 bucket</strong><br>run artifacts + datasets</td>
+        <td>Per GB + request</td>
+        <td>Versioned, AES-256, TLS-only bucket policy, all public access blocked, Intelligent Tiering after 30 days</td>
+      </tr>
+      <tr>
+        <td><code>…-dev-state</code></td>
+        <td><strong>DynamoDB table</strong><br>run lifecycle</td>
+        <td>Per request</td>
+        <td>On-demand billing, point-in-time recovery, client_id GSI</td>
+      </tr>
+      <tr>
+        <td><code>…-dev-observability</code></td>
+        <td><strong>CloudWatch dashboard</strong><br>Bedrock usage</td>
+        <td>Free</td>
+        <td>Tokens, cache read/write, latency, TTFT, errors — across Opus, Sonnet, and Haiku</td>
+      </tr>
+      <tr>
+        <td>optional</td>
+        <td><strong>Invocation logging</strong><br>log group + role</td>
+        <td>Per GB ingested</td>
+        <td>Prepared but <strong>disabled</strong> — it captures full prompts and responses</td>
+      </tr>
+      <tr>
+        <td>runtime</td>
+        <td><strong>Amazon Bedrock</strong></td>
+        <td>Per token</td>
+        <td>Sonnet 4.6 for the engine, Haiku 4.5 for verification, via cross-region inference profiles</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>All resources tagged <code>Application=intelligence-engine</code>, <code>Environment=dev</code>, <code>ManagedBy=cloudformation</code>.</p>
+</section>
+
+<!-- ============ RUNNING ============ -->
+<section id="running">
+  <div class="sec-head">
+    <div class="sec-num">11</div>
+    <h2>Running It</h2>
+  </div>
+
+<pre><code><span class="cmt"># install</span>
+pip install -e <span class="str">".[dev]"</span>
+
+<span class="cmt"># tests — no AWS required</span>
+pytest -q
+
+<span class="cmt"># refresh credentials</span>
+aws sso login --profile intelligence-dev
+
+<span class="cmt"># deploy infrastructure</span>
+aws cloudformation deploy --profile intelligence-dev --region us-east-1 \
+  --template-file infrastructure/cloudformation/storage.yaml \
+  --stack-name intelligence-engine-dev-storage --parameter-overrides Environment=dev
+
+<span class="cmt"># generate all twenty datasets and upload to S3</span>
+python scripts/data_generation/generate_all.py --profile intelligence-dev
+
+<span class="cmt"># run the app</span>
+python webapp/app.py
+<span class="cmt">#   consultant → http://localhost:5000</span>
+<span class="cmt">#   engineer   → http://localhost:5000/engineer</span>
+
+<span class="cmt"># run consultant console only</span>
+ENGINEER_CONSOLE=0 python webapp/app.py
+
+<span class="cmt"># Bedrock usage reporting</span>
+python scripts/bedrock_usage.py --profile intelligence-dev --hours 24
+python scripts/bedrock_usage.py --profile intelligence-dev --cost --month-to-date</code></pre>
+</section>
+
+<!-- ============ CORPORATE ============ -->
+<section id="corporate">
+  <div class="sec-head">
+    <div class="sec-num">12</div>
+    <h2>Corporate Deployment Path</h2>
+    <p>How this maps into an environment where DevOps owns infrastructure and console access is restricted.</p>
+  </div>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>Concern</th><th>Sandbox today</th><th>Corporate target</th></tr></thead>
+    <tbody>
+      <tr><td>Consultant UI</td><td>Local Flask</td><td>App Runner container behind corporate SSO, scales to zero</td></tr>
+      <tr><td>Engineer access</td><td>Same process at <code>/engineer</code></td><td>Separate service, separate auth, or unregistered blueprint</td></tr>
+      <tr><td>Engineering workflow</td><td>Claude Code on the laptop</td><td>Claude Code on an EC2 dev instance reached via SSM Session Manager — no console, no SSH keys, sessions recorded</td></tr>
+      <tr><td>Credentials</td><td>SSO profile</td><td>IAM role attached to the compute; nothing to manage locally</td></tr>
+      <tr><td>Deployment</td><td>Manual CLI</td><td>Git → PR review → CI/CD → staging → DevOps-approved promotion</td></tr>
+      <tr><td>Network</td><td>Public endpoints</td><td>Private subnets with VPC endpoints for Bedrock, S3, and DynamoDB</td></tr>
+      <tr><td>Agent runtime</td><td>Python thread per run</td><td>Bedrock AgentCore Runtime with session suspend/resume at checkpoints</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>
+    The checkpoint model is the piece that maps most directly. Today a run pauses by
+    blocking a background thread. AgentCore Runtime suspends the session instead, so a run
+    waiting on a consultant consumes no tokens and no compute — which matters when a real
+    engagement briefing might sit unreviewed overnight.
+  </p>
+  <p>See <a class="ref" href="corporate-deployment-architecture.md">corporate-deployment-architecture.md</a> for role definitions and the full topology.</p>
+</section>
+
+<!-- ============ LIMITS ============ -->
+<section id="limits">
+  <div class="sec-head">
+    <div class="sec-num">13</div>
+    <h2>Known Limits</h2>
+    <p>Stated plainly, because a reference architecture that hides its gaps is not useful.</p>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-h"><div class="card-t">Run state is in-memory</div></div>
+      <div class="card-d">The DynamoDB table and state manager exist and are exercised by the CLI orchestrator, but the web app keeps runs in a process dictionary. Restarting loses history. Wiring the web app to DynamoDB is the next structural step.</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><div class="card-t">Research is model knowledge, not live retrieval</div></div>
+      <div class="card-d">Company facts come from the model's training data and are bounded by its cutoff. The consultant validates and corrects at checkpoint 1, which is why that checkpoint exists. Live retrieval would be a genuine improvement.</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><div class="card-t">Datasets are synthetic</div></div>
+      <div class="card-d">The workforce data is generated, not observed. It demonstrates the pattern of grounding analysis in measured signals; it is not evidence about any real company.</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><div class="card-t">provider_data_share is enabled</div></div>
+      <div class="card-d">Acceptable for a personal sandbox with synthetic data. It must be reviewed before any deployment touching confidential client information.</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><div class="card-t">No authentication</div></div>
+      <div class="card-d">The web app is unauthenticated and intended for local use. Corporate deployment requires SSO in front of both consoles.</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><div class="card-t">No CI/CD</div></div>
+      <div class="card-d">Tests run locally; deployment is manual CLI. A pipeline with secret scanning and staged promotion is defined in the corporate architecture but not yet built.</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>Intelligence Engine — Architecture &amp; Implementation Reference</p>
+  <p>Python 3.12 · Flask · Amazon Bedrock · S3 · DynamoDB · CloudFormation · CloudWatch</p>
+  <p>Synthetic data only. No real client information appears in this repository.</p>
+</footer>
+
+</div>
+</body>
+</html>

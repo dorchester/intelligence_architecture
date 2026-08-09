@@ -1,0 +1,262 @@
+[
+  {
+    "profile_id": "sterling-pharma-00001",
+    "first_name": "Amanda",
+    "last_name": "Li",
+    "full_name": "Amanda Li",
+    "headline": "HR Coordinator at Sterling Life Sciences",
+    "company": "Sterling Life Sciences",
+    "company_id": "sterling-pharma",
+    "department": "Human Resources & Talent Acquisition",
+    "title": "HR Coordinator",
+    "seniority_level": "Entry",
+    "location": "New York, NY",
+    "tenure_years": 0.7,
+    "age": 27,
+    "education": {
+      "university": "Stanford University",
+      "degree": "BS in Human Resources",
+      "graduation_year": 2019
+    },
+    "skills": [
+      "Business Analysis",
+      "HRIS platforms",
+      "employee relations",
+      "talent acquisition",
+      "Project Management",
+      "Strategy",
+      "compensation benchmarking"
+    ],
+    "connections": 856,
+    "job_history": [
+      {
+        "company": "Sterling Life Sciences",
+        "title": "HR Coordinator",
+        "start_year": 2022,
+        "end_year": null,
+        "current": true
+      },
+      {
+        "company": "Acme Corp",
+        "title": "Analyst",
+        "start_year": 2018,
+        "end_year": 2022,
+        "current": false
+      }
+    ],
+    "recent_activity": [],
+    "turnover_risk_score": 0.48,
+    "open_to_opportunities": true
+  },
+  {
+    "profile_id": "sterling-pharma-00002",
+    "first_name": "Jack",
+    "last_name": "Lee",
+    "full_name": "Jack Lee",
+    "headline": "VP of Clinical Development at Sterling Life Sciences",
+    "company": "Sterling Life Sciences",
+    "company_id": "sterling-pharma",
+    "department": "Clinical Development",
+    "title": "VP of Clinical Development",
+    "seniority_level": "VP/Executive",
+    "location": "Chicago, IL",
+    "tenure_years": 10.4,
+    "age": 50,
+    "education": {
+      "university": "University of Wisconsin",
+      "degree": "MS in Clinical Research",
+      "graduation_year": 2000
+    },
+    "skills": [
+      "Business Analysis",
+      "Change Management",
+      "Agile",
+      "regulatory submissions",
+      "clinical data management",
+      "protocol design",
+      "GCP compliance"
+    ],
+    "connections": 2929,
+    "job_history": [
+      {
+        "company": "Sterling Life Sciences",
+        "title": "VP of Clinical Development",
+        "start_year": 2023,
+        "end_year": null,
+        "current": true
+      },
+      {
+        "company": "Sterling Life Sciences",
+        "title": "Director of Clinical Operations",
+        "start_year": 2020,
+        "end_year": 2023,
+        "current": false
+      },
+      {
+        "company": "Catalyst Partners",
+        "title": "Senior Clinical Trial Manager",
+        "start_year": 2016,
+        "end_year": 2020,
+        "current": false
+      },
+      {
+        "company": "Acme Corp",
+        "title": "Clinical Trial Manager",
+        "start_year": 2014,
+        "end_year": 2016,
+        "current": false
+      },
+      {
+        "company": "Sterling Life Sciences",
+        "title": "Clinical Research Associate",
+        "start_year": 2011,
+        "end_year": 2014,
+        "current": false
+      },
+      {
+        "company": "Frontier Corp",
+        "title": "Analyst",
+        "start_year": 2010,
+        "end_year": 2011,
+        "current": false
+      }
+    ],
+    "recent_activity": [],
+    "turnover_risk_score": 0.07,
+    "open_to_opportunities": false
+  },
+  {
+    "profile_id": "sterling-pharma-00003",
+    "first_name": "Raymond",
+    "last_name": "Lewis",
+    "full_name": "Raymond Lewis",
+    "headline": "Senior Manufacturing Specialist at Sterling Life Sciences",
+    "company": "Sterling Life Sciences",
+    "company_id": "sterling-pharma",
+    "department": "Pharmaceutical Manufacturing & Operations",
+    "title": "Senior Manufacturing Specialist",
+    "seniority_level": "Senior",
+    "location": "Chicago, IL",
+    "tenure_years": 4.4,
+    "age": 39,
+    "education": {
+      "university": "University of Michigan",
+      "degree": "BS in Biochemistry",
+      "graduation_year": 2007
+    },
+    "skills": [
+      "bioreactor operation",
+      "Change Management",
+      "process validation",
+      "Agile",
+      "Project Management",
+      "GMP compliance",
+      "lean manufacturing"
+    ],
+    "connections": 2914,
+    "job_history": [
+      {
+        "company": "Sterling Life Sciences",
+        "title": "Senior Manufacturing Specialist",
+        "start_year": 2025,
+        "end_year": null,
+        "current": true
+      },
+      {
+        "company": "Apex Industries",
+        "title": "Process Operator",
+        "start_year": 2024,
+        "end_year": 2025,
+        "current": false
+      },
+      {
+        "company": "Sterling Life Sciences",
+        "title": "Manufacturing Technician",
+        "start_year": 2020,
+        "end_year": 2024,
+        "current": false
+      },
+      {
+        "company": "Acme Corp",
+        "title": "Analyst",
+        "start_year": 2019,
+        "end_year": 2020,
+        "current": false
+      }
+    ],
+    "recent_activity": [
+      {
+        "type": "industry_insight",
+        "month": "2026-08",
+        "engagement": {
+          "likes": 81,
+          "comments": 14,
+          "shares": 9
+        },
+        "topic": "Lessons from a decade in this industry"
+      },
+      {
+        "type": "job_change",
+        "month": "2026-08",
+        "engagement": {
+          "likes": 47,
+          "comments": 29,
+          "shares": 6
+        },
+        "topic": "Thrilled to take on a new role in Pharmaceutical Manufacturing & Operations"
+      },
+      {
+        "type": "event",
+        "month": "2026-06",
+        "engagement": {
+          "likes": 54,
+          "comments": 10,
+          "shares": 2
+        },
+        "topic": "Panel discussion on workforce transformation"
+      },
+      {
+        "type": "industry_insight",
+        "month": "2026-05",
+        "engagement": {
+          "likes": 143,
+          "comments": 27,
+          "shares": 0
+        },
+        "topic": "What the latest research tells us"
+      },
+      {
+        "type": "thought_leadership",
+        "month": "2026-04",
+        "engagement": {
+          "likes": 136,
+          "comments": 29,
+          "shares": 4
+        },
+        "topic": "Leadership lessons from recent transformation"
+      },
+      {
+        "type": "company_news",
+        "month": "2026-04",
+        "engagement": {
+          "likes": 66,
+          "comments": 11,
+          "shares": 6
+        },
+        "topic": "Great work from the Pharmaceutical Manufacturing & Operations team"
+      },
+      {
+        "type": "thought_leadership",
+        "month": "2026-03",
+        "engagement": {
+          "likes": 55,
+          "comments": 1,
+          "shares": 10
+        },
+        "topic": "Why organizational agility matters now"
+      }
+    ],
+    "turnover_risk_score": 0.14,
+    "open_to_opportunities": false
+  }
+]

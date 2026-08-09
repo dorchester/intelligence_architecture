@@ -98,64 +98,166 @@ SKILLS_BY_DOMAIN = {
 POST_TYPES = ["thought_leadership", "job_change", "company_news", "industry_insight", "achievement", "event"]
 
 
-def generate_company_template(model: BedrockModel, company: dict) -> dict:
-    """Use LLM to generate realistic org-specific template for a company."""
-    prompt = f"""Generate a realistic organizational template for a company like this:
-Name: {company['name']}
-Industry: {company['industry']}
-Headcount: {company['headcount']}
-Segments: {company['segments']}
+def _parse_json(response: str):
+    """Parse a JSON object from an LLM response, tolerating code fences."""
+    import re
 
-Return JSON with:
-{{
-  "departments": [
-    {{
-      "name": "Department Name",
-      "headcount_pct": 0.15,
-      "title_ladder": ["Entry Title", "Mid Title", "Senior Title", "Director Title", "VP Title"],
-      "common_skills": ["skill1", "skill2", "skill3"],
-      "typical_degrees": ["degree1", "degree2"],
-      "avg_tenure_years": 4.5,
-      "turnover_rate": 0.15
-    }}
-  ],
-  "posting_categories": [
-    {{
-      "category": "Category Name",
-      "volume_pct": 0.20,
-      "typical_titles": ["Title 1", "Title 2"],
-      "locations": ["City, ST", "City, ST"],
-      "remote_pct": 0.3
-    }}
-  ],
-  "culture_keywords": ["keyword1", "keyword2", "keyword3"],
-  "recent_initiatives": ["Initiative 1", "Initiative 2"]
-}}
-
-Include 8-12 departments and 6-8 posting categories. Make it specific to the {company['industry']} industry.
-Return ONLY valid JSON."""
-
-    response = model.invoke(
-        messages=[{"role": "user", "content": prompt}],
-        system="Generate realistic organizational data. Return only valid JSON.",
-        max_tokens=3000,
-        temperature=0.7,
-    )
-
-    text = response.strip()
+    text = (response or "").strip()
     if text.startswith("```"):
-        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+        parts = text.split("\n", 1)
+        if len(parts) > 1:
+            text = parts[1].rsplit("```", 1)[0]
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        import re
-        match = re.search(r'\{[\s\S]*\}', text)
+        match = re.search(r"\{[\s\S]*\}", text)
         if match:
             try:
                 return json.loads(match.group())
-            except:
-                pass
+            except json.JSONDecodeError:
+                return None
+    return None
+
+
+def _llm_json(model: BedrockModel, prompt: str, system: str, max_tokens: int, attempts: int = 3):
+    """Call the model and parse JSON, retrying on truncation or parse failure."""
+    tokens = max_tokens
+    for attempt in range(attempts):
+        try:
+            response = model.invoke(
+                messages=[{"role": "user", "content": prompt}],
+                system=system,
+                max_tokens=tokens,
+                temperature=0.7 if attempt == 0 else 0.3,
+            )
+        except Exception:
+            time.sleep(2 * (attempt + 1))
+            continue
+
+        parsed = _parse_json(response)
+        if parsed:
+            return parsed
+        # Likely truncation — give it more room next time
+        tokens = min(int(tokens * 1.8), 16000)
+    return None
+
+
+def generate_departments(model: BedrockModel, company: dict) -> list | None:
+    """Generate the department structure for a company."""
+    prompt = f"""Generate a realistic department structure for this company:
+Name: {company['name']}
+Industry: {company['industry']}
+Headcount: {company['headcount']:,}
+Business segments: {', '.join(company['segments'])}
+
+Return a JSON object with a single key "departments" containing 8-12 departments.
+Each department:
+{{
+  "name": "Department Name",
+  "headcount_pct": 0.15,
+  "title_ladder": ["Entry", "Mid", "Senior", "Director", "VP"],
+  "common_skills": ["skill1", "skill2", "skill3", "skill4"],
+  "typical_degrees": ["degree1", "degree2"],
+  "avg_tenure_years": 4.5,
+  "turnover_rate": 0.15
+}}
+
+Rules:
+- headcount_pct values must sum to approximately 1.0
+- title_ladder must have exactly 5 entries, junior to senior, using real titles for this industry
+- Departments must be specific to {company['industry']} (not generic corporate functions only)
+- turnover_rate between 0.05 and 0.35, realistic for the function
+- Keep each field concise
+
+Return ONLY the JSON object."""
+
+    result = _llm_json(
+        model, prompt,
+        "You generate realistic organizational structures. Return only valid JSON. Be concise.",
+        max_tokens=6000,
+    )
+    if not result:
         return None
+    depts = result.get("departments")
+    return depts if isinstance(depts, list) and depts else None
+
+
+def generate_posting_categories(model: BedrockModel, company: dict, departments: list) -> list | None:
+    """Generate hiring posting categories for a company."""
+    dept_names = [d.get("name", "") for d in departments][:12]
+    prompt = f"""Generate realistic job-posting categories for this company:
+Name: {company['name']}
+Industry: {company['industry']}
+Headcount: {company['headcount']:,}
+Departments: {', '.join(dept_names)}
+HQ: {company['hq']}
+
+Return a JSON object with a single key "posting_categories" containing 6-8 categories.
+Each category:
+{{
+  "category": "Category Name",
+  "volume_pct": 0.20,
+  "typical_titles": ["Title 1", "Title 2", "Title 3"],
+  "locations": ["City, ST", "City, ST"],
+  "remote_pct": 0.3
+}}
+
+Rules:
+- volume_pct values must sum to approximately 1.0
+- category names should align with the departments listed above
+- locations should be realistic US cities for this industry, including the HQ
+- remote_pct between 0.0 and 0.7 depending on how remote-friendly the function is
+- 3-5 typical_titles per category
+
+Return ONLY the JSON object."""
+
+    result = _llm_json(
+        model, prompt,
+        "You generate realistic hiring data. Return only valid JSON. Be concise.",
+        max_tokens=4000,
+    )
+    if not result:
+        return None
+    cats = result.get("posting_categories")
+    return cats if isinstance(cats, list) and cats else None
+
+
+def generate_company_template(model: BedrockModel, company: dict) -> dict | None:
+    """Build a company template using two focused LLM calls.
+
+    Split into two calls because a combined request reliably exceeded the
+    output token budget and returned truncated JSON.
+    """
+    departments = generate_departments(model, company)
+    if not departments:
+        return None
+
+    categories = generate_posting_categories(model, company, departments)
+    if not categories:
+        # Departments alone are enough to generate profiles; derive
+        # posting categories from them rather than failing outright.
+        categories = _categories_from_departments(company, departments)
+
+    return {"departments": departments, "posting_categories": categories}
+
+
+def _categories_from_departments(company: dict, departments: list) -> list:
+    """Derive posting categories from departments when the LLM call fails."""
+    top = sorted(
+        departments, key=lambda d: d.get("headcount_pct", 0), reverse=True
+    )[:7]
+    total = sum(d.get("headcount_pct", 0.1) for d in top) or 1.0
+    cats = []
+    for d in top:
+        ladder = d.get("title_ladder", ["Associate"])
+        cats.append({
+            "category": d.get("name", "General"),
+            "volume_pct": round(d.get("headcount_pct", 0.1) / total, 3),
+            "typical_titles": ladder[:4],
+            "locations": [company["hq"], "Chicago, IL", "Dallas, TX"],
+            "remote_pct": 0.25,
+        })
+    return cats
 
 
 def generate_profiles(company: dict, template: dict, count: int = 500) -> list[dict]:
@@ -236,12 +338,29 @@ def generate_profiles(company: dict, template: dict, count: int = 500) -> list[d
     return profiles
 
 
+def _skills_for_category(rng, cat: dict, template_skills: dict) -> list[str]:
+    """Pick required skills for a posting, preferring skills from the
+    matching department, falling back to a generic domain pool."""
+    pool = template_skills.get(cat.get("category", ""), [])
+    if len(pool) < 3:
+        key = cat.get("category", "").lower().split()[0] if cat.get("category") else ""
+        pool = list(set(pool) | set(SKILLS_BY_DOMAIN.get(key, SKILLS_BY_DOMAIN["consulting"])))
+    n = min(4, len(pool))
+    return rng.sample(pool, n) if n else []
+
+
 def generate_postings(company: dict, template: dict, count: int = 500) -> list[dict]:
     """Generate synthetic job postings for the past 2 years."""
     postings = []
     categories = template.get("posting_categories", [])
     if not categories:
         return postings
+
+    # Map department name -> its skills, so postings ask for plausible skills
+    template_skills = {
+        d.get("name", ""): d.get("common_skills", [])
+        for d in template.get("departments", [])
+    }
 
     company_seed = int(hashlib.md5((company["id"] + "-postings").encode()).hexdigest()[:8], 16)
     rng = random.Random(company_seed)
@@ -291,10 +410,7 @@ def generate_postings(company: dict, template: dict, count: int = 500) -> list[d
             "salary_range": {"low": salary_low, "high": salary_high, "currency": "USD"},
             "applicant_count": rng.randint(20, 500) if status != "active" else rng.randint(5, 150),
             "days_to_fill": rng.randint(15, 90) if status == "filled" else None,
-            "skills_required": rng.sample(
-                SKILLS_BY_DOMAIN.get(cat["category"].lower().split()[0], SKILLS_BY_DOMAIN["consulting"]),
-                min(4, len(SKILLS_BY_DOMAIN["consulting"]))
-            ),
+            "skills_required": _skills_for_category(rng, cat, template_skills),
             "segment": rng.choice(company["segments"]),
         }
         postings.append(posting)

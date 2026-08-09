@@ -1,165 +1,65 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intelligence Engine — Engineer Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #0a0c10;
-            --surface: #12151c;
-            --card: #161921;
-            --border: #262d3d;
-            --text: #f1f3f5;
-            --text-secondary: #a1a9bc;
-            --text-muted: #6b7280;
-            --blue: #3b82f6;
-            --green: #10b981;
-            --purple: #8b5cf6;
-            --orange: #f59e0b;
-            --cyan: #06b6d4;
-            --red: #ef4444;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Inter', system-ui, sans-serif;
-            background: var(--bg); color: var(--text);
-            min-height: 100vh; -webkit-font-smoothing: antialiased;
-        }
-        .shell { max-width: 1200px; margin: 0 auto; padding: 2rem 2.5rem; }
-        header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2.5rem; }
-        header h1 { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.02em; }
-        header .nav-links { display: flex; gap: 1rem; align-items: center; }
-        header .nav-links a {
-            font-size: 0.78rem; font-weight: 500; color: var(--text-muted);
-            text-decoration: none; padding: 0.4rem 0.8rem; border-radius: 6px;
-            border: 1px solid transparent; transition: all 0.15s;
-        }
-        header .nav-links a:hover { color: var(--text); border-color: var(--border); }
-        header .nav-links a.active { color: var(--cyan); border-color: var(--cyan); }
+{% extends "_base_engineer.html" %}
+{% set active_nav = 'dashboard' %}
+{% block title %}Dashboard{% endblock %}
+{% block heading %}Engineer Console{% endblock %}
 
-        /* Status tiles */
-        .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 2.5rem; }
+{% block extra_css %}
+        .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 2.5rem; }
         .tile {
-            background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-            padding: 1.1rem 1.25rem; transition: border-color 0.15s;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 1.1rem 1.25rem; transition: border-color 0.15s;
         }
         .tile:hover { border-color: var(--blue); }
         .tile-value { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-        .tile-label { font-size: 0.68rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 0.2rem; }
+        .tile-label {
+            font-size: 0.66rem; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.07em; margin-top: 0.2rem;
+        }
         .tile:nth-child(1) .tile-value { color: var(--green); }
         .tile:nth-child(2) .tile-value { color: var(--blue); }
         .tile:nth-child(3) .tile-value { color: var(--orange); }
         .tile:nth-child(4) .tile-value { color: var(--purple); }
         .tile:nth-child(5) .tile-value { color: var(--cyan); }
+        .tile:nth-child(6) .tile-value { color: var(--red); }
 
-        /* Sections */
-        .section { margin-bottom: 2.5rem; }
-        .section-head {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 1rem;
-        }
-        .section-head h2 { font-size: 0.9rem; font-weight: 700; }
-        .section-head .badge {
-            font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.6rem;
-            border-radius: 4px; background: var(--surface); color: var(--text-muted);
-        }
-
-        /* Configuration panel */
-        .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; }
+        .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 0.6rem; }
         .config-item {
             background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-            padding: 0.85rem 1rem; display: flex; justify-content: space-between; align-items: center;
+            padding: 0.8rem 1rem; display: flex; justify-content: space-between;
+            align-items: center; gap: 0.75rem;
         }
-        .config-key { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+        .config-key { font-size: 0.76rem; font-weight: 600; color: var(--text-secondary); flex-shrink: 0; }
         .config-val {
-            font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--cyan);
-            background: var(--surface); padding: 0.2rem 0.5rem; border-radius: 4px;
-        }
-
-        /* Runs table */
-        .runs-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.82rem; }
-        .runs-table th {
-            text-align: left; padding: 0.6rem 0.8rem; font-size: 0.68rem; font-weight: 700;
-            text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);
-            border-bottom: 1px solid var(--border);
-        }
-        .runs-table td {
-            padding: 0.65rem 0.8rem; border-bottom: 1px solid rgba(38,45,61,0.4);
-            vertical-align: top;
-        }
-        .runs-table tr:hover td { background: var(--surface); }
-        .runs-table code {
             font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--cyan);
+            background: var(--surface); padding: 0.2rem 0.5rem; border-radius: 4px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .runs-table a { color: var(--blue); text-decoration: none; font-weight: 600; }
-        .runs-table a:hover { text-decoration: underline; }
+        .config-val.ok { color: var(--green); }
+        .config-val.bad { color: var(--red); }
+
+        .infra-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.7rem; }
+        .infra-card {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 1rem 1.2rem;
+        }
+        .infra-card h4 { font-size: 0.78rem; font-weight: 700; margin-bottom: 0.45rem; }
+        .infra-card p { font-size: 0.73rem; color: var(--text-secondary); line-height: 1.55; }
+        .dot {
+            display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+            background: var(--green); margin-right: 0.4rem;
+        }
+        .dot.off { background: var(--text-muted); }
         .stage-badge {
-            font-size: 0.63rem; font-weight: 700; padding: 0.15rem 0.45rem;
+            font-size: 0.62rem; font-weight: 700; padding: 0.15rem 0.45rem;
             border-radius: 4px; text-transform: uppercase; white-space: nowrap;
         }
         .stage-badge.completed { background: rgba(16,185,129,0.1); color: var(--green); }
         .stage-badge.waiting { background: rgba(245,158,11,0.1); color: var(--orange); }
         .stage-badge.running { background: rgba(59,130,246,0.1); color: var(--blue); }
         .stage-badge.rejected { background: rgba(239,68,68,0.1); color: var(--red); }
+{% endblock %}
 
-        /* Run detail panel */
-        .detail-panel {
-            background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-            padding: 1.5rem; margin-top: 1rem; display: none;
-        }
-        .detail-panel.visible { display: block; }
-        .detail-panel h3 { font-size: 0.82rem; font-weight: 700; margin-bottom: 0.75rem; }
-        .detail-kv { display: grid; grid-template-columns: 140px 1fr; gap: 0.4rem 1rem; font-size: 0.78rem; margin-bottom: 1rem; }
-        .detail-kv dt { color: var(--text-muted); font-weight: 600; }
-        .detail-kv dd { color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; word-break: break-all; }
-
-        /* Logs panel */
-        .log-panel {
-            background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-            padding: 1rem; max-height: 300px; overflow-y: auto;
-            font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; line-height: 1.8;
-        }
-        .log-panel .entry { color: var(--text-secondary); }
-        .log-panel .entry.feedback { color: var(--purple); }
-        .log-panel .entry.success { color: var(--green); }
-        .log-panel .entry.error { color: var(--red); }
-
-        /* Infrastructure section */
-        .infra-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem; }
-        .infra-card {
-            background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem;
-        }
-        .infra-card h4 { font-size: 0.78rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text); }
-        .infra-card p { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; }
-        .infra-card code { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--cyan); }
-        .infra-card .status-dot-inline {
-            display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-            background: var(--green); margin-right: 0.4rem;
-        }
-
-        /* Links */
-        .ext-link {
-            font-size: 0.75rem; color: var(--blue); text-decoration: none;
-            display: inline-flex; align-items: center; gap: 0.3rem;
-        }
-        .ext-link:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
-<div class="shell">
-    <header>
-        <h1>Engineer Dashboard</h1>
-        <nav class="nav-links">
-            <a href="/">Consultant View</a>
-            <a href="/engineer" class="active">Engineer</a>
-            <a href="https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards/dashboard/intelligence-engine-bedrock-usage" target="_blank">CloudWatch &nearr;</a>
-        </nav>
-    </header>
-
-    <!-- System status tiles -->
+{% block content %}
     <div class="tiles">
         <div class="tile">
             <div class="tile-value">{{ runs | length }}</div>
@@ -178,126 +78,123 @@
             <div class="tile-label">Processing</div>
         </div>
         <div class="tile">
-            <div class="tile-value">{{ total_llm_calls }}</div>
-            <div class="tile-label">LLM Calls (Session)</div>
+            <div class="tile-value">{{ dataset_count }}</div>
+            <div class="tile-label">Datasets</div>
+        </div>
+        <div class="tile">
+            <div class="tile-value">{{ guardrail_events }}</div>
+            <div class="tile-label">Guardrail Events</div>
         </div>
     </div>
 
-    <!-- System Configuration -->
     <div class="section">
-        <div class="section-head">
-            <h2>System Configuration</h2>
-        </div>
+        <div class="section-head"><h2>Runtime Configuration</h2></div>
         <div class="config-grid">
             <div class="config-item">
-                <span class="config-key">Runtime Model</span>
-                <span class="config-val">us.anthropic.claude-sonnet-4-6</span>
+                <span class="config-key">Engine Model</span>
+                <span class="config-val">{{ model_id }}</span>
+            </div>
+            <div class="config-item">
+                <span class="config-key">Bedrock</span>
+                <span class="config-val {% if bedrock_status == 'connected' %}ok{% else %}bad{% endif %}">{{ bedrock_status }}</span>
             </div>
             <div class="config-item">
                 <span class="config-key">AWS Profile</span>
-                <span class="config-val">intelligence-dev</span>
+                <span class="config-val">{{ aws_profile }}</span>
             </div>
             <div class="config-item">
                 <span class="config-key">Region</span>
-                <span class="config-val">us-east-1</span>
+                <span class="config-val">{{ aws_region }}</span>
             </div>
             <div class="config-item">
-                <span class="config-key">Runs Directory</span>
-                <span class="config-val">{{ runs_dir }}</span>
+                <span class="config-key">Dataset Bucket</span>
+                <span class="config-val">{{ bucket or 'unavailable' }}</span>
             </div>
             <div class="config-item">
-                <span class="config-key">Bedrock API</span>
-                <span class="config-val">{{ bedrock_status }}</span>
-            </div>
-            <div class="config-item">
-                <span class="config-key">App Version</span>
-                <span class="config-val">0.1.0</span>
+                <span class="config-key">Blocked Runs</span>
+                <span class="config-val {% if blocked_runs %}bad{% else %}ok{% endif %}">{{ blocked_runs }}</span>
             </div>
         </div>
     </div>
 
-    <!-- Infrastructure -->
     <div class="section">
         <div class="section-head">
             <h2>AWS Infrastructure</h2>
-            <span class="badge">3 stacks deployed</span>
+            <span class="badge">3 CloudFormation stacks</span>
         </div>
         <div class="infra-grid">
             <div class="infra-card">
-                <h4><span class="status-dot-inline"></span>S3 Storage</h4>
-                <p>Run artifacts bucket<br><code>intelligence-engine-dev-runs-*</code></p>
-                <p style="margin-top:0.4rem;">Versioned, encrypted, private</p>
+                <h4><span class="dot"></span>S3 Storage</h4>
+                <p>Run artifacts and workforce datasets<br>
+                <code>{{ bucket or 'intelligence-engine-dev-runs-*' }}</code></p>
+                <p style="margin-top:0.4rem;">Versioned &middot; AES-256 &middot; TLS-only &middot; private</p>
             </div>
             <div class="infra-card">
-                <h4><span class="status-dot-inline"></span>DynamoDB State</h4>
-                <p>Run lifecycle table<br><code>intelligence-engine-dev-runs</code></p>
-                <p style="margin-top:0.4rem;">PAY_PER_REQUEST, PITR enabled</p>
+                <h4><span class="dot"></span>DynamoDB</h4>
+                <p>Run lifecycle state<br><code>intelligence-engine-dev-runs</code></p>
+                <p style="margin-top:0.4rem;">PAY_PER_REQUEST &middot; PITR enabled</p>
             </div>
             <div class="infra-card">
-                <h4><span class="status-dot-inline"></span>CloudWatch</h4>
-                <p>Bedrock usage dashboard<br><code>intelligence-engine-bedrock-usage</code></p>
+                <h4><span class="dot"></span>CloudWatch</h4>
+                <p>Bedrock token &amp; latency dashboard<br><code>intelligence-engine-bedrock-usage</code></p>
                 <p style="margin-top:0.4rem;">
-                    <a class="ext-link" href="https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards/dashboard/intelligence-engine-bedrock-usage" target="_blank">Open dashboard &nearr;</a>
+                    <a class="link" href="https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards/dashboard/intelligence-engine-bedrock-usage" target="_blank">Open dashboard &nearr;</a>
                 </p>
             </div>
             <div class="infra-card">
-                <h4><span class="status-dot-inline"></span>Amazon Bedrock</h4>
-                <p>Claude Sonnet 4.6 inference<br><code>us.anthropic.claude-sonnet-4-6</code></p>
-                <p style="margin-top:0.4rem;">On-demand, pay-per-token</p>
+                <h4><span class="dot {% if bedrock_status != 'connected' %}off{% endif %}"></span>Amazon Bedrock</h4>
+                <p>Claude inference via cross-region profile<br><code>{{ model_id }}</code></p>
+                <p style="margin-top:0.4rem;">On-demand &middot; pay-per-token</p>
             </div>
         </div>
     </div>
 
-    <!-- All Runs -->
     <div class="section">
         <div class="section-head">
             <h2>All Runs</h2>
             <span class="badge">{{ runs | length }} total</span>
         </div>
-        {% if runs %}
-        <table class="runs-table">
+        {% if runs_list %}
+        <table>
             <thead>
                 <tr>
-                    <th>Run ID</th>
-                    <th>Company</th>
-                    <th>Stage</th>
-                    <th>Checkpoints</th>
-                    <th>Model</th>
-                    <th>Started</th>
-                    <th></th>
+                    <th>Run</th><th>Company</th><th>Stage</th><th>Checkpoints</th>
+                    <th>Data</th><th>Flags</th><th>Started</th><th></th>
                 </tr>
             </thead>
             <tbody>
-                {% for run in runs_list %}
+            {% for r in runs_list %}
                 <tr>
-                    <td><code>{{ run.run_id[:8] }}</code></td>
-                    <td><a href="/run/{{ run.run_id }}">{{ run.company_name }}</a></td>
+                    <td><code>{{ r.run_id[:8] }}</code></td>
+                    <td>{{ r.company_name }}</td>
                     <td>
                         <span class="stage-badge
-                            {%- if run.stage == 'completed' %} completed
-                            {%- elif run.stage == 'waiting_for_approval' %} waiting
-                            {%- elif run.stage == 'rejected' %} rejected
+                            {%- if r.stage == 'completed' %} completed
+                            {%- elif r.stage == 'waiting_for_approval' %} waiting
+                            {%- elif r.stage in ('rejected','blocked','error') %} rejected
                             {%- else %} running{% endif %}">
-                            {% if run.stage == 'waiting_for_approval' %}awaiting input{% else %}{{ run.stage.replace('_', ' ') }}{% endif %}
+                            {% if r.stage == 'waiting_for_approval' %}awaiting input{% else %}{{ r.stage.replace('_',' ') }}{% endif %}
                         </span>
                     </td>
-                    <td>{{ run.checkpoints | length }}/5</td>
-                    <td><code>{{ (run.model_used or '—')[:20] }}</code></td>
-                    <td>{{ run.created_at[:16] }}</td>
-                    <td><a href="/engineer/run/{{ run.run_id }}" style="font-size:0.72rem;">inspect</a></td>
+                    <td>{{ r.checkpoints | length }}/5</td>
+                    <td>{% if r.dataset_available %}<span style="color:var(--green);">yes</span>{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+                    <td>{% if r.guardrail_events %}{{ r.guardrail_events | length }}{% else %}—{% endif %}</td>
+                    <td>{{ r.created_at[:16] }}</td>
+                    <td><a class="link" href="{{ url_for('engineer.inspect_run', run_id=r.run_id) }}">inspect</a></td>
                 </tr>
-                {% endfor %}
+            {% endfor %}
             </tbody>
         </table>
         {% else %}
-        <p style="color: var(--text-muted); font-size: 0.85rem;">No runs yet. Start one from the <a href="/" style="color:var(--blue);">consultant view</a>.</p>
+        <div class="panel">
+            <p style="font-size:0.85rem;color:var(--text-muted);">
+                No runs yet. Start one from the <a class="link" href="/">consultant console</a>.
+            </p>
+        </div>
         {% endif %}
     </div>
-</div>
+{% endblock %}
 
-<script>
-// Auto-refresh the engineer dashboard every 5 seconds
-setTimeout(() => location.reload(), 5000);
-</script>
-</body>
-</html>
+{% block scripts %}
+<script>setTimeout(() => location.reload(), 8000);</script>
+{% endblock %}

@@ -1,0 +1,162 @@
+[
+  {
+    "company_id": "meridian-insurance",
+    "company_name": "Meridian Insurance Group",
+    "industry": "Insurance / Financial Services",
+    "headcount": 45000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "atlas-motors",
+    "company_name": "Atlas Motors Corporation",
+    "industry": "Automotive / Manufacturing",
+    "headcount": 155000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "helix-pharma",
+    "company_name": "Helix Pharmaceuticals",
+    "industry": "Pharmaceuticals / Healthcare",
+    "headcount": 130000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "velocity-logistics",
+    "company_name": "Velocity Logistics International",
+    "industry": "Logistics / Transportation",
+    "headcount": 500000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "summit-hospitality",
+    "company_name": "Summit Hospitality Group",
+    "industry": "Hospitality / Hotels",
+    "headcount": 160000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "pinnacle-health",
+    "company_name": "Pinnacle Health Systems",
+    "industry": "Healthcare / Hospital Systems",
+    "headcount": 280000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "cardinal-energy",
+    "company_name": "Cardinal Energy Partners",
+    "industry": "Energy / Oil & Gas",
+    "headcount": 62000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "nexus-telecom",
+    "company_name": "Nexus Telecommunications",
+    "industry": "Telecommunications",
+    "headcount": 115000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "fortress-bank",
+    "company_name": "Fortress National Bank",
+    "industry": "Banking / Financial Services",
+    "headcount": 290000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "titan-aerospace",
+    "company_name": "Titan Aerospace & Defense",
+    "industry": "Aerospace & Defense",
+    "headcount": 116000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "harvest-foods",
+    "company_name": "Harvest Foods Corporation",
+    "industry": "Consumer Goods / Food & Beverage",
+    "headcount": 315000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "ironclad-manufacturing",
+    "company_name": "Ironclad Manufacturing Group",
+    "industry": "Diversified Manufacturing",
+    "headcount": 85000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "horizon-tech",
+    "company_name": "Horizon Technology Solutions",
+    "industry": "Technology / IT Services",
+    "headcount": 740000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "pacific-retail",
+    "company_name": "Pacific Retail Holdings",
+    "industry": "Retail",
+    "headcount": 400000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "sterling-pharma",
+    "company_name": "Sterling Life Sciences",
+    "industry": "Pharmaceuticals / Biotechnology",
+    "headcount": 43000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "cascade-utilities",
+    "company_name": "Cascade Power & Utilities",
+    "industry": "Utilities / Energy",
+    "headcount": 28000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "vanguard-consulting",
+    "company_name": "Vanguard Professional Services",
+    "industry": "Professional Services",
+    "headcount": 450000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "liberty-airlines",
+    "company_name": "Liberty Airlines Group",
+    "industry": "Airlines / Aviation",
+    "headcount": 95000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "beacon-media",
+    "company_name": "Beacon Media & Entertainment",
+    "industry": "Media & Entertainment",
+    "headcount": 220000,
+    "profile_count": 500,
+    "posting_count": 500
+  },
+  {
+    "company_id": "cornerstone-realty",
+    "company_name": "Cornerstone Real Estate Investment",
+    "industry": "Commercial Real Estate",
+    "headcount": 115000,
+    "profile_count": 500,
+    "posting_count": 500
+  }
+]

@@ -1,0 +1,391 @@
+{
+  "company_id": "sterling-pharma",
+  "company_name": "Sterling Life Sciences",
+  "industry": "Pharmaceuticals / Biotechnology",
+  "headcount": 43000,
+  "profiles_analyzed": 500,
+  "department_distribution": {
+    "Human Resources & Talent Acquisition": 12,
+    "Clinical Development": 44,
+    "Pharmaceutical Manufacturing & Operations": 103,
+    "Bioinformatics & Data Science": 21,
+    "Commercial & Sales": 76,
+    "Research & Drug Discovery": 66,
+    "Finance & Business Operations": 27,
+    "Quality Assurance & Compliance": 46,
+    "Pharmacovigilance & Drug Safety": 21,
+    "Medical Affairs": 31,
+    "Regulatory Affairs": 30,
+    "Supply Chain & Logistics": 23
+  },
+  "seniority_distribution": {
+    "Entry": 182,
+    "VP/Executive": 43,
+    "Senior": 99,
+    "Mid": 109,
+    "Director": 67
+  },
+  "location_distribution": {
+    "Chicago, IL": 81,
+    "Remote": 80,
+    "Dallas, TX": 78,
+    "New York, NY": 67,
+    "Atlanta, GA": 67,
+    "Indianapolis, IN": 64,
+    "San Francisco, CA": 63
+  },
+  "avg_tenure_years": 3.07,
+  "median_tenure_years": 1.9,
+  "tenure_by_department": {
+    "Human Resources & Talent Acquisition": 2.99,
+    "Clinical Development": 3.54,
+    "Pharmaceutical Manufacturing & Operations": 2.85,
+    "Bioinformatics & Data Science": 3.04,
+    "Commercial & Sales": 2.9,
+    "Research & Drug Discovery": 3.06,
+    "Finance & Business Operations": 2.97,
+    "Quality Assurance & Compliance": 3.1,
+    "Pharmacovigilance & Drug Safety": 3.21,
+    "Medical Affairs": 3.0,
+    "Regulatory Affairs": 3.79,
+    "Supply Chain & Logistics": 2.97
+  },
+  "top_skills": [
+    [
+      "Project Management",
+      262
+    ],
+    [
+      "Agile",
+      259
+    ],
+    [
+      "Stakeholder Management",
+      255
+    ],
+    [
+      "Strategy",
+      246
+    ],
+    [
+      "Business Analysis",
+      240
+    ],
+    [
+      "Change Management",
+      238
+    ],
+    [
+      "bioreactor operation",
+      103
+    ],
+    [
+      "process validation",
+      103
+    ],
+    [
+      "GMP compliance",
+      103
+    ],
+    [
+      "lean manufacturing",
+      103
+    ],
+    [
+      "account management",
+      76
+    ],
+    [
+      "CRM platforms",
+      76
+    ],
+    [
+      "market access",
+      76
+    ],
+    [
+      "pharmaceutical sales",
+      76
+    ],
+    [
+      "molecular biology",
+      66
+    ]
+  ],
+  "top_universities": [
+    [
+      "Stanford University",
+      23
+    ],
+    [
+      "UCLA",
+      19
+    ],
+    [
+      "University of Chicago",
+      19
+    ],
+    [
+      "Columbia University",
+      19
+    ],
+    [
+      "University of Texas at Austin",
+      19
+    ],
+    [
+      "University of Washington",
+      18
+    ],
+    [
+      "UC Berkeley",
+      18
+    ],
+    [
+      "NYU",
+      17
+    ],
+    [
+      "Purdue University",
+      17
+    ],
+    [
+      "Virginia Tech",
+      17
+    ]
+  ],
+  "flight_risk_pct": 31.8,
+  "flight_risk_by_department": {
+    "Human Resources & Talent Acquisition": 26.7,
+    "Clinical Development": 20.0,
+    "Pharmaceutical Manufacturing & Operations": 23.4,
+    "Bioinformatics & Data Science": 32.6,
+    "Commercial & Sales": 37.3,
+    "Research & Drug Discovery": 18.3,
+    "Finance & Business Operations": 25.1,
+    "Quality Assurance & Compliance": 13.1,
+    "Pharmacovigilance & Drug Safety": 18.8,
+    "Medical Affairs": 19.5,
+    "Regulatory Affairs": 12.3,
+    "Supply Chain & Logistics": 23.8
+  },
+  "open_to_opportunities_pct": 21.6,
+  "external_hire_ratio": 0.756,
+  "avg_prior_employers": 2.02,
+  "postings_analyzed": 500,
+  "postings_by_department": {
+    "Clinical Development & Medical Affairs": 113,
+    "Quality Assurance, Compliance & Regulatory Affairs": 53,
+    "Pharmaceutical Manufacturing & Operations": 84,
+    "Research & Drug Discovery": 74,
+    "Supply Chain, Logistics & Pharmacovigilance": 28,
+    "Bioinformatics & Data Science": 36,
+    "Finance, HR & Business Operations": 49,
+    "Commercial, Sales & Marketing": 63
+  },
+  "postings_by_quarter": {
+    "2024-Q3": 36,
+    "2024-Q4": 54,
+    "2025-Q1": 69,
+    "2025-Q2": 59,
+    "2025-Q3": 71,
+    "2025-Q4": 51,
+    "2026-Q1": 68,
+    "2026-Q2": 69,
+    "2026-Q3": 23
+  },
+  "active_postings": 21,
+  "avg_days_to_fill": 52.3,
+  "days_to_fill_by_department": {
+    "Clinical Development & Medical Affairs": 52.5,
+    "Quality Assurance, Compliance & Regulatory Affairs": 55,
+    "Pharmaceutical Manufacturing & Operations": 49.6,
+    "Bioinformatics & Data Science": 58.6,
+    "Commercial, Sales & Marketing": 49.2,
+    "Supply Chain, Logistics & Pharmacovigilance": 48.3,
+    "Finance, HR & Business Operations": 52.4,
+    "Research & Drug Discovery": 54.4
+  },
+  "remote_pct": 36.6,
+  "work_arrangement_mix": {
+    "Remote": 183,
+    "Hybrid": 200,
+    "On-site": 117
+  },
+  "seniority_demand": {
+    "Senior": 117,
+    "Entry Level": 109,
+    "Mid Level": 190,
+    "Director": 65,
+    "VP": 19
+  },
+  "avg_salary_by_seniority": {
+    "Senior": 132322,
+    "Entry Level": 60424,
+    "Mid Level": 94100,
+    "Director": 176061,
+    "VP": 243276
+  },
+  "hardest_to_fill": [
+    {
+      "title": "GMP Compliance Analyst",
+      "department": "Quality Assurance, Compliance & Regulatory Affairs",
+      "avg_days_to_fill": 70.4,
+      "count": 5
+    },
+    {
+      "title": "Medicinal Chemist",
+      "department": "Research & Drug Discovery",
+      "avg_days_to_fill": 64.4,
+      "count": 12
+    },
+    {
+      "title": "Senior Research Scientist",
+      "department": "Research & Drug Discovery",
+      "avg_days_to_fill": 61.6,
+      "count": 7
+    },
+    {
+      "title": "Financial Analyst",
+      "department": "Finance, HR & Business Operations",
+      "avg_days_to_fill": 61,
+      "count": 4
+    },
+    {
+      "title": "Bioinformatics Scientist",
+      "department": "Bioinformatics & Data Science",
+      "avg_days_to_fill": 59.8,
+      "count": 5
+    },
+    {
+      "title": "Drug Safety Associate",
+      "department": "Supply Chain, Logistics & Pharmacovigilance",
+      "avg_days_to_fill": 59.2,
+      "count": 4
+    },
+    {
+      "title": "Quality Assurance Manager",
+      "department": "Quality Assurance, Compliance & Regulatory Affairs",
+      "avg_days_to_fill": 58.3,
+      "count": 6
+    },
+    {
+      "title": "Key Account Manager",
+      "department": "Commercial, Sales & Marketing",
+      "avg_days_to_fill": 58.3,
+      "count": 10
+    },
+    {
+      "title": "Talent Acquisition Specialist",
+      "department": "Finance, HR & Business Operations",
+      "avg_days_to_fill": 57.7,
+      "count": 6
+    },
+    {
+      "title": "Computational Biologist",
+      "department": "Bioinformatics & Data Science",
+      "avg_days_to_fill": 57,
+      "count": 3
+    }
+  ],
+  "top_demanded_skills": [
+    [
+      "Stakeholder Management",
+      214
+    ],
+    [
+      "Business Analysis",
+      206
+    ],
+    [
+      "Project Management",
+      206
+    ],
+    [
+      "Change Management",
+      202
+    ],
+    [
+      "Agile",
+      201
+    ],
+    [
+      "Strategy",
+      195
+    ],
+    [
+      "process validation",
+      84
+    ],
+    [
+      "GMP compliance",
+      84
+    ],
+    [
+      "bioreactor operation",
+      84
+    ],
+    [
+      "lean manufacturing",
+      84
+    ],
+    [
+      "assay development",
+      74
+    ],
+    [
+      "molecular biology",
+      74
+    ],
+    [
+      "in vitro pharmacology",
+      74
+    ],
+    [
+      "medicinal chemistry",
+      74
+    ],
+    [
+      "genomics analysis",
+      36
+    ]
+  ],
+  "hiring_velocity_trend": "Stable quarter over quarter (+1%)",
+  "profiles_with_activity": 358,
+  "avg_posts_per_active_profile": 6.7,
+  "top_discussion_topics": [
+    [
+      "Sterling Life Sciences announces new initiative",
+      148
+    ],
+    [
+      "Lessons from a decade in this industry",
+      143
+    ],
+    [
+      "What the latest research tells us",
+      141
+    ],
+    [
+      "Excited to join Sterling Life Sciences",
+      141
+    ],
+    [
+      "Our team just hit a major milestone",
+      139
+    ],
+    [
+      "New chapter in my career",
+      139
+    ],
+    [
+      "Certification complete!",
+      138
+    ],
+    [
+      "Panel discussion on workforce transformation",
+      137
+    ]
+  ],
+  "job_change_signal_count": 411
+}

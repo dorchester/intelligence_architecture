@@ -1,0 +1,80 @@
+[
+  {
+    "posting_id": "sterling-pharma-post-00001",
+    "company": "Sterling Life Sciences",
+    "company_id": "sterling-pharma",
+    "title": "Director of Clinical Operations",
+    "department": "Clinical Development & Medical Affairs",
+    "location": "Remote",
+    "work_arrangement": "Remote",
+    "seniority_level": "Senior",
+    "posted_date": "2024-10-18",
+    "status": "filled",
+    "salary_range": {
+      "low": 110277,
+      "high": 154913,
+      "currency": "USD"
+    },
+    "applicant_count": 278,
+    "days_to_fill": 57,
+    "skills_required": [
+      "Strategy",
+      "Business Analysis",
+      "Stakeholder Management",
+      "Agile"
+    ],
+    "segment": "Oncology"
+  },
+  {
+    "posting_id": "sterling-pharma-post-00002",
+    "company": "Sterling Life Sciences",
+    "company_id": "sterling-pharma",
+    "title": "Clinical Research Associate",
+    "department": "Clinical Development & Medical Affairs",
+    "location": "Remote",
+    "work_arrangement": "Remote",
+    "seniority_level": "Entry Level",
+    "posted_date": "2025-06-01",
+    "status": "filled",
+    "salary_range": {
+      "low": 51403,
+      "high": 68738,
+      "currency": "USD"
+    },
+    "applicant_count": 320,
+    "days_to_fill": 60,
+    "skills_required": [
+      "Agile",
+      "Business Analysis",
+      "Change Management",
+      "Strategy"
+    ],
+    "segment": "Manufacturing Expansion"
+  },
+  {
+    "posting_id": "sterling-pharma-post-00003",
+    "company": "Sterling Life Sciences",
+    "company_id": "sterling-pharma",
+    "title": "QA Auditor",
+    "department": "Quality Assurance, Compliance & Regulatory Affairs",
+    "location": "Philadelphia, PA",
+    "work_arrangement": "Hybrid",
+    "seniority_level": "Mid Level",
+    "posted_date": "2026-02-07",
+    "status": "filled",
+    "salary_range": {
+      "low": 83307,
+      "high": 113714,
+      "currency": "USD"
+    },
+    "applicant_count": 266,
+    "days_to_fill": 65,
+    "skills_required": [
+      "Project Management",
+      "Stakeholder Management",
+      "Change Management",
+      "Business Analysis"
+    ],
+    "segment": "Manufacturing Expansion"
+  }
+]

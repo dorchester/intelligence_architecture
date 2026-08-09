@@ -83,9 +83,9 @@
         <h1>{% block heading %}Engineer{% endblock %}</h1>
         <nav class="nav-links">
             <a href="/">Consultant</a>
-            <a href="/engineer" {% if active_nav == 'dashboard' %}class="active"{% endif %}>Dashboard</a>
-            <a href="/engineer/guardrails" {% if active_nav == 'guardrails' %}class="active"{% endif %}>Guardrails</a>
-            <a href="/engineer/datasets" {% if active_nav == 'datasets' %}class="active"{% endif %}>Datasets</a>
+            <a href="{{ url_for('engineer.dashboard') }}" {% if active_nav == 'dashboard' %}class="active"{% endif %}>Dashboard</a>
+            <a href="{{ url_for('engineer.guardrails_page') }}" {% if active_nav == 'guardrails' %}class="active"{% endif %}>Guardrails</a>
+            <a href="{{ url_for('engineer.datasets') }}" {% if active_nav == 'datasets' %}class="active"{% endif %}>Datasets</a>
             <a href="https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards/dashboard/intelligence-engine-bedrock-usage" target="_blank">CloudWatch &nearr;</a>
         </nav>
     </header>

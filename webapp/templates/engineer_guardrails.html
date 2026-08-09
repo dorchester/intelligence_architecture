@@ -97,7 +97,7 @@
                         <td><code>{{ e.check }}</code></td>
                         <td>{{ e.message }}{% if e.detail %}<br><span style="color:var(--text-muted);font-size:0.75rem;">{{ e.detail }}</span>{% endif %}</td>
                         <td>{{ e.company }}</td>
-                        <td><a class="link" href="/engineer/run/{{ e.run_id }}"><code>{{ e.run_id[:8] }}</code></a></td>
+                        <td><a class="link" href="{{ url_for('engineer.inspect_run', run_id=e.run_id) }}"><code>{{ e.run_id[:8] }}</code></a></td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -113,7 +113,7 @@
             <h2>Edit Configuration</h2>
             <span class="badge">changes apply to new runs immediately</span>
         </div>
-        <form action="/engineer/guardrails/save" method="POST">
+        <form action="{{ url_for('engineer.guardrails_save') }}" method="POST">
             <textarea name="raw_config" class="editor" spellcheck="false">{{ raw_config }}</textarea>
             <div style="margin-top:0.8rem;">
                 <button type="submit" class="btn btn-primary">Save &amp; Reload</button>

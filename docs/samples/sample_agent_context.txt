@@ -1,0 +1,64 @@
+WORKFORCE DATASET — Sterling Life Sciences
+Industry: Pharmaceuticals / Biotechnology | Reported headcount: 43,000
+Sample: 500 employee profiles, 500 job postings (24 months)
+
+WORKFORCE COMPOSITION
+  Pharmaceutical Manufacturing & Operations: 103 (20.6%) | avg tenure 2.9y | flight risk 23%
+  Commercial & Sales: 76 (15.2%) | avg tenure 2.9y | flight risk 37%
+  Research & Drug Discovery: 66 (13.2%) | avg tenure 3.1y | flight risk 18%
+  Quality Assurance & Compliance: 46 (9.2%) | avg tenure 3.1y | flight risk 13%
+  Clinical Development: 44 (8.8%) | avg tenure 3.5y | flight risk 20%
+  Medical Affairs: 31 (6.2%) | avg tenure 3.0y | flight risk 20%
+  Regulatory Affairs: 30 (6.0%) | avg tenure 3.8y | flight risk 12%
+  Finance & Business Operations: 27 (5.4%) | avg tenure 3.0y | flight risk 25%
+  Supply Chain & Logistics: 23 (4.6%) | avg tenure 3.0y | flight risk 24%
+  Bioinformatics & Data Science: 21 (4.2%) | avg tenure 3.0y | flight risk 33%
+
+SENIORITY MIX
+  Entry: 182, Mid: 109, Senior: 99, Director: 67, VP/Executive: 43
+
+TENURE & RETENTION
+  Average tenure: 3.1 years
+  Median tenure: 1.9 years
+  Flight risk (elevated): 31.8% of workforce
+  Signalling openness to opportunities: 21.6%
+  External hires vs internal promotions: 76% external
+  Average prior employers per person: 2.0
+
+HIRING ACTIVITY (24 months)
+  Total postings: 500
+  Currently active: 21
+  Average days to fill: 52
+  Remote-eligible: 37%
+  Trend: Stable quarter over quarter (+1%)
+
+HIRING BY FUNCTION
+  Clinical Development & Medical Affairs: 113 postings | 52 days avg to fill
+  Pharmaceutical Manufacturing & Operations: 84 postings | 50 days avg to fill
+  Research & Drug Discovery: 74 postings | 54 days avg to fill
+  Commercial, Sales & Marketing: 63 postings | 49 days avg to fill
+  Quality Assurance, Compliance & Regulatory Affairs: 53 postings | 55 days avg to fill
+  Finance, HR & Business Operations: 49 postings | 52 days avg to fill
+  Bioinformatics & Data Science: 36 postings | 59 days avg to fill
+  Supply Chain, Logistics & Pharmacovigilance: 28 postings | 48 days avg to fill
+
+HARDEST ROLES TO FILL
+  GMP Compliance Analyst (Quality Assurance, Compliance & Regulatory Affairs): 70 days, 5 postings
+  Medicinal Chemist (Research & Drug Discovery): 64 days, 12 postings
+  Senior Research Scientist (Research & Drug Discovery): 62 days, 7 postings
+  Financial Analyst (Finance, HR & Business Operations): 61 days, 4 postings
+  Bioinformatics Scientist (Bioinformatics & Data Science): 60 days, 5 postings
+
+COMPENSATION BANDS (posted midpoint)
+  Senior: $132,322, Entry Level: $60,424, Mid Level: $94,100, Director: $176,061, VP: $243,276
+
+IN-DEMAND SKILLS
+  Stakeholder Management (214), Business Analysis (206), Project Management (206), Change Management (202), Agile (201), Strategy (195), process validation (84), GMP compliance (84), bioreactor operation (84), lean manufacturing (84)
+
+WORKFORCE SKILLS ON HAND
+  Project Management (262), Agile (259), Stakeholder Management (255), Strategy (246), Business Analysis (240), Change Management (238), bioreactor operation (103), process validation (103), GMP compliance (103), lean manufacturing (103)
+
+SOCIAL SIGNALS
+  Profiles with recent activity: 358 (72%)
+  Job-change posts detected: 411
+  Common topics: Sterling Life Sciences announces new initiative, Lessons from a decade in this industry, What the latest research tells us, Excited to join Sterling Life Sciences, Our team just hit a major milestone

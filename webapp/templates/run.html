@@ -65,6 +65,41 @@
         .status-banner.completed { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.15); color: var(--green); }
         .status-banner.rejected { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.15); color: var(--red); }
         .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+        .guardrail-block {
+            background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.25);
+            border-radius: 10px; padding: 1.1rem 1.3rem; margin-bottom: 1.5rem;
+        }
+        .gb-title { font-size: 0.88rem; font-weight: 700; color: var(--red); margin-bottom: 0.35rem; }
+        .gb-body { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; }
+        .gb-link { display: inline-block; margin-top: 0.7rem; font-size: 0.8rem; color: var(--blue); text-decoration: none; font-weight: 600; }
+        .gb-link:hover { text-decoration: underline; }
+
+        .dataset-strip {
+            background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.2);
+            border-radius: 10px; padding: 0.8rem 1.2rem; margin-bottom: 1.25rem;
+        }
+        .ds-label {
+            font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.07em; color: var(--green); margin-bottom: 0.4rem;
+        }
+        .ds-stats { display: flex; gap: 1.4rem; flex-wrap: wrap; font-size: 0.78rem; color: var(--text-secondary); }
+        .ds-stats strong { color: var(--text); font-variant-numeric: tabular-nums; }
+
+        .guardrail-warns { margin-bottom: 1.25rem; }
+        .gw-item {
+            display: flex; gap: 0.6rem; align-items: baseline;
+            font-size: 0.78rem; color: var(--orange);
+            padding: 0.45rem 0.9rem; background: rgba(245,158,11,0.05);
+            border-left: 2px solid var(--orange); border-radius: 0 6px 6px 0;
+            margin-bottom: 0.3rem;
+        }
+        .gw-tag {
+            font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em; opacity: 0.7; flex-shrink: 0;
+        }
+        .gw-detail { color: var(--text-muted); }
+
+        .status-banner.rejected .status-dot { animation: none; }
         .status-banner.running .status-dot,
         .status-banner.waiting .status-dot { animation: blink 1.5s ease-in-out infinite; }
         @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
@@ -151,12 +186,6 @@
         </div>
     </div>
 
-    <!-- Nav -->
-    <div style="display:flex; justify-content:flex-end; margin-bottom:1rem; gap:0.5rem;">
-        <a href="/engineer/run/{{ run.run_id }}" style="font-size:0.72rem; color:var(--text-muted); text-decoration:none; padding:0.35rem 0.75rem; border:1px solid var(--border); border-radius:6px;">Inspect</a>
-        <a href="/engineer" style="font-size:0.72rem; color:var(--text-muted); text-decoration:none; padding:0.35rem 0.75rem; border:1px solid var(--border); border-radius:6px;">Engineer Dashboard</a>
-    </div>
-
     <!-- Progress segments (5 checkpoints) -->
     <div class="progress-bar" id="progress-bar">
         {% set completed_checkpoints = run.checkpoints | length %}
@@ -172,16 +201,52 @@
     <div class="status-banner
         {%- if run.stage == 'completed' %} completed
         {%- elif run.stage == 'waiting_for_approval' %} waiting
-        {%- elif run.stage == 'rejected' %} rejected
+        {%- elif run.stage in ('rejected', 'blocked', 'error') %} rejected
         {%- else %} running{% endif %}" id="status-banner">
         <div class="status-dot"></div>
         <span id="status-text">
         {% if run.stage == 'completed' %}Engagement complete
         {% elif run.stage == 'waiting_for_approval' %}Your input is needed
         {% elif run.stage == 'rejected' %}Engagement rejected
+        {% elif run.stage == 'blocked' %}Stopped by guardrail
+        {% elif run.stage == 'error' %}Run failed
         {% else %}Processing: {{ run.stage.replace('_', ' ') }}{% endif %}
         </span>
     </div>
+
+    {% if run.stage == 'blocked' and run.blocked_reason %}
+    <div class="guardrail-block">
+        <div class="gb-title">Guardrail stopped this run</div>
+        <div class="gb-body">{{ run.blocked_reason }}</div>
+        <a href="/" class="gb-link">Start a new briefing &rarr;</a>
+    </div>
+    {% endif %}
+
+    {% if run.dataset_available and run.dataset_summary %}
+    {% set ds = run.dataset_summary %}
+    <div class="dataset-strip">
+        <div class="ds-label">Workforce dataset in scope</div>
+        <div class="ds-stats">
+            <span><strong>{{ '{:,}'.format(ds.profiles_analyzed) }}</strong> profiles</span>
+            <span><strong>{{ '{:,}'.format(ds.postings_analyzed) }}</strong> postings</span>
+            <span><strong>{{ ds.avg_tenure_years }}y</strong> avg tenure</span>
+            <span><strong>{{ ds.flight_risk_pct }}%</strong> flight risk</span>
+            <span><strong>{{ ds.active_postings }}</strong> open roles</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {% set warn_events = run.guardrail_events | selectattr('severity', 'equalto', 'warn') | list %}
+    {% if warn_events %}
+    <div class="guardrail-warns">
+        {% for e in warn_events %}
+        <div class="gw-item">
+            <span class="gw-tag">check</span>
+            <span>{{ e.message }}{% if e.detail %} — <span class="gw-detail">{{ e.detail }}</span>{% endif %}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <!-- Checkpoint card (only shown when waiting) -->
     <div id="checkpoint-area">

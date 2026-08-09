@@ -531,11 +531,14 @@ class DatasetQuery:
         hardest.sort(key=lambda x: -x["avg_days_to_fill"])
         s.hardest_to_fill = hardest[:10]
 
-        # Hiring velocity: compare last two quarters present
+        # Hiring velocity: compare the last two *complete* quarters.
+        # The newest and oldest quarters in the window are usually partial —
+        # including them reads as a false spike or collapse.
         quarters = sorted(quarter_counter.keys())
-        if len(quarters) >= 2:
-            recent = quarter_counter[quarters[-1]]
-            prior = quarter_counter[quarters[-2]]
+        if len(quarters) >= 4:
+            complete = quarters[1:-1]
+            recent = quarter_counter[complete[-1]]
+            prior = quarter_counter[complete[-2]]
             if prior:
                 change = (recent - prior) / prior
                 if change > 0.15:
@@ -547,6 +550,8 @@ class DatasetQuery:
                         f"Slowing ({change:.0%} vs prior quarter)"
                     )
                 else:
-                    s.hiring_velocity_trend = "Stable quarter over quarter"
+                    s.hiring_velocity_trend = (
+                        f"Stable quarter over quarter ({change:+.0%})"
+                    )
         if not s.hiring_velocity_trend:
             s.hiring_velocity_trend = "Insufficient history"

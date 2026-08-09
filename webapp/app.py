@@ -1,13 +1,19 @@
-"""Consultant-facing web UI for the Intelligence Engine.
+"""Consultant console for the Intelligence Engine.
 
 A pre-engagement intelligence tool for management consultants specializing in
 organization, workforce, and change. Generates research-backed briefings about
-prospective or current clients using publicly available information.
+prospective or current clients.
+
+This module owns only the consultant experience. The engineer console is a
+separate blueprint (webapp/engineer.py) with its own routes and templates;
+shared runtime state lives in webapp/runtime.py.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import sys
 import threading
 import time
 import uuid
@@ -15,78 +21,32 @@ from pathlib import Path
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 
-import sys
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from webapp import runtime
+from webapp.runtime import (
+    RUNS_DIR,
+    guardrails,
+    get_bedrock_model,
+    get_dataset_query,
+    list_preset_companies,
+    runs,
+)
 
 app = Flask(__name__)
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(BASE_DIR))
+# The engineer console is mounted only when enabled. In a corporate
+# deployment it would run as a separate service behind different auth.
+ENABLE_ENGINEER_CONSOLE = os.environ.get("ENGINEER_CONSOLE", "1") != "0"
+if ENABLE_ENGINEER_CONSOLE:
+    from webapp.engineer import engineer_bp
 
-RUNS_DIR = BASE_DIR / "runs"
-
-from guardrails.engine import GuardrailEngine
-
-# In-memory run state
-runs: dict[str, dict] = {}
-
-# Guardrail engine — reloaded on demand so engineers can tune without restart
-guardrails = GuardrailEngine()
-
-# Lazily-initialised dataset client (None if AWS unavailable)
-_dataset_query = None
-_dataset_error: str | None = None
+    app.register_blueprint(engineer_bp)
 
 
-def get_bedrock_model(model_id: str = "us.anthropic.claude-sonnet-4-6"):
-    from agent.model import BedrockModel, ModelConfig
-    config = ModelConfig(model_id=model_id, profile="intelligence-dev")
-    return BedrockModel(config)
-
-
-def get_dataset_query():
-    """Return a DatasetQuery bound to the project bucket, or None."""
-    global _dataset_query, _dataset_error
-    if _dataset_query is not None:
-        return _dataset_query
-    try:
-        import boto3
-        from datasets.query import DatasetQuery
-
-        session = boto3.Session(profile_name="intelligence-dev", region_name="us-east-1")
-        cfn = session.client("cloudformation")
-        resp = cfn.describe_stacks(StackName="intelligence-engine-dev-storage")
-        bucket = next(
-            o["OutputValue"]
-            for o in resp["Stacks"][0]["Outputs"]
-            if o["OutputKey"] == "BucketName"
-        )
-        limits = guardrails.dataset_limits()
-        _dataset_query = DatasetQuery(
-            bucket=bucket,
-            region="us-east-1",
-            profile="intelligence-dev",
-            max_profiles=limits["max_profiles_returned"],
-            max_postings=limits["max_postings_returned"],
-        )
-        _dataset_error = None
-        return _dataset_query
-    except Exception as e:
-        _dataset_error = f"{type(e).__name__}: {e}"
-        return None
-
-
-def list_preset_companies() -> list[dict]:
-    """Companies with a synthetic dataset available in S3."""
-    dq = get_dataset_query()
-    if not dq:
-        return []
-    try:
-        return dq.list_companies()
-    except Exception:
-        return []
-
-
-# ============ ROUTES ============
+# ============ CONSULTANT ROUTES ============
 
 @app.route("/")
 def index():
@@ -96,7 +56,7 @@ def index():
         "index.html",
         recent_runs=recent_runs,
         presets=presets,
-        dataset_error=_dataset_error,
+        dataset_error=runtime.dataset_error(),
         validation_error=request.args.get("error"),
         validation_detail=request.args.get("detail"),
     )
@@ -121,11 +81,7 @@ def start_run():
         return redirect(url_for("index", error=v.message, detail=v.detail))
 
     # ---- GUARDRAIL: concurrency ----
-    active = sum(
-        1 for r in runs.values()
-        if r["stage"] not in ("completed", "rejected", "error", "blocked")
-    )
-    cr = guardrails.check_concurrent_runs(active)
+    cr = guardrails.check_concurrent_runs(runtime.active_run_count())
     if cr.blocked:
         v = cr.blocking_violations[0]
         return redirect(url_for("index", error=v.message, detail=v.detail))
@@ -166,122 +122,6 @@ def run_status(run_id: str):
     if not run:
         return "Run not found", 404
     return render_template("run.html", run=run)
-
-
-@app.route("/engineer")
-def engineer_dashboard():
-    """Top-level engineer dashboard showing system state, all runs, infrastructure."""
-    runs_list = sorted(runs.values(), key=lambda r: r["created_at"], reverse=True)
-    active_runs = sum(1 for r in runs.values() if r["stage"] not in ["completed", "rejected", "waiting_for_approval", "initialized"])
-    total_llm_calls = sum(len([e for e in r.get("log", []) if "Bedrock" in e or "generated" in e.lower()]) for r in runs.values())
-    bedrock_status = "connected"
-    try:
-        get_bedrock_model()
-    except Exception:
-        bedrock_status = "error"
-    return render_template("engineer.html",
-        runs=runs.values(),
-        runs_list=runs_list,
-        active_runs=active_runs,
-        total_llm_calls=total_llm_calls,
-        runs_dir=str(RUNS_DIR),
-        bedrock_status=bedrock_status,
-    )
-
-
-@app.route("/engineer/run/<run_id>")
-def engineer_inspect(run_id: str):
-    """Engineer detail view for a single run."""
-    run = runs.get(run_id)
-    if not run:
-        return "Run not found", 404
-    return render_template("engineer_run.html", run=run)
-
-
-@app.route("/engineer/guardrails")
-def engineer_guardrails():
-    """Guardrail configuration viewer and editor."""
-    guardrails.reload()
-    raw = ""
-    try:
-        raw = guardrails.config_path.read_text(encoding="utf-8")
-    except Exception:
-        pass
-
-    # Aggregate guardrail events across all runs
-    events = []
-    for r in runs.values():
-        for e in r.get("guardrail_events", []):
-            events.append({**e, "run_id": r["run_id"], "company": r.get("company_name", "")})
-    events.reverse()
-
-    return render_template(
-        "engineer_guardrails.html",
-        config=guardrails.config,
-        raw_config=raw,
-        config_path=str(guardrails.config_path),
-        events=events[:50],
-        saved=request.args.get("saved"),
-        error=request.args.get("error"),
-    )
-
-
-@app.route("/engineer/guardrails/save", methods=["POST"])
-def engineer_guardrails_save():
-    """Persist edited guardrail YAML."""
-    import yaml as _yaml
-
-    raw = request.form.get("raw_config", "")
-    try:
-        _yaml.safe_load(raw)  # validate before writing
-    except Exception as e:
-        return redirect(url_for("engineer_guardrails", error=f"Invalid YAML: {e}"))
-
-    try:
-        guardrails.config_path.write_text(raw, encoding="utf-8")
-        guardrails.reload()
-    except Exception as e:
-        return redirect(url_for("engineer_guardrails", error=str(e)))
-
-    return redirect(url_for("engineer_guardrails", saved="1"))
-
-
-@app.route("/engineer/datasets")
-def engineer_datasets():
-    """Dataset inventory and inspection."""
-    dq = get_dataset_query()
-    companies = []
-    if dq:
-        try:
-            companies = dq.list_companies()
-        except Exception:
-            companies = []
-    return render_template(
-        "engineer_datasets.html",
-        companies=companies,
-        dataset_error=_dataset_error,
-        bucket=getattr(dq, "bucket", None),
-    )
-
-
-@app.route("/engineer/datasets/<company_id>")
-def engineer_dataset_detail(company_id: str):
-    """Inspect one company's dataset."""
-    dq = get_dataset_query()
-    if not dq:
-        return "Dataset service unavailable", 503
-    summary = dq.summarize(company_id)
-    if not summary:
-        return "Dataset not found", 404
-    sample_profiles = dq.get_profiles(company_id, limit=5)
-    sample_postings = dq.get_postings(company_id, limit=5)
-    return render_template(
-        "engineer_dataset_detail.html",
-        summary=summary,
-        agent_context=summary.to_agent_context(),
-        sample_profiles=sample_profiles,
-        sample_postings=sample_postings,
-    )
 
 
 @app.route("/run/<run_id>/approve", methods=["POST"])

@@ -1,116 +1,121 @@
 # CLAUDE.md — Intelligence Engine
 
-## What This Is
+## What this is
 
-A pre-engagement intelligence tool for management consultants. Enter a real company name, the engine researches it via Claude on Bedrock, generates organizational/workforce analysis, identifies engagement opportunities, and produces a professional intelligence briefing — with 5 human checkpoints throughout.
+A pre-engagement intelligence tool for management consultants (organization,
+workforce, change). Enter a company → verify it's real → load workforce dataset
+→ 4 LLM phases → HTML briefing, with 5 consultant checkpoints throughout.
 
-## Quick Start
+## Quick start
 
 ```bash
 pip install -e ".[dev]"
-pytest                           # 17 tests, no AWS needed
-python webapp/app.py             # Consultant UI at localhost:5000
-                                 # Engineer dashboard at localhost:5000/engineer
+pytest -q                          # 46 tests, no AWS
+python webapp/app.py               # consultant → :5000, engineer → :5000/engineer
+ENGINEER_CONSOLE=0 python webapp/app.py   # consultant only
 ```
 
-## AWS Setup
+## AWS
 
-Profile: `intelligence-dev` (SSO, us-east-1)
-Verify: `aws sts get-caller-identity --profile intelligence-dev`
-
-Three CloudFormation stacks deployed:
-- `intelligence-engine-dev-storage` — S3 bucket for run artifacts
-- `intelligence-engine-dev-state` — DynamoDB table for run state
-- `intelligence-engine-dev-observability` — CloudWatch usage dashboard
-
-Deploy all:
 ```bash
-aws cloudformation deploy --profile intelligence-dev --region us-east-1 \
-  --template-file infrastructure/cloudformation/storage.yaml \
-  --stack-name intelligence-engine-dev-storage --parameter-overrides Environment=dev
+aws sso login --profile intelligence-dev   # expires often; refresh first
+aws sts get-caller-identity --profile intelligence-dev
+./infrastructure/deploy.sh                 # all three stacks
+```
 
-aws cloudformation deploy --profile intelligence-dev --region us-east-1 \
-  --template-file infrastructure/cloudformation/state.yaml \
-  --stack-name intelligence-engine-dev-state --parameter-overrides Environment=dev
+Region `us-east-1`. Stacks: `intelligence-engine-dev-{storage,state,observability}`.
 
-aws cloudformation deploy --profile intelligence-dev --region us-east-1 \
-  --template-file infrastructure/cloudformation/observability.yaml \
-  --stack-name intelligence-engine-dev-observability --parameter-overrides Environment=dev
+**Datasets are already generated and in S3** — 20 companies, 10,000 profiles,
+10,000 postings. Regenerate only if needed:
+```bash
+python scripts/data_generation/generate_all.py --profile intelligence-dev
 ```
 
 ## Architecture
 
 ```
-Consultant (webapp/) → Bedrock Claude Sonnet 4.6 → Research + Analysis → HTML Briefing
-                              ↕
-                    S3 (artifacts) + DynamoDB (state)
+webapp/app.py       consultant console + orchestration (4 LLM phases, 5 checkpoints)
+webapp/engineer.py  engineer console — separate Blueprint at /engineer
+webapp/runtime.py   shared state (runs dict, guardrails, AWS accessors)
+guardrails/         YAML-configured rule engine, 14 rules
+datasets/query.py   S3 dataset access + ~30 workforce signals
+agent/              Bedrock wrapper, RunContext
+storage/            local + S3 backends
+state/              DynamoDB run lifecycle (used by CLI orchestrator, not webapp)
+infrastructure/     deploy.sh + CloudFormation
+scripts/            data generation, usage reporting, sample export
 ```
 
-Two personas:
-- **Consultant** (`localhost:5000`): enters company, approves 5 checkpoints, gets intelligence briefing
-- **Engineer** (`localhost:5000/engineer`): system dashboard, run inspection, infrastructure status
+## Models
 
-## Key Files
+| Purpose | Model |
+|---|---|
+| Engine runtime | `us.anthropic.claude-sonnet-4-6` |
+| Entity verification | `us.anthropic.claude-haiku-4-5-20251001-v1:0` |
+| Claude Code (engineering) | whatever the session is set to — **different thing** |
 
-| Path | Purpose |
-|------|---------|
-| `webapp/app.py` | Flask app — all routes, LLM calls, checkpoint logic |
-| `webapp/templates/` | Jinja2 HTML templates (index, run, engineer, engineer_run) |
-| `agent/engine.py` | Methodology-driven agent with Bedrock tool-use |
-| `agent/model.py` | Bedrock model abstraction (configurable) |
-| `agent/context.py` | RunContext — per-run state and artifact access |
-| `storage/` | StorageBackend interface (LocalStorage, S3Storage) |
-| `state/run_state.py` | DynamoDB run lifecycle manager |
-| `tools/basic_analysis.py` | Deterministic pandas workforce analysis |
-| `tools/chart.py` | matplotlib chart generation |
-| `tools/report.py` | Jinja2 HTML report renderer |
-| `methodology/` | Markdown playbooks the agent follows |
-| `prompts/` | System prompt + narrative template |
-| `infrastructure/cloudformation/` | All AWS infrastructure as CloudFormation |
-| `scripts/bedrock_usage.py` | CLI for Bedrock token usage and Cost Explorer |
-| `orchestrator.py` | CLI orchestrator (S3 + DynamoDB + Bedrock + checkpoints) |
-| `docs/` | Architecture, decisions, build status, corporate deployment |
+Model IDs are config, never hardcoded in analytical code. See `agent/model.py`
+and `webapp/runtime.py:DEFAULT_MODEL`.
 
-## Runtime Model
+## Key design decisions
 
-Default: `us.anthropic.claude-sonnet-4-6` (inference profile)
-The active Claude Code session uses: `us.anthropic.claude-opus-4-6-v1[1m]`
+1. **Client isolation is structural.** Storage and dataset calls take
+   `client_id`/`run_id` as required args; keys are built from them. No code path
+   constructs a key without them. Tests assert cross-client reads fail.
+2. **Guardrails are config, not code.** `guardrails/config.yaml` holds every
+   rule's enabled flag, severity (block/warn/log), and parameters. The engineer
+   console edits and hot-reloads it.
+3. **Revision loops, not rejection.** Each checkpoint is a `while True` — request
+   a revision and that phase re-runs with the feedback. Bounded by
+   `max_revisions_per_checkpoint`.
+4. **Feedback compounds.** Checkpoint N's feedback enters phases N+1 onward and
+   is written to `feedback_log.json`.
+5. **Two consoles, two blueprints.** Consultant templates have zero engineer
+   links. Engineer console is disableable.
+6. **Datasets ground the LLM.** `DatasetSummary.to_agent_context()` renders
+   measured signals into every prompt so the briefing cites figures rather than
+   recalling them.
 
-These are different — do not conflate them. The webapp uses Sonnet for cost efficiency.
-The model is configurable in `agent/model.py` via `ModelConfig`.
+## Gotchas hit before
 
-## Known Constraints
+- **Windows Unicode crash.** Background threads died silently on emoji in LLM
+  output (cp1252). Fixed with `_safe_str()` + top-level try/except in
+  `_execute_run`. Don't remove those.
+- **Truncated JSON from Bedrock.** A single large template request exceeded
+  `max_tokens` and returned unparseable JSON. Split into two calls
+  (`generate_departments`, `generate_posting_categories`) with `_llm_json()`
+  retrying at escalating token limits.
+- **Partial trailing quarter.** Hiring velocity compared the newest quarter,
+  which is partial, showing a false "-67% slowing". Now compares only complete
+  quarters (`quarters[1:-1]`).
+- **SSO expires constantly.** If anything AWS fails, check credentials first.
 
-- **Claude Fable 5**: inference profile ACTIVE but invocation returns "unavailable" — external AWS limitation
-- **provider_data_share**: enabled on this account for Fable experiment — NOT acceptable for production with real client data
-- **Cost Explorer**: data lags 24-48h behind CloudWatch metrics
-- **Webapp state**: in-memory (restarting loses run history) — production uses DynamoDB
-- **No CI/CD**: deploys are manual via CLI
-
-## Principles
-
-1. Deterministic tools vs. LLM reasoning — never mix them
-2. Run isolation by construction (client_id/run_id prefix in all storage paths)
-3. Prompts are NOT a security boundary
-4. Methodology guides but doesn't cage the agent
-5. Infrastructure as code (CloudFormation)
-6. No real client data, no credentials in repo
-7. Feedback from consultant checkpoints feeds into subsequent LLM calls
-
-## Tests
+## Testing
 
 ```bash
-pytest -v                          # All unit/integration (no AWS)
-python run_local.py --use-bedrock  # Local with Bedrock narrative
-python orchestrator.py run --auto-approve  # Full AWS (S3+DDB+Bedrock)
-python scripts/bedrock_usage.py --hours 24 # Token usage report
+pytest -q                                              # all
+pytest tests/test_guardrails.py -q                     # 29 guardrail tests
+python scripts/bedrock_usage.py --profile intelligence-dev --hours 24
 ```
 
-## Corporate Deployment
+## Known limits
 
-See `docs/corporate-deployment-architecture.md` for the target model:
-- Engineer uses Claude Code on EC2 via SSM (no console access)
-- DevOps owns infra (VPC, IAM roles, CI/CD pipeline)
-- Consultants access via App Runner behind corporate SSO
-- Production agent runs on AgentCore Runtime
-- All changes flow through Git → PR → CI/CD → deploy
+- Web app run state is in-memory (DynamoDB wiring exists but is used by the CLI
+  orchestrator only) — restart loses history
+- Research is model knowledge, not live retrieval
+- Datasets are synthetic
+- No auth, no CI/CD
+- `provider_data_share` enabled on the account — sandbox only, review before
+  production
+
+## For GitHub viewers without AWS
+
+`docs/architecture-report.html` is the full visual walkthrough.
+`docs/samples/` holds real system output including
+`sample_agent_context.txt` — the exact text the LLM receives.
+
+## Corporate deployment
+
+`docs/corporate-deployment-architecture.md` — engineer uses Claude Code on an
+EC2 instance via SSM (no console), DevOps owns IaC, consultants reach App Runner
+behind SSO, production agent on AgentCore Runtime.
