@@ -172,6 +172,34 @@ exactly one function responsible for it, and each function's power is a
 inventing a new role per person or per tool; the policy layer is the stable
 vocabulary, and seats are just attachment points for it.
 
+### End to end: the humans behind the machines
+
+The pipeline roles have machine-sounding names (`conformance`,
+`product-builder`, `stage-runner`), which obscures the question that matters
+for a real team: *which human stands behind each one?* The full report
+lifecycle, human-first:
+
+| # | Lifecycle step | Human accountable | Executes as |
+|---|---|---|---|
+| 1 | Admit a source (signoff + drop to `landing/`) | Data steward | steward seat |
+| 2 | Conform it (L1→L2: identifiers dropped, schema registered) | Data engineer | `conformance` |
+| 3 | Build data products (L3 aggregates, L4 vectors/graph) | Data engineer / product owner — each derived table names its `ie.owner` in catalog metadata | `product-builder` |
+| 4 | Validate the products | Analyst / data scientist | Databricks, read-only |
+| 5 | Build & tune the report pipeline (stages, prompts, evals) | AI engineer | workbench; runs as `stage-runner` |
+| 6 | Run the report | Consultant / engagement lead | console → `workflow` → `stage-runner` |
+| 7 | Approve checkpoints, request revisions | Consultant (human-in-the-loop by design) | `wf-approval` records it |
+| 8 | Onboard people (console logins) | Data steward | steward seat |
+| 9 | Audit afterward | Steward / auditor | steward seat (log + CloudTrail) |
+| 10 | Change the system itself | Platform engineer (deployer) | admin today; CI/CD role as successor |
+
+A machine role is never accountable for anything — it is the enumerated
+identity a human's work executes under. `product-builder` is the data
+engineer's transformations wearing their least-privilege grants; `ie.owner`
+on every derived table records which human answers for the product. In a
+one-person shop the same human holds most rows; because each row is already
+a distinct seat, handing one to a new person is a seating action, not a
+redesign.
+
 ### If a traditional team walked in tomorrow
 
 The seats are named for functions, not job titles — but they map cleanly onto
