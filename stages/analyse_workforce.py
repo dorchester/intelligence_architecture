@@ -135,8 +135,8 @@ def main(client_id: str) -> None:
     cfg = config()
     lakehouse, artifacts = cfg["lakehouse_bucket"], cfg["artifacts_bucket"]
 
-    df = read_parquet(lakehouse, f"silver/profiles/client_id={client_id}/part-0000.parquet")
-    print(f"read {len(df):,} conformed rows through the silver-read grant")
+    df = read_parquet(lakehouse, f"foundational/profiles/client_id={client_id}/part-0000.parquet")
+    print(f"read {len(df):,} conformed rows through the foundational-read grant")
 
     feedback = __import__("os").environ.get("REVISION_FEEDBACK", "").strip()
     if feedback:

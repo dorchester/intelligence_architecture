@@ -1,0 +1,353 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - medallion governance tiers, audit trail, stewardship
+
+# The governance layer over the data plane. Separate stack on purpose: the
+# data plane owns five live buckets and should not churn every time a tier,
+# grant or catalogue schema changes.
+#
+# Shape: shells first, synthetically filled, connected by one thread.
+#
+#   landing/            L1 source        raw synthetic drops
+#   foundational/       L2 conformed     identifiers dropped on the way in
+#   derived/            L3 products      built from foundational, owner + lineage
+#   contextualized/     L4 retrieval     vectors and graph, built from derived
+#   vault (annex)       sensitive        zero grants until privacy signoff
+#   artifacts, site     consumption      outside the governance boundary
+#
+# Every tier gets its own prefix, its own catalogue schema and its own pair of
+# read/write policies, so a stage's reach is a statement about which tier it
+# belongs to rather than a bucket-wide grant. Read and write are always
+# separate: the identity that builds a tier is never the identity that
+# consumes it.
+#
+# Cost: catalogue schemas and IAM policies are free. The trail bills per
+# data event recorded and for the log objects it writes.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+  StewardEmail:
+    Type: String
+    Default: ''
+    Description: Address that receives the stewardship digest. Empty skips the subscription.
+
+Conditions:
+  HasSteward: !Not [!Equals [!Ref StewardEmail, '']]
+
+Resources:
+
+  # ---------- catalogue schemas, one per tier ----------
+
+  FoundationalDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub ie_${Environment}_foundational
+        Description: L2 conformed records. Pseudonymous, governed, not public-safe.
+
+  DerivedDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub ie_${Environment}_derived
+        Description: L3 data products built from foundational. Owner and lineage required.
+
+  ContextualizedDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub ie_${Environment}_contextualized
+        Description: L4 retrieval structures - embeddings and graph - built from derived.
+
+  # Reserved so the deferred work has a named home rather than an implicit
+  # one. Empty schemas cost nothing and stop a later tier being improvised
+  # into whichever database happened to be nearest.
+  StewardshipDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub ie_${Environment}_stewardship
+        Description: Steward log and policy-gate outcomes.
+
+  # ---------- per-tier grants ----------
+  # Read and write are deliberately never combined. A stage that consumes a
+  # tier must not be able to rewrite it, which is the property that makes
+  # lineage trustworthy.
+
+  FoundationalReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub intelligence-engine-${Environment}-foundational-read
+      Description: Row-level read on conformed data. Enumerated per stage, never default.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [s3:GetObject]
+            Resource:
+              Fn::Sub:
+                - '${B}/foundational/*'
+                - B:
+                    Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+          - Effect: Allow
+            Action: [s3:ListBucket]
+            Resource:
+              Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+            Condition:
+              StringLike:
+                s3:prefix: ['foundational/*', 'foundational']
+
+  FoundationalWritePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub intelligence-engine-${Environment}-foundational-write
+      Description: Held only by conformance - the step that drops direct identifiers.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [s3:PutObject]
+            Resource:
+              Fn::Sub:
+                - '${B}/foundational/*'
+                - B:
+                    Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+
+  DerivedReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub intelligence-engine-${Environment}-derived-read
+      Description: Read L3 data products. The grant most consumers should hold.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [s3:GetObject]
+            Resource:
+              Fn::Sub:
+                - '${B}/derived/*'
+                - B:
+                    Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+          - Effect: Allow
+            Action: [s3:ListBucket]
+            Resource:
+              Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+            Condition:
+              StringLike:
+                s3:prefix: ['derived/*', 'derived']
+
+  DerivedWritePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub intelligence-engine-${Environment}-derived-write
+      Description: Publish an L3 product. Requires owner and lineage on the table.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [s3:PutObject]
+            Resource:
+              Fn::Sub:
+                - '${B}/derived/*'
+                - B:
+                    Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+
+  ContextualizedReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub intelligence-engine-${Environment}-contextualized-read
+      Description: Read retrieval structures - embeddings and graph edges.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [s3:GetObject]
+            Resource:
+              Fn::Sub:
+                - '${B}/contextualized/*'
+                - B:
+                    Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+          - Effect: Allow
+            Action: [s3:ListBucket]
+            Resource:
+              Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+            Condition:
+              StringLike:
+                s3:prefix: ['contextualized/*', 'contextualized']
+
+  ContextualizedWritePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub intelligence-engine-${Environment}-contextualized-write
+      Description: Build retrieval structures from derived products.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [s3:PutObject]
+            Resource:
+              Fn::Sub:
+                - '${B}/contextualized/*'
+                - B:
+                    Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+
+  StewardshipWritePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub intelligence-engine-${Environment}-stewardship-write
+      Description: Append to the steward log and publish a digest. Append-only by convention.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [s3:PutObject]
+            Resource:
+              Fn::Sub:
+                - '${B}/stewardship/*'
+                - B:
+                    Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+          - Effect: Allow
+            Action: [sns:Publish]
+            Resource: !Ref StewardTopic
+
+  # ---------- stewardship notification ----------
+
+  StewardTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub intelligence-engine-${Environment}-stewardship
+      DisplayName: Intelligence Engine stewardship
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  StewardSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasSteward
+    Properties:
+      TopicArn: !Ref StewardTopic
+      Protocol: email
+      Endpoint: !Ref StewardEmail
+
+  # ---------- audit trail ----------
+  #
+  # The gap the governance inventory found: without data events, a read of a
+  # row-level object is not provably logged, which is the first control an
+  # auditor asks about. Management events alone do not cover object reads.
+
+  TrailBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub intelligence-engine-${Environment}-audit-${AWS::AccountId}
+      VersioningConfiguration: {Status: Enabled}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: RetainAuditOneYear
+            Status: Enabled
+            ExpirationInDays: 365
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  TrailBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TrailBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AclCheck
+            Effect: Allow
+            Principal: {Service: cloudtrail.amazonaws.com}
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt TrailBucket.Arn
+          - Sid: Write
+            Effect: Allow
+            Principal: {Service: cloudtrail.amazonaws.com}
+            Action: s3:PutObject
+            Resource: !Sub '${TrailBucket.Arn}/AWSLogs/${AWS::AccountId}/*'
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+          - Sid: TlsOnly
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt TrailBucket.Arn
+              - !Sub '${TrailBucket.Arn}/*'
+            Condition:
+              Bool: {'aws:SecureTransport': false}
+
+  Trail:
+    Type: AWS::CloudTrail::Trail
+    DependsOn: TrailBucketPolicy
+    Properties:
+      TrailName: !Sub intelligence-engine-${Environment}
+      S3BucketName: !Ref TrailBucket
+      IsLogging: true
+      IsMultiRegionTrail: true
+      IncludeGlobalServiceEvents: true
+      # Integrity validation is what lets an auditor prove the log was not
+      # edited after the fact. Without it the trail is evidence of activity
+      # but not evidence of completeness.
+      EnableLogFileValidation: true
+      EventSelectors:
+        - ReadWriteType: All
+          IncludeManagementEvents: true
+          DataResources:
+            # Object-level reads of governed tiers and of the vault. These are
+            # the events that answer "who read this row".
+            - Type: AWS::S3::Object
+              Values:
+                - Fn::Sub:
+                    - '${B}/foundational/'
+                    - B:
+                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+                - Fn::Sub:
+                    - '${B}/derived/'
+                    - B:
+                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+                - Fn::Sub:
+                    - '${B}/'
+                    - B:
+                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-vault-arn
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+  FoundationalDatabaseName:
+    Value: !Ref FoundationalDatabase
+  DerivedDatabaseName:
+    Value: !Ref DerivedDatabase
+  ContextualizedDatabaseName:
+    Value: !Ref ContextualizedDatabase
+  StewardshipDatabaseName:
+    Value: !Ref StewardshipDatabase
+  StewardTopicArn:
+    Value: !Ref StewardTopic
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-steward-topic
+  TrailBucketName:
+    Value: !Ref TrailBucket
+  TrailName:
+    Value: !Ref Trail

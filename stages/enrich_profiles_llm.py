@@ -270,7 +270,7 @@ def main(client_id: str) -> None:
     started = time.time()
     cfg = config()
     df = read_parquet(cfg["lakehouse_bucket"],
-                      f"silver/profiles/client_id={client_id}/part-0000.parquet")
+                      f"foundational/profiles/client_id={client_id}/part-0000.parquet")
     print(f"read {len(df):,} conformed rows")
 
     feedback = os.environ.get("REVISION_FEEDBACK", "").strip()

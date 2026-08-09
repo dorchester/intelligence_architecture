@@ -76,7 +76,9 @@ Resources:
       # row-level silver and publish artifacts because these policies say so,
       # not because of blanket access.
       ManagedPolicyArns:
-        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-silver-read
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-foundational-read
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-derived-read
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-contextualized-read
         - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-artifacts-publish
       Policies:
         - PolicyName: stage-execution
@@ -198,7 +200,7 @@ Resources:
               Service: codebuild.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
-        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-silver-write
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-foundational-write
         - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-catalog-write
       Policies:
         - PolicyName: conformance-execution
@@ -284,6 +286,119 @@ Resources:
         EnvironmentVariables:
           - Name: CLIENT_ID
             Value: sterling-pharma
+          - Name: IE_ENV
+            Value: !Ref Environment
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # ---------- tier builder: L2 -> L3 -> L4 ----------
+  #
+  # Separate from the stage runner because the runner is a consumer. A builder
+  # reads the tier beneath it and writes its own; it never writes the tier it
+  # reads. That is what keeps lineage meaningful - a product cannot quietly
+  # rewrite its own source.
+
+  ProductBuilderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-product-builder
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-foundational-read
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-derived-read
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-derived-write
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-contextualized-write
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-catalog-write
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-stewardship-write
+      Policies:
+        - PolicyName: builder-execution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/intelligence-engine-${Environment}-product-builder*
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchCheckLayerAvailability
+                Resource: !GetAtt StagesRepository.Arn
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  Fn::Sub:
+                    - '${B}/build/*'
+                    - B:
+                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+              # Embeddings for the contextualized tier.
+              - Effect: Allow
+                Action: bedrock:InvokeModel
+                Resource:
+                  - !Sub arn:aws:bedrock:*:${AWS::AccountId}:application-inference-profile/*
+                  - arn:aws:bedrock:*::foundation-model/amazon.titan-embed-*
+                  - arn:aws:bedrock:*::foundation-model/anthropic.*
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/intelligence-engine/${Environment}/stages/*
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  ProductBuilderProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub intelligence-engine-${Environment}-product-builder
+      Description: Builds derived and contextualized tiers from foundational data
+      ServiceRole: !GetAtt ProductBuilderRole.Arn
+      TimeoutInMinutes: 30
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Source:
+        Type: S3
+        Location:
+          Fn::Sub:
+            - '${Bucket}/build/source.zip'
+            - Bucket:
+                Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-name
+        BuildSpec: |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - echo "Provide a buildspec override naming the builder stage"
+                - exit 1
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/intelligence-engine-${Environment}-stages:latest
+        ImagePullCredentialsType: SERVICE_ROLE
+        EnvironmentVariables:
           - Name: IE_ENV
             Value: !Ref Environment
       Tags:
@@ -737,6 +852,8 @@ Outputs:
     Value: !Ref StageRunnerProject
   StagesRepositoryUri:
     Value: !GetAtt StagesRepository.RepositoryUri
+  ProductBuilderProjectName:
+    Value: !Ref ProductBuilderProject
   GoldenReplayProjectName:
     Value: !Ref GoldenReplayProject
   ApproveCommand:

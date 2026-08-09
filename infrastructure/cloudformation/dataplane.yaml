@@ -303,45 +303,10 @@ Resources:
             Action: [s3:PutObject]
             Resource: !Sub '${LandingBucket.Arn}/*'
 
-  LakehouseSilverReadPolicy:
-    Type: AWS::IAM::ManagedPolicy
-    Properties:
-      ManagedPolicyName: !Sub intelligence-engine-${Environment}-silver-read
-      Description: >-
-        Row-level read on curated data. Attach per build stage that genuinely
-        needs microdata; this is the enumerated grant, not a default.
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Action: [s3:GetObject]
-            Resource: !Sub '${LakehouseBucket.Arn}/silver/*'
-          - Effect: Allow
-            Action: [s3:ListBucket]
-            Resource: !GetAtt LakehouseBucket.Arn
-            Condition:
-              StringLike:
-                s3:prefix: ['silver/*', 'silver']
 
   # Deliberately a separate policy from silver-read. Conformance is the only
   # job that writes curated data; an analytical stage that can read microdata
   # must not also be able to rewrite it, or "read-only" means nothing.
-  LakehouseSilverWritePolicy:
-    Type: AWS::IAM::ManagedPolicy
-    Properties:
-      ManagedPolicyName: !Sub intelligence-engine-${Environment}-silver-write
-      Description: >-
-        Write curated data. Held only by the conformance job - the step that
-        drops direct identifiers, which is what makes silver-read safe to hand out.
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Action: [s3:PutObject]
-            Resource: !Sub '${LakehouseBucket.Arn}/silver/*'
-          - Effect: Allow
-            Action: [s3:ListBucket]
-            Resource: !GetAtt LakehouseBucket.Arn
 
   # Table and partition registration for the same job. Scoped to this
   # database and its tables, not the account catalogue.
@@ -490,6 +455,14 @@ Outputs:
     Value: !GetAtt VaultKey.Arn
     Export:
       Name: !Sub intelligence-engine-${Environment}-vault-key-arn
+  LakehouseBucketArn:
+    Value: !GetAtt LakehouseBucket.Arn
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-lakehouse-arn
+  VaultBucketArn:
+    Value: !GetAtt VaultBucket.Arn
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-vault-arn
   AthenaWorkGroupName:
     Value: !Ref AthenaWorkGroup
   GlueDatabaseName:

@@ -1,12 +1,12 @@
-"""Stage: conform landing records into the governed silver layer.
+"""Stage: conform L1 source records into the L2 foundational tier.
 
-    python stages/conform_to_silver.py <client_id>
+    python stages/conform_to_foundational.py <client_id>
 
-This is the stage that makes the `silver-read` grant meaningful. Before it
+This is the stage that makes the `foundational-read` grant meaningful. Before it
 runs, the lakehouse is empty and every downstream grant points at nothing.
 
 The important step is not the file format - it is that **direct identifiers
-are dropped here**. Bronze may hold raw records; silver is what analytical
+are dropped here**. L1 may hold raw records; foundational is what analytical
 stages are allowed to read, so the removal happens on the way in rather than
 being left to every downstream consumer to remember.
 
@@ -16,7 +16,7 @@ carries department, location, title, seniority, tenure and a stable
 `profile_id`, and that combination is re-identifying in a small population.
 Under GDPR and equivalent regimes pseudonymous data is still personal data:
 it narrows exposure and shortens a review, it does not remove the obligation.
-Treat `silver/*` as governed personal data, not as a public-safe extract.
+Treat `foundational/*` as governed personal data, not as a public-safe extract.
 
 `turnover_risk_score` deserves particular attention: it is an inferred
 judgement about an individual's likelihood of leaving. Derived attributes of
@@ -25,7 +25,7 @@ and they are the reason a real deployment needs a documented lawful basis
 before this data is put in front of a model.
 
 Writes:
-  s3://<lakehouse>/silver/profiles/client_id=<id>/part-0000.parquet
+  s3://<lakehouse>/foundational/profiles/client_id=<id>/part-0000.parquet
 and registers the partition in the Glue catalog so Athena can query it.
 """
 from __future__ import annotations
@@ -34,11 +34,13 @@ import sys
 import pandas as pd
 
 from _aws import config, emit_metric, put_parquet, read_jsonl, session
+from _governance import (flush_steward_log, gate_anonymization,
+                         gate_engagement_permissibility)
 
-# Dropped, never written to silver. Everything analytical is structural.
+# Dropped, never written to foundational. Everything analytical is structural.
 DIRECT_IDENTIFIERS = ["first_name", "last_name", "full_name", "headline"]
 
-TABLE = "profiles_silver"
+TABLE = "profiles"
 
 
 def conform(records: list[dict]) -> pd.DataFrame:
@@ -88,7 +90,7 @@ def register_glue_partition(database: str, bucket: str, client_id: str, df: pd.D
         return {"i": "bigint", "f": "double", "b": "boolean"}.get(k, "string")
 
     columns = [{"Name": c, "Type": gtype(df[c].dtype)} for c in df.columns]
-    location = f"s3://{bucket}/silver/profiles/"
+    location = f"s3://{bucket}/foundational/profiles/"
     storage = {
         "Columns": columns,
         "Location": location,
@@ -132,23 +134,32 @@ def main(client_id: str) -> None:
     cfg = config()
     source_bucket = cfg["source_bucket"]
     lakehouse = cfg["lakehouse_bucket"]
-    database = cfg["glue_database"]
+    database = cfg["foundational_db"]
+
+    # Gate (a): permissibility, before anything is read.
+    gate_engagement_permissibility(client_id, purpose="organisational analysis")
 
     records = read_jsonl(source_bucket, f"datasets/{client_id}/profiles.jsonl")
     print(f"read {len(records):,} landing records for {client_id}")
 
     df = conform(records)
-    key = f"silver/profiles/client_id={client_id}/part-0000.parquet"
+
+    # Gate (b): anonymisation, before anything is persisted. This raises
+    # rather than warns if a direct identifier survived conformance.
+    gate_anonymization(df, tier="foundational")
+
+    key = f"foundational/profiles/client_id={client_id}/part-0000.parquet"
     written = put_parquet(df, lakehouse, key)
     print(f"wrote s3://{lakehouse}/{key} ({written:,} bytes, {len(df.columns)} columns)")
 
     register_glue_partition(database, lakehouse, client_id, df)
 
-    emit_metric("conform_to_silver", "RowsConformed", float(len(df)), "Count")
+    emit_metric("conform_to_foundational", "RowsConformed", float(len(df)), "Count")
+    flush_steward_log()
     print(f"CONFORM OK | {len(df):,} rows | columns: {', '.join(sorted(df.columns))}")
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        sys.exit("usage: conform_to_silver.py <client_id>")
+        sys.exit("usage: conform_to_foundational.py <client_id>")
     main(sys.argv[1])
