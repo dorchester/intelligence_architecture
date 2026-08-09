@@ -104,12 +104,16 @@ Resources:
                 - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REGISTRY
             build:
               commands:
-                - echo Building $REPO_URI:$IMAGE_TAG
-                - docker build --platform linux/amd64 -t $REPO_URI:$IMAGE_TAG .
+                - echo Building $REPO_URI:$IMAGE_TAG from $DOCKERFILE
+                - docker build --platform linux/amd64 -f $DOCKERFILE -t $REPO_URI:$IMAGE_TAG .
             post_build:
               commands:
                 - docker push $REPO_URI:$IMAGE_TAG
-                - echo Pushed $REPO_URI:$IMAGE_TAG
+                # The digest is what makes an execution reproducible: a tag can
+                # be moved, a digest cannot. Printed so callers can pin to it.
+                - DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $REPO_URI:$IMAGE_TAG)
+                - echo "Pushed $REPO_URI:$IMAGE_TAG"
+                - echo "IMAGE_DIGEST=$DIGEST"
       Environment:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
@@ -123,6 +127,10 @@ Resources:
             Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/intelligence-engine-${Environment}-console
           - Name: IMAGE_TAG
             Value: latest
+          # Overridden to build the workflow stage image from the same project
+          # rather than standing up a second one.
+          - Name: DOCKERFILE
+            Value: Dockerfile
       Tags:
         - Key: Application
           Value: intelligence-engine

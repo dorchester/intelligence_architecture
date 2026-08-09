@@ -17,6 +17,7 @@ PROFILE="${AWS_PROFILE:-intelligence-dev}"
 REGION="${AWS_REGION:-us-east-1}"
 ENVIRONMENT="dev"
 TAG=""
+TARGET="console"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -24,6 +25,12 @@ while [[ $# -gt 0 ]]; do
     --profile) PROFILE="$2";     shift 2 ;;
     --region)  REGION="$2";      shift 2 ;;
     --tag)     TAG="$2";         shift 2 ;;
+    # The workflow stage image builds from the same CodeBuild project, with
+    # the Dockerfile and destination repository overridden. Before this the
+    # stage image had no repeatable build path at all - it was pushed by hand,
+    # which is exactly the provenance gap the console build was designed to
+    # avoid.
+    --stage-image) TARGET="stages"; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -46,7 +53,14 @@ out() { aws cloudformation describe-stacks --profile "$PROFILE" --region "$REGIO
 
 BUCKET="$(out storage BucketName)"
 PROJECT="$(out build ProjectName)"
-REPO_URI="$(out build RepositoryUri)"
+
+if [[ "$TARGET" == "stages" ]]; then
+  REPO_URI="$(out workflow StagesRepositoryUri)"
+  DOCKERFILE="infrastructure/stage-image/Dockerfile"
+else
+  REPO_URI="$(out build RepositoryUri)"
+  DOCKERFILE="Dockerfile"
+fi
 
 for v in BUCKET PROJECT REPO_URI; do
   if [[ -z "${!v}" || "${!v}" == "None" ]]; then
@@ -65,11 +79,14 @@ echo "Uploading to s3://${BUCKET}/build/source.zip" >&2
 aws s3 cp "$TMP_ZIP" "s3://${BUCKET}/build/source.zip" \
   --profile "$PROFILE" --region "$REGION" --only-show-errors
 
-echo "Starting CodeBuild ${PROJECT} (tag ${TAG})" >&2
+echo "Starting CodeBuild ${PROJECT} (${TARGET}, tag ${TAG})" >&2
 BUILD_ID="$(aws codebuild start-build \
   --profile "$PROFILE" --region "$REGION" \
   --project-name "$PROJECT" \
-  --environment-variables-override "name=IMAGE_TAG,value=${TAG},type=PLAINTEXT" \
+  --environment-variables-override \
+    "name=IMAGE_TAG,value=${TAG},type=PLAINTEXT" \
+    "name=REPO_URI,value=${REPO_URI},type=PLAINTEXT" \
+    "name=DOCKERFILE,value=${DOCKERFILE},type=PLAINTEXT" \
   --query 'build.id' --output text)"
 
 echo "  build ${BUILD_ID}" >&2
@@ -90,4 +107,15 @@ while true; do
   esac
 done
 
+# Resolve the digest so callers can pin an execution to an immutable image.
+# A tag can be moved after the fact; a digest is the commit-equivalent.
+DIGEST="$(aws ecr describe-images \
+  --profile "$PROFILE" --region "$REGION" \
+  --repository-name "${REPO_URI##*/}" \
+  --image-ids "imageTag=${TAG}" \
+  --query 'imageDetails[0].imageDigest' --output text 2>/dev/null || true)"
+
 echo "${REPO_URI}:${TAG}"
+if [[ -n "$DIGEST" && "$DIGEST" != "None" ]]; then
+  echo "${REPO_URI}@${DIGEST}"
+fi
