@@ -10,7 +10,7 @@ workforce, change). Enter a company → verify it's real → load workforce data
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                          # 69 tests, no AWS
+pytest -q                          # 70 tests, no AWS
 python webapp/app.py               # consultant → :5000, engineer → :5000/engineer
 ENGINEER_CONSOLE=0 python webapp/app.py   # consultant only
 ```
@@ -26,7 +26,14 @@ aws sts get-caller-identity --profile intelligence-dev
 
 Region `us-east-1`. Stacks: `intelligence-engine-dev-{storage,state,
 observability,ecr,build,app,workbench,dataplane,author-seat,llm-controls,
-databricks-access}`.
+databricks-access,workflow}`.
+
+Workflow harness: state machine `intelligence-engine-dev-report-build` -
+stages run in CodeBuild from the `-stages` ECR image (python+node+playwright),
+approvals are waitForTaskToken records in the runs table, approved with
+`aws stepfunctions send-task-success`. Golden replay:
+`aws codebuild start-build --project-name intelligence-engine-dev-golden-replay`
+(source refreshed by remote_build.sh or a manual s3 cp of `git archive HEAD`).
 
 Workbench: `aws ssm start-session --target <InstanceId from workbench stack>`.
 Databricks account-level IaC is Terraform in `infrastructure/databricks/`,

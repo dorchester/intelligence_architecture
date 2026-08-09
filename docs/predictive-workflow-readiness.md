@@ -25,19 +25,27 @@ records what remains.
 | Model quotas verified | **Checked — action needed** | Applied Haiku 4.5 quota is 50 req/min vs a 10,000 default; fine for 8-way concurrency, will throttle high-volume builds. Request an increase before production loads |
 | Invocation logging | **Prepared, disabled** | `observability-logging.yaml` captures full prompts/responses; enabling is a privacy decision, not an engineering one |
 | Durable, authenticated, days-long approvals | **Built** | Checkpoint waits persist to DynamoDB and hold no thread or compute; approval — minutes or days later, across restarts and redeploys — spawns the next phase. Cognito authenticates the approver on the hosted console |
-| Orchestration substrate for the stage batch | **Open decision** | Days-long zero-compute suspends justify Step Functions under this project's own rules; not built until confirmed |
-| In-account regression replay | **Pattern proven** | CodeBuild runs project containers in-account today; a replay project is a template away |
+| Orchestration substrate for the stage batch | **Built & proven** | `workflow.yaml` — Step Functions Standard: stages as CodeBuild tasks from the stage image, `waitForTaskToken` approvals suspending with zero compute for up to 7 days each. Demo execution ran a Bedrock stage, suspended twice, and a Playwright render gate passed in real Chromium |
+| In-account regression replay | **Deployed & passing** | `golden-replay` CodeBuild project runs the full suite in-account from committed source — hosted runners never touch anything sensitive |
 | Hub-site serving | **Bucket deployed** | Private site bucket, CloudFront-ready. A public repository mirror of client-derived content is **recommended against** |
-| Build-stage container contract | **Private-repo work** | Bedrock wrapper, env-var config, and the CodeBuild path here are the working reference |
+| Build-stage container contract | **Base image shipped** | `infrastructure/stage-image/` — python 3.12 + node + Playwright/Chromium in ECR, so render checks are blocking gates. Stage semantics remain private-repo work |
 
 ## Decision gates (not engineering)
 
 1. **Sensitive dataset ingestion** — privacy review before any read grant on the vault.
 2. **Vendor licence reviews** — before any vendor dataset is bulk-copied into the lakehouse (interactive federated query is the interim posture).
 3. **Invocation logging** — captures prompts and responses; needs a privacy decision plus KMS before enabling.
-4. **Orchestration substrate** — Step Functions is justified and recommended; awaiting confirmation.
 5. **Public mirroring of report sites** — recommended no; serve privately behind CloudFront + auth.
 6. **Billing-level cost attribution** — requires activating cost-allocation tags in the billing console, an account setting this project does not touch.
+
+## Workflow approvals vs. console approvals
+
+Two approval surfaces exist deliberately. The engine console's checkpoints are
+Cognito-authenticated in the browser. The workflow harness's checkpoints are
+task-token approvals granted via `SendTaskSuccess` — IAM-authenticated and
+CloudTrail-audited today, with a console surface as the natural next step.
+Screenshot context attaches as artifacts-bucket objects referenced from the
+approval record.
 
 ## Databricks
 

@@ -1,17 +1,46 @@
 # Intelligence Engine
 
-A pre-engagement intelligence tool for management consultants working in
-organization, workforce, and change.
+**Durable, human-governed agentic analysis on AWS** — a pre-engagement
+intelligence platform for management consulting, built as a working reference
+for how agentic LLM systems get engineered responsibly.
 
-Enter a company. The engine verifies it's real, loads a workforce dataset if one
-exists, researches the organization through Claude on Amazon Bedrock, identifies
-engagement opportunities, and produces a briefing — pausing at five checkpoints
-where the consultant validates, corrects, and redirects the work.
+[![ci](https://github.com/dorchester/intelligence_architecture/actions/workflows/ci.yml/badge.svg)](https://github.com/dorchester/intelligence_architecture/actions/workflows/ci.yml)
 
-**No AWS access? Start here:**
-[`docs/architecture-report.html`](docs/architecture-report.html) is a complete
-visual walkthrough, and [`docs/samples/`](docs/samples/) contains real output
-from the running system so you can see exactly what it produces.
+Enter a company. The engine verifies it's real before spending tokens, grounds
+itself in measured workforce data, researches the organization through Claude
+on Amazon Bedrock, identifies engagement opportunities, and produces a
+briefing — pausing at five checkpoints where a consultant validates, corrects,
+and redirects the work.
+
+**📖 Documentation site: [dorchester.github.io/intelligence_architecture](https://dorchester.github.io/intelligence_architecture/)** —
+start there for the visual architecture report, real system output, and the
+full requirement map. Nothing in it requires AWS access.
+
+## Why it is technically interesting
+
+Six properties most agent demos skip, all implemented and tested here:
+
+1. **Durable human-in-the-loop.** Execution is segmented: each phase runs to a
+   checkpoint, persists to DynamoDB, and its thread *ends*. Waits hold zero
+   compute and survive restarts — proven by killing a live run mid-wait and
+   approving it from a fresh process. The same property exists at pipeline
+   scale via Step Functions `waitForTaskToken` (7-day zero-compute suspends).
+2. **Structural client isolation.** Storage and dataset calls require
+   `client_id`/`run_id`; keys are built from them; cross-client reads fail by
+   construction and tests attempt them. Prompts are never the boundary.
+3. **Guardrails as configuration.** Fourteen YAML rules — entity verification
+   before token spend, PII blocking, revision and spend ceilings — hot-reloaded
+   from an engineer console, enforced *before* inference.
+4. **Grounded, not recalled.** ~30 measured workforce signals are injected into
+   every prompt; an independent Databricks SQL engine reproduces the same
+   figures from the same S3 files, with zero data copied.
+5. **An enumerated-grant data plane.** Five S3 domains behind hard IAM walls,
+   including a KMS vault with zero read grants until privacy signoff; only the
+   post-QA-gate stage may publish artifacts — no-bypass is an IAM denial.
+6. **Engineering inside the boundary.** An SSM-only, auto-stopping workbench
+   hosts Claude Code, Terraform, and the Databricks CLI in-account; CI holds no
+   credentials and scans every push for secrets; in-account golden replay
+   covers what hosted runners must never touch.
 
 ---
 
@@ -52,7 +81,7 @@ with `ENGINEER_CONSOLE=0`.
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                    # 69 tests, no AWS needed
+pytest -q                    # 70 tests, no AWS needed
 python webapp/app.py         # → http://localhost:5000
 ```
 
@@ -209,7 +238,11 @@ infrastructure/
   deploy.sh         deploy every stack, optionally the hosted console
   build_and_push.sh build the image locally and push to ECR
   remote_build.sh   build it in AWS instead, via CodeBuild
-  cloudformation/   storage, state, observability, ecr, build, app, logging
+  stage-image/      workflow stage base image (python + node + playwright)
+  databricks/       Terraform (serverless workspace) + asset bundle
+  cloudformation/   storage, state, observability, ecr, build, app,
+                    dataplane, workflow, workbench, author-seat,
+                    llm-controls, databricks-access, logging
 scripts/
   data_generation/  company archetypes + generator
   bedrock_usage.py  CloudWatch tokens + Cost Explorer
@@ -217,7 +250,7 @@ scripts/
 docs/
   architecture-report.html   full visual walkthrough
   samples/                   real output, no AWS needed
-tests/                       69 tests
+tests/                       70 tests
 ```
 
 ---
@@ -239,6 +272,7 @@ All CloudFormation-managed, tagged `Application=intelligence-engine`.
 | `…-dev-author-seat` | IAM identity for the authoring persona — artifact read, Bedrock, no deploys | free |
 | `…-dev-llm-controls` | Per-client Bedrock attribution profiles + monthly spend alerts | free |
 | `…-dev-databricks-access` | Read-only Unity Catalog role over datasets + credential parameters | free |
+| `…-dev-workflow` | Step Functions harness — CodeBuild stages, zero-compute approvals, stage image ECR, golden replay | per run |
 
 The first four idle at zero. `…-dev-app` is the only standing cost, and deleting
 that one stack removes it without touching data or datasets.
@@ -256,6 +290,9 @@ No account IDs appear anywhere in this repository.
 ---
 
 ## Documentation
+
+**[dorchester.github.io/intelligence_architecture](https://dorchester.github.io/intelligence_architecture/)**
+is the front door — a designed landing page over everything below.
 
 - [`docs/architecture-report.html`](docs/architecture-report.html) — full visual walkthrough
 - [`docs/samples/`](docs/samples/) — real system output, readable without AWS

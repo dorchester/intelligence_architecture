@@ -125,14 +125,18 @@ functional requirements onto this account; the short version:
 - **Built**: durable approvals — checkpoint waits persist to DynamoDB,
   survive restarts/redeploys, and hold no thread or compute; approval spawns
   the next phase. Proven live by killing the process mid-wait.
-- **Open gates**: orchestration substrate, privacy signoff for the vault,
-  vendor licence reviews, invocation logging.
+- **Built since**: the Step Functions workflow harness (stages → zero-compute
+  approvals → stages, proven end to end with a passing Playwright render
+  gate), the in-account golden-replay project, CI with full-history secret
+  scanning, and a Databricks serverless workspace querying the datasets in
+  place with a version-controlled enrichment job.
+- **Open gates**: privacy signoff for the vault, vendor licence reviews,
+  invocation logging, cost-allocation tag activation.
 
 ## Next
 
 1. Unpin the App Runner instance count (waits are durable; executing phases
    are still process-local threads)
-2. CI/CD with secret scanning and staged promotion
 3. AgentCore Runtime for session suspend/resume at checkpoints
 4. Least-privilege IAM roles per persona
 5. VPC endpoints for Bedrock, S3, DynamoDB
