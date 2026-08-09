@@ -125,6 +125,15 @@ def run_status(run_id: str):
     return render_template("run.html", run=run)
 
 
+@app.route("/run/<run_id>/engineer")
+def engineer_view(run_id: str):
+    """Engineer/technical view of a run."""
+    run = runs.get(run_id)
+    if not run:
+        return "Run not found", 404
+    return render_template("engineer.html", run=run)
+
+
 @app.route("/run/<run_id>/approve", methods=["POST"])
 def approve_checkpoint(run_id: str):
     run = runs.get(run_id)
