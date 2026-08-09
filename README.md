@@ -131,6 +131,29 @@ with `ENGINEER_CONSOLE=0`.
 
 ---
 
+## The six human roles
+
+The consoles are two of six working surfaces. Every human function has a
+seat with enumerated permissions, a guide with its real commands, and a
+deliberate answer to "can this person block the system?" — the headlines,
+consolidated from [`docs/guides/`](docs/guides/):
+
+| Role | Seat | Headline | Critical to |
+|---|---|---|---|
+| **Consultant / engagement lead** ([guide](docs/guides/consultant.md)) | Hosted console (Cognito — no cloud permissions at all) | Runs reports and owns the checkpoints: approve, request bounded revisions with feedback injected into the prompts, or reject. Can close the browser mid-run and lose nothing. | **Execution** — the only human a running report ever waits for |
+| **Forward-deployed engineer (FDE)** ([guide](docs/guides/fde.md)) | Workbench — EC2 + Claude Code inside the account, SSM-only, no SSH | Owns the workload: edits stages and prompts, runs them raw against synthetic data, then runs the full harness against a candidate image digest while the blessed digest serves everyone else. Regression floor: tests + in-account replay + seeded-defect eval of model behavior. | Engineering |
+| **Platform engineer** ([guide](docs/guides/platform-engineer.md)) | Deployer seat (`sts:AssumeRole`) | Turns merged templates into deployed stacks through `cfn-exec` — the only channel by which boundaries change — and promotes tested stage images to "blessed." Can mutate nothing directly; rollback is one command. | Engineering |
+| **Data steward** ([guide](docs/guides/data-steward.md)) | Steward seat (`sts:AssumeRole`) | The only identity that can admit data (`landing/`) or console users; the only one that can read the stewardship log and audit trail. Their policy runs as code in the gates, so a steward absence stops new admissions — never a report. | Nothing at runtime — by design |
+| **Data scientist / analyst** ([guide](docs/guides/analyst.md)) | Databricks (Unity Catalog, zero-copy) | Reads every governed tier in place with no AWS credentials; holds write on nothing, so notebook freedom can't corrupt the pipeline. New products enter through reviewed stage changes, not side doors. | Nothing |
+| **Account admin** ([guide](docs/guides/admin.md)) | SSO — dormant | Two jobs only: seating people (one `sts:AssumeRole` grant each) and recovery if the deploy channel itself breaks. Used on a normal day = design failure. | Nothing, by design |
+
+Machine identities (`conformance`, `product-builder`, `stage-runner`, …) are
+never accountable for anything — each is a human's work wearing
+least-privilege grants. The full identity-by-identity model, including who
+deliberately cannot do what, is [`docs/access-model.md`](docs/access-model.md).
+
+---
+
 ## Quick start
 
 ```bash
