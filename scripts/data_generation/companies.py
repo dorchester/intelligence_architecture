@@ -1,7 +1,11 @@
-"""Top 20 Deloitte client archetypes for synthetic data generation.
+"""Twenty large-enterprise archetypes for synthetic data generation.
 
-Each company is anonymized but based on real public Deloitte relationships.
-The data here is the "seed" that drives profile and posting generation.
+Each is a fictional company sketched to be representative of a sector, not a
+stand-in for any actual firm or engagement. The `inspired_by` field names a
+well-known public company only to anchor scale and segment mix; no
+relationship of any kind is implied. The data here is the "seed" that drives
+profile and posting generation, and every record produced from it is
+synthetic.
 """
 
 COMPANIES = [
@@ -152,7 +156,7 @@ COMPANIES = [
     {
         "id": "vanguard-consulting",
         "name": "Vanguard Professional Services",
-        "inspired_by": "Deloitte (self-referential)",
+        "inspired_by": "Global professional services firm",
         "industry": "Professional Services",
         "headcount": 450000,
         "hq": "New York, NY",
