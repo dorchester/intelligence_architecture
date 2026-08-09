@@ -33,15 +33,15 @@ from _aws import config, emit_metric, put_json, read_parquet
 BATCH_SIZE = 50
 
 # Identical for every batch, so it is marked cacheable - and at ~2,230 tokens
-# it is deliberately left BELOW the measured 4,096-token threshold, so running
-# this stage prints the warning from _bedrock rather than a fake saving.
+# it sits BELOW the 4,096-token minimum, so running this stage prints the
+# warning from _bedrock rather than a fake saving.
 #
-# That is the honest demonstration. Caching is proven to work on this account
-# (a 4,887 token prefix caches; 4,082 does not), and the failure mode worth
-# showing is the common one: a prompt that looks cached, reports nothing, and
-# bills in full. Inflating this taxonomy to clear the bar would demonstrate
-# padding, not caching. A production taxonomy reaches 4,096 tokens on its own
-# merits; when it does, the warning goes quiet and the saving is real.
+# That is deliberate. Caching demonstrably works on this account (4,887 tokens
+# caches, 4,082 does not), and the failure mode worth showing is the common
+# one: a prompt that looks cached, reports nothing, and bills in full.
+# Inflating this taxonomy to clear the bar would demonstrate padding, not
+# caching. A production taxonomy reaches 4,096 on its own merits, and when it
+# does the warning goes quiet and the saving is real.
 EXTRACT_SYSTEM = """You classify workforce profiles for an organisational
 capability analysis of a pharmaceutical company. Apply the taxonomy below
 exactly. Consistency across batches matters more than nuance in any single

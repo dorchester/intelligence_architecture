@@ -16,6 +16,47 @@ and redirects the work.
 start there for the visual architecture report, real system output, and the
 full requirement map. Nothing in it requires AWS access.
 
+## This is a real build, on a personal AWS account
+
+Nothing here is a diagram of a system that might exist. Every stack in this
+repository is deployed, and the claims below are quoted from logs of runs that
+actually executed:
+
+- The workflow harness has completed executions end to end — containerised
+  stages, zero-compute approval suspends, a blocking Chromium render gate.
+- Conformance reads landing records, drops direct identifiers, writes parquet,
+  registers a Glue partition; Athena queries it; a stage reads it back through
+  an IAM grant scoped to exactly that prefix.
+- A raking stage converges in 9 iterations and finishes in **8.9 s** against a
+  30-minute container budget.
+- Databricks reads the same S3 files in place through Unity Catalog and
+  computes the same average tenure — **3.07 years** from three independent
+  engines, with zero data copied.
+
+**It runs on a sandbox account, engineered to stay near free-tier
+economics.** That constraint shaped the architecture rather than being
+retrofitted onto it:
+
+| Choice | Instead of | Why |
+|---|---|---|
+| CodeBuild per stage | An always-on runner | Billed by the minute, idles at nothing |
+| Public subnet + SSM | A NAT gateway | NAT is ~$32/month standing, for egress alone |
+| DynamoDB on-demand | Provisioned capacity | No floor under an idle table |
+| Bedrock on-demand | Provisioned throughput | Per-token, no reservation |
+| `waitForTaskToken` | A polling loop | A 7-day wait costs nothing to hold |
+| Auto-stopping workbench | A persistent dev box | Forgetting it costs the volume only |
+
+Free tier covers most of it and pay-per-use covers the rest. **One component
+carries a standing cost: App Runner, roughly $5–10/month** for provisioned
+container memory, billed whether anyone signs in or not. Deleting that one
+stack removes it without touching data — see
+[Hosted on AWS](#hosted-on-aws).
+
+The discipline is the point. An architecture that only works with a NAT
+gateway and a provisioned cluster cannot be evaluated by one engineer on a
+personal account, and a substrate nobody can afford to run is a substrate
+nobody validates.
+
 ## Why it is technically interesting
 
 Six properties most agent demos skip, all implemented and tested here:
@@ -233,6 +274,11 @@ datasets/
 agent/              Bedrock wrapper, run context
 storage/            local + S3 backends, one interface
 state/              DynamoDB run lifecycle
+stages/             reference workflow stages - one per class of work
+  conform_to_silver.py   landing -> governed parquet, identifiers dropped
+  analyse_workforce.py   IPF raking, logistic fit, Kish effective n, chart
+  enrich_profiles_llm.py batched extraction, synthesis, advisory reviewer
+  _bedrock.py            caching, bounded concurrency, structured output
 Dockerfile          console image (single worker, non-root)
 infrastructure/
   deploy.sh         deploy every stack, optionally the hosted console

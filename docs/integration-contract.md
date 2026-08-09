@@ -200,14 +200,14 @@ This split is the point: a stage that can read microdata **cannot rewrite
 it**. Widening the stage runner instead would have made "read-only"
 meaningless.
 
-### 1.5a Prompt caching has a threshold, and it is not the documented one
+### 1.5a Prompt caching has a threshold, and missing it fails silently
 
 Marking a shared prefix `cache_control` is how batched extraction becomes
 affordable — the prefix is billed once at write cost and then at roughly a
 tenth. A prefix below the model's minimum is **accepted and silently
 ignored**: no error, no warning, `usage` simply reports zero.
 
-Measured on this account, Haiku 4.5 through an application inference profile:
+Measured here against Haiku 4.5 through an application inference profile:
 
 | Prefix | Result |
 |---|---|
@@ -215,9 +215,23 @@ Measured on this account, Haiku 4.5 through an application inference profile:
 | 4,082 tokens | no cache |
 | 4,887 tokens | **cached** (write, then read on the next call) |
 
-**The real boundary is 4,096 tokens — twice the published 2,048 for Haiku.**
-A prompt sized against the documentation looks cached, bills in full, and on
-a ten-call batch is roughly a 10× overspend that nothing surfaces.
+**The boundary is 4,096 tokens**, which matches the Bedrock documentation for
+Claude Haiku 4.5, Sonnet 4.5 and Opus 4.5/4.6. The trap is that **1,024 and
+2,048 are the minimums for older Claude generations** — size a prompt from a
+stale reference and it sits under the bar, reports nothing, and bills in full.
+On a ten-call batched extraction that is roughly a 10× overspend that nothing
+surfaces.
+
+Two properties that change design decisions:
+
+- **Cache reads do not count against the requests-per-minute quota.** With an
+  applied Haiku limit of 50 req/min, caching relieves the throttling problem
+  as well as the cost one — it is a concurrency lever, not only a price lever.
+- **Caching is unavailable through the batch inference API.** Batch (~50%
+  cheaper, no rpm pressure, minutes-to-hours latency) and caching (~90% off
+  reads, online latency) are *alternative* economics, not stackable. Batch
+  also cannot fit inside a 30-minute stage, so it is a different stage shape,
+  not a drop-in swap.
 
 `stages/_bedrock.py` warns when a prefix is marked cacheable and falls below
 the threshold. Re-measure when changing model or region rather than trusting
