@@ -162,6 +162,114 @@ Resources:
         - Key: ManagedBy
           Value: cloudformation
 
+  # ---------- conformance: landing -> silver ----------
+  #
+  # A separate identity from the stage runner on purpose. This job is the only
+  # thing that writes curated data, and it is where direct identifiers are
+  # dropped. Analytical stages read what it produces and cannot rewrite it.
+
+  ConformanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-conformance
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-silver-write
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-catalog-write
+      Policies:
+        - PolicyName: conformance-execution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/intelligence-engine-${Environment}-conformance*
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchCheckLayerAvailability
+                Resource: !GetAtt StagesRepository.Arn
+              # Landing-side source. Read-only, and only the dataset prefix.
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  Fn::Sub:
+                    - '${B}/datasets/*'
+                    - B:
+                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource:
+                  Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/intelligence-engine/${Environment}/stages/*
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  ConformanceProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub intelligence-engine-${Environment}-conformance
+      Description: Conforms landing records into the governed silver layer
+      ServiceRole: !GetAtt ConformanceRole.Arn
+      TimeoutInMinutes: 30
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Source:
+        Type: S3
+        Location:
+          Fn::Sub:
+            - '${Bucket}/build/source.zip'
+            - Bucket:
+                Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-name
+        BuildSpec: |
+          version: 0.2
+          phases:
+            build:
+              commands:
+                - cd stages
+                - python conform_to_silver.py "$CLIENT_ID"
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/intelligence-engine-${Environment}-stages:latest
+        ImagePullCredentialsType: SERVICE_ROLE
+        EnvironmentVariables:
+          - Name: CLIENT_ID
+            Value: sterling-pharma
+          - Name: IE_ENV
+            Value: !Ref Environment
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
   # ---------- approval recorder ----------
 
   ApprovalFunctionRole:
