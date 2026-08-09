@@ -199,9 +199,12 @@ the AWS CLI, the Databricks CLI, and Terraform, all inside the account rather
 than on a laptop.
 
 - **No SSH.** No key pair exists, and the security group has **zero inbound
-  rules**. Access is Session Manager over outbound HTTPS, and every session is
-  recorded in CloudTrail. This is the shape a firm's DevOps team will accept:
-  no console, no bastion, no open port.
+  rules**. Access is Session Manager over outbound HTTPS. This is the shape a
+  firm's DevOps team will accept: no console, no bastion, no open port.
+  Sessions appear in CloudTrail *Event History*, which is on by default and
+  keeps 90 days of management events — but **no durable trail is configured**,
+  so there is no long-term retention, no data-event logging, and no log-file
+  integrity validation. See [Data governance](#data-governance).
 - **No NAT gateway.** A public subnet with an auto-assigned IP costs cents;
   a NAT gateway would be ~$32/month for the same egress.
 - **Auto-stops.** A CloudWatch alarm stops the instance after an hour of low
@@ -365,6 +368,28 @@ is the front door — a designed landing page over everything below.
 - [`CLAUDE.md`](CLAUDE.md) — context for Claude Code sessions
 
 ---
+
+## Data governance
+
+Five S3 domains, all encrypted, versioned, TLS-only and public-access-blocked,
+behind distinct IAM grants — `silver-read` and `silver-write` are held by
+*different* roles, so a stage that reads microdata cannot rewrite it. The
+sensitive vault's KMS key grants decrypt to **no principal** and holds zero
+objects, pending privacy signoff.
+
+Conformance drops direct identifiers on the way into `silver/` — verified: the
+catalogued table carries no name, headline or exact age. **That makes the data
+pseudonymous, not anonymous.** Department, location, title, tenure and a stable
+`profile_id` remain, and that combination re-identifies in a small population.
+
+**Real gaps, stated plainly:** no CloudTrail trail (so data reads are not
+provably logged), no retention rule on the lakehouse (so no deletion story),
+catalogue access is plain IAM rather than Lake Formation, and no automated PII
+discovery. These are acceptable *only* because the data is synthetic — every
+one becomes blocking the moment real workforce records land.
+
+Full status, with what is measured versus assumed:
+[`docs/integration-contract.md`](docs/integration-contract.md#data-governance-status).
 
 ## Known limits
 

@@ -7,10 +7,22 @@ runs, the lakehouse is empty and every downstream grant points at nothing.
 
 The important step is not the file format - it is that **direct identifiers
 are dropped here**. Bronze may hold raw records; silver is what analytical
-stages are allowed to read, so silver must already be safe to read. That is
-why the stage-runner role can be handed `silver/*` without further review,
-and why an aggregates-only rule downstream is a much smaller problem than it
-would otherwise be.
+stages are allowed to read, so the removal happens on the way in rather than
+being left to every downstream consumer to remember.
+
+Be precise about what this does and does not achieve. Removing names and
+banding age makes these records **pseudonymous, not anonymous**. A row still
+carries department, location, title, seniority, tenure and a stable
+`profile_id`, and that combination is re-identifying in a small population.
+Under GDPR and equivalent regimes pseudonymous data is still personal data:
+it narrows exposure and shortens a review, it does not remove the obligation.
+Treat `silver/*` as governed personal data, not as a public-safe extract.
+
+`turnover_risk_score` deserves particular attention: it is an inferred
+judgement about an individual's likelihood of leaving. Derived attributes of
+that kind are often more sensitive than the identifiers that were removed,
+and they are the reason a real deployment needs a documented lawful basis
+before this data is put in front of a model.
 
 Writes:
   s3://<lakehouse>/silver/profiles/client_id=<id>/part-0000.parquet

@@ -200,6 +200,13 @@ This split is the point: a stage that can read microdata **cannot rewrite
 it**. Widening the stage runner instead would have made "read-only"
 meaningless.
 
+**What conformance does not do.** Dropping names and banding age makes the
+records *pseudonymous, not anonymous*. Department, location, title, seniority,
+tenure and a stable `profile_id` remain, and that combination re-identifies
+in a small population. `silver/*` is governed personal data and the
+`silver-read` grant is an access-control decision, not a privacy clearance.
+See [Data governance](#data-governance-status) for what that still requires.
+
 ### 1.5a Prompt caching has a threshold, and missing it fails silently
 
 Marking a shared prefix `cache_control` is how batched extraction becomes
@@ -369,6 +376,66 @@ must be built for the architecture that will run them — CodeBuild — not the
 one they were authored on.
 
 ---
+
+## Data governance status
+
+Measured on the deployed account, not asserted from the templates. Run
+`python scripts/qa_sweep.py` for the operational half; this section covers the
+governance half.
+
+### Enforced today
+
+| Control | State |
+|---|---|
+| Encryption at rest | All five domains. `AES256` on landing, lakehouse, artifacts, site; **KMS CMK** on the vault |
+| Encryption in transit | TLS-only bucket policies (`aws:SecureTransport`) on every domain |
+| Public access | Blocked at bucket level on all five |
+| Versioning | Enabled on all five |
+| Vault isolation | The vault CMK grants decrypt to **no principal** beyond root account administration. It currently holds **0 objects** |
+| Grant separation | `silver-read`, `silver-write`, `catalog-write`, `artifacts-publish`, `landing-write` are distinct managed policies held by distinct roles |
+| Identifier removal | Verified: the catalogued `profiles_silver` table contains **no** name, headline or exact-age column |
+| Landing retention | Raw deliveries expire at **90 days** |
+
+### Open gaps
+
+These are real and unresolved. None is hidden behind an optimistic phrasing
+elsewhere in this repository.
+
+1. **No CloudTrail trail.** Event History covers 90 days of management events
+   by default, but there is no durable trail to S3, **no data-event logging**,
+   and no log-file integrity validation. Consequence: *you cannot presently
+   prove who read a row-level object in `silver/`.* For a governed data set
+   that is usually the first control an auditor asks for.
+2. **No retention on the lakehouse, vault or site domains.** Objects persist
+   indefinitely. Without a retention rule there is no deletion story, and
+   without a deletion story there is no answer to a subject-access or erasure
+   request.
+3. **Pseudonymous, not anonymous.** See §1.4a. `silver/*` remains personal
+   data; `turnover_risk_score` is an inferred judgement about an individual
+   and is arguably more sensitive than the identifiers that were removed.
+4. **Catalogue access is plain IAM, not Lake Formation.** No column-level or
+   row-level governance, no centralised grant registry, no tag-based access
+   control. Any in-account principal with Glue and S3 permissions can read the
+   table.
+5. **No automated PII discovery.** Macie is not enabled, so the claim that
+   conformance removed everything sensitive rests on reading the code rather
+   than on scanning the output.
+6. **No data classification tags** on buckets or objects, so nothing
+   downstream can make a policy decision from the data's own metadata.
+7. **Invocation logging is undecided.** Prompts carry the workforce signals;
+   enabling Bedrock invocation logging would persist them. That is a privacy
+   decision, not an engineering one, and it has not been taken.
+
+### Why it is safe to run as it stands
+
+The data is **synthetic** — twenty fictional company archetypes generated for
+this project. No real person is described by any row, which is what makes it
+reasonable to operate with the gaps above still open.
+
+**Each gap becomes blocking the moment real workforce data lands.** In rough
+order of lead time: the trail and retention rules are hours of work; Lake
+Formation and classification are days; the lawful-basis and invocation-logging
+decisions are organisational and should start first.
 
 ## Two-pass deploys
 
