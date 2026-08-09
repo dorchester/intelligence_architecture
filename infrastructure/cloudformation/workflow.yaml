@@ -80,6 +80,7 @@ Resources:
         - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-derived-read
         - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-contextualized-read
         - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-artifacts-publish
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-stewardship-write
       Policies:
         - PolicyName: stage-execution
           PolicyDocument:
@@ -118,6 +119,8 @@ Resources:
                   - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/us.anthropic.*
                   - !Sub arn:aws:bedrock:*:${AWS::AccountId}:application-inference-profile/*
                   - arn:aws:bedrock:*::foundation-model/anthropic.*
+                  # Query embedding for retrieval over the contextualized tier.
+                  - arn:aws:bedrock:*::foundation-model/amazon.titan-embed-*
               # Stage configuration and vendor credentials resolve from one
               # enumerated SSM path. Granting the namespace is an
               # infrastructure decision; what is allowed to go into it is a
@@ -202,6 +205,7 @@ Resources:
       ManagedPolicyArns:
         - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-foundational-write
         - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-catalog-write
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-stewardship-write
       Policies:
         - PolicyName: conformance-execution
           PolicyDocument:

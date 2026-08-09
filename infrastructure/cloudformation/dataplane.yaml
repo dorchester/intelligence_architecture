@@ -334,6 +334,10 @@ Resources:
               - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
               - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${GlueDatabase}
               - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/${GlueDatabase}/*
+              # The medallion tier schemas created by the governance stack.
+              # Scoped to this project's naming, not the account catalogue.
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/ie_${Environment}_*
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/ie_${Environment}_*/*
 
   ArtifactsPublishPolicy:
     Type: AWS::IAM::ManagedPolicy

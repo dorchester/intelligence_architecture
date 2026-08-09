@@ -357,6 +357,7 @@ No account IDs appear anywhere in this repository.
 **[dorchester.github.io/intelligence_architecture](https://dorchester.github.io/intelligence_architecture/)**
 is the front door — a designed landing page over everything below.
 
+- [`docs/aws-walkthrough.md`](docs/aws-walkthrough.md) — **everything on AWS, in the order it makes sense to meet it**: deploy from nothing, the medallion tiers, the connective thread, governance, and how to verify it all
 - [`docs/architecture-report.html`](docs/architecture-report.html) — full visual walkthrough
 - [`docs/samples/`](docs/samples/) — real system output, readable without AWS
 - [`docs/integration-contract.md`](docs/integration-contract.md) — **the boundary between this substrate and a workload that runs on it**: exact IAM grants, execution input shape, approval mechanics, and the seams that are genuinely open
@@ -372,8 +373,11 @@ is the front door — a designed landing page over everything below.
 ## Data governance
 
 Five S3 domains, all encrypted, versioned, TLS-only and public-access-blocked,
-behind distinct IAM grants — `silver-read` and `silver-write` are held by
-*different* roles, so a stage that reads microdata cannot rewrite it. The
+and inside the lakehouse three **medallion tiers** — `foundational/` (conformed),
+`derived/` (aggregate products with owner and lineage), `contextualized/`
+(vectors and a typed graph). Each tier has its own catalogue schema and its own
+*pair* of read and write grants held by *different* roles, so a stage that
+consumes a tier cannot rewrite it. The
 sensitive vault's KMS key grants decrypt to **no principal** and holds zero
 objects, pending privacy signoff.
 
@@ -382,11 +386,16 @@ catalogued table carries no name, headline or exact age. **That makes the data
 pseudonymous, not anonymous.** Department, location, title, tenure and a stable
 `profile_id` remain, and that combination re-identifies in a small population.
 
-**Real gaps, stated plainly:** no CloudTrail trail (so data reads are not
-provably logged), no retention rule on the lakehouse (so no deletion story),
-catalogue access is plain IAM rather than Lake Formation, and no automated PII
-discovery. These are acceptable *only* because the data is synthetic — every
-one becomes blocking the moment real workforce records land.
+Two policy gates sit on every path — permissibility before a read,
+anonymisation before a write — and an append-only steward log records what they
+found, with an SNS digest for escalations. A multi-region CloudTrail with
+**data events** over the governed tiers and the vault answers "who read this
+row".
+
+**Real gaps, stated plainly:** no retention rule on the lakehouse (so no
+deletion story), catalogue access is plain IAM rather than Lake Formation, and
+no automated PII discovery. These are acceptable *only* because the data is
+synthetic — every one becomes blocking the moment real workforce records land.
 
 Full status, with what is measured versus assumed:
 [`docs/integration-contract.md`](docs/integration-contract.md#data-governance-status).

@@ -92,19 +92,30 @@ def main() -> int:
     s3 = s.client("s3")
     lake = out("dataplane", "LakehouseBucketName")
     if lake:
-        n = s3.list_objects_v2(Bucket=lake, Prefix="silver/").get("KeyCount", 0)
-        check("silver layer populated", n > 0, f"{n} object(s)")
+        # Every medallion tier, not just the one that happens to be populated.
+        for tier in ("foundational", "derived", "contextualized", "stewardship"):
+            n = s3.list_objects_v2(Bucket=lake, Prefix=f"{tier}/").get("KeyCount", 0)
+            check(f"{tier} tier populated", n > 0, f"{n} object(s)")
     arts = out("dataplane", "ArtifactsBucketName")
     if arts:
         a = s3.list_objects_v2(Bucket=arts, Prefix="analysis/").get("KeyCount", 0)
         check("analysis artifacts present", a > 0, f"{a} object(s)")
-    db = out("dataplane", "GlueDatabaseName")
-    if db:
+    glue = s.client("glue")
+    for db_key, table in (("FoundationalDatabaseName", "profiles"),
+                          ("DerivedDatabaseName", "workforce_composition"),
+                          ("ContextualizedDatabaseName", "profile_vectors"),
+                          ("ContextualizedDatabaseName", "graph_edges")):
+        db = out("governance", db_key)
+        if not db:
+            continue
         try:
-            s.client("glue").get_table(DatabaseName=db, Name="profiles_silver")
-            check("glue table registered", True)
+            t = glue.get_table(DatabaseName=db, Name=table)["Table"]
+            owner = t.get("Parameters", {}).get("ie.owner", "")
+            lineage = t.get("Parameters", {}).get("ie.lineage.source_table", "")
+            note = "owner+lineage" if (owner and lineage) else "registered"
+            check(f"{db}.{table}", True, note)
         except Exception as e:  # noqa: BLE001
-            check("glue table registered", False, type(e).__name__)
+            check(f"{db}.{table}", False, type(e).__name__)
 
     print("\n=== workflow harness ===")
     arn = out("workflow", "StateMachineArn")
