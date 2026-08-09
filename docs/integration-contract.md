@@ -31,6 +31,7 @@ Built from [`infrastructure/stage-image/Dockerfile`](../infrastructure/stage-ima
 |---|---|
 | Base | `python:3.12-slim-bookworm` (pinned — trixie renames the font packages Playwright's `--with-deps` expects) |
 | Python | `boto3`, `pandas`, `pyyaml`, `jinja2` |
+| Analytical | `numpy`, `scipy`, `scikit-learn`, `matplotlib` (`MPLBACKEND=Agg`), `openpyxl`, `pyarrow` |
 | Node | `nodejs`, `npm`, `playwright@1.49.1` |
 | Browser | Chromium, at `PLAYWRIGHT_BROWSERS_PATH=/opt/playwright` |
 | User | non-root `stage` (uid 10002) |
@@ -49,8 +50,10 @@ runtime. The base image intentionally contains no pipeline code.
 - Image: the stages repository at `:latest`, pulled with `SERVICE_ROLE` credentials
 - Compute: `BUILD_GENERAL1_SMALL`, Linux
 - Timeout: **30 minutes per stage**
-- Source: `NO_SOURCE` — the default buildspec fails deliberately with
-  `exit 1`; the harness always overrides it
+- Source: the packaged repository at `s3://<bucket>/build/source.zip`, so a
+  buildspec is a *command* rather than a whole program inlined into the
+  execution input. The harness owns which command runs; the repository owns
+  what it does. The default buildspec fails deliberately with `exit 1`.
 
 **Role:** `intelligence-engine-<env>-stage-runner`. The complete grant set:
 
@@ -157,18 +160,45 @@ argument fails with `ValidationException: The provided key element does not
 match the schema` — an easy mistake, because `client_id` is present on every
 item and indexed by a GSI.
 
-To resume:
+**The approval payload carries a decision and feedback, not a boolean.** The
+engine's actual interaction is revise-with-feedback, so the harness models the
+same thing:
 
 ```bash
 aws dynamodb get-item --table-name intelligence-engine-<env>-runs \
   --key '{"run_id":{"S":"wf#<execution>#midpoint_review"}}'
 
+# continue
 aws stepfunctions send-task-success --task-token <token> \
-  --task-output '{"approved":true}'
+  --task-output '{"decision":"approve","feedback":""}'
+
+# re-run the phase with direction
+aws stepfunctions send-task-success --task-token <token> \
+  --task-output '{"decision":"revise","feedback":"Biologics pipeline is understated."}'
+
+# stop the build
+aws stepfunctions send-task-success --task-token <token> \
+  --task-output '{"decision":"reject","feedback":"Wrong client."}'
 ```
 
-Rejection is `send-task-failure` with the same token. Prefer reading the token
-programmatically over echoing it — anyone holding it can approve.
+Both fields are **required**. On `revise` the state machine loops that phase's
+stage Map again with `REVISION_FEEDBACK` set in the stage environment, then
+returns to the same approval — bounded by `max_revisions` (default 2), after
+which the build proceeds rather than looping forever. `reject` fails the
+execution with `RejectedByReviewer`.
+
+Prefer reading the token programmatically over echoing it — anyone holding it
+can approve.
+
+### 1.4a Conformance is a separate identity
+
+`intelligence-engine-<env>-conformance` is the only role holding
+`silver-write` and `catalog-write`. It reads landing records, drops direct
+identifiers, writes parquet under `silver/`, and registers the Glue partition.
+
+This split is the point: a stage that can read microdata **cannot rewrite
+it**. Widening the stage runner instead would have made "read-only"
+meaningless.
 
 ### 1.5 LLM access
 
@@ -251,10 +281,13 @@ strong provenance property — source is packaged by `git archive` of committed
 state, so every image maps to a checkout-able commit — and `:latest` weakens
 it here. Pinning stage images by digest per execution would close the gap.
 
-### 3.4 Exactly two checkpoints
+### 3.4 Two checkpoint *positions*, each revisable
 
-`midpoint_review` and `final_review` are structural. A workload needing three
-or five approval points requires a template change, not a config change.
+`midpoint_review` and `final_review` remain structural positions. Each can now
+loop with feedback, so the interaction is right even though the count is not:
+a playbook with nine checkpoints still has to collapse them into two
+positions, and which ones collapse into which is a workload decision that has
+not been made.
 
 ### 3.5 Approval is CLI plus IAM
 
@@ -310,6 +343,22 @@ whole path on the deployed harness and **SUCCEEDED**:
 The render gate is genuinely blocking: the stage exits non-zero on an empty
 headline or a short body, which fails the CodeBuild stage and the execution
 with it.
+
+**The data path is proven too.** The lakehouse was empty until conformance
+ran — the `silver-read` grant pointed at nothing:
+
+| Step | Evidence |
+|---|---|
+| Landing read, identifiers dropped | `dropped direct identifiers: ['first_name', 'last_name', 'full_name', 'headline']` |
+| Conformed parquet written | `silver/profiles/client_id=sterling-pharma/part-0000.parquet` (52,137 bytes, 17 columns) |
+| Catalogue registered | `created glue table intelligence_engine_dev.profiles_silver` + partition |
+| Queryable | Athena `SUCCEEDED` — 500 rows grouped by seniority |
+| Read back **through `silver-read`** | `read 500 conformed rows through the silver-read grant` |
+| Statistics inside the build budget | IPF rake converged in 9 iterations; effective *n* 412 of 500 (82.4% design efficiency); **8.9 s** against a 30-minute timeout |
+
+The raked mean tenure moves 3.074y → 2.658y, and the unweighted 3.074
+reproduces what the Python layer and Databricks both compute from the same
+files — three engines, one number.
 
 Two failures found by running it — both now fixed and worth knowing about:
 

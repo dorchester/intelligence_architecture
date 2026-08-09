@@ -98,6 +98,16 @@ Resources:
                   - ecr:GetDownloadUrlForLayer
                   - ecr:BatchCheckLayerAvailability
                 Resource: !GetAtt StagesRepository.Arn
+              # The packaged repository CodeBuild downloads to get stage code.
+              # Enumerated to the build prefix - not the bucket, and not the
+              # datasets prefix, which this identity has no reason to read.
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  Fn::Sub:
+                    - '${B}/build/*'
+                    - B:
+                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
               - Effect: Allow
                 Action:
                   - bedrock:InvokeModel
@@ -140,8 +150,16 @@ Resources:
       TimeoutInMinutes: 30
       Artifacts:
         Type: NO_ARTIFACTS
+      # Stages get the packaged repository, so a buildspec is a command rather
+      # than a whole program inlined into the execution input. The harness
+      # still owns which command runs; the repository owns what it does.
       Source:
-        Type: NO_SOURCE
+        Type: S3
+        Location:
+          Fn::Sub:
+            - '${Bucket}/build/source.zip'
+            - Bucket:
+                Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-name
         BuildSpec: |
           version: 0.2
           phases:
