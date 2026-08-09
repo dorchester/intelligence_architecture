@@ -11,49 +11,72 @@ prompt-level rule.
 
 ## The one rule everything follows
 
-> **No identity inside the system can change the system's boundaries.**
+> **Boundaries change through exactly one channel — a reviewed template,
+> deployed as a logged stack operation. No identity inside the system can
+> change them any other way.**
 
 Every runtime identity — the console, the stage runner, the workbench, the
 Databricks connection — holds an enumerated list of permissions and has **no
 ability to modify CloudFormation stacks, IAM roles, or IAM policies.** The
 reason is escalation: an identity that can rewrite IAM can grant itself
 anything, so its *real* permission set is "everything, eventually." Keeping
-`iam:*` and `cloudformation:CreateStack/UpdateStack` out of every runtime role
-means the permission tables below are the truth, not a starting point.
+`iam:*` and direct stack operations out of every runtime role means the
+permission tables below are the truth, not a starting point.
 
 The practical consequence people notice first: **the engineer workbench cannot
-deploy.** That is not a gap — it is the design. The workbench seat can change
-*code* (edit stages, rebuild images, rerun the pipeline); only the deployer
-identity can change *infrastructure*, and infrastructure changes ride through
-git where they leave a diff and an author.
+deploy.** That is not a gap — it is the design. The workbench seat changes
+*code* (edit stages, rebuild images, rerun the pipeline); *infrastructure*
+changes ride through git to the deployer seat, where they leave a diff, an
+author, and a CloudTrail entry.
 
-## Who deploys, then — and the break-glass corollary
+## The second rule: who is allowed to be a bottleneck
 
-| Identity | What it is | How it deploys |
-|---|---|---|
-| **Human operator** (IAM Identity Center SSO, `AdministratorAccess` permission set) | The only privileged identity. Short-lived credentials via `aws sso login`; no long-lived keys exist anywhere. | `./infrastructure/deploy.sh` from a checkout of this repo |
+The permission question ("who *can* do what") has a twin that governance
+reviews usually miss: the liveness question — **whose absence stops the
+system?** The design principle here is that almost nobody's should:
 
-The rule above has a corollary that is easy to miss: **if every recurring
-critical act routes through the admin, the admin is not break-glass — it is an
-active operator**, and that is its own governance failure. An identity that
-powerful should be *rarely used*, and rarity is only possible if the routine
-acts live somewhere narrower.
+- **Critical to execution: the consultant, and only the consultant.** Their
+  checkpoint approvals are the deliberate human-in-the-loop on *their own
+  report*. Nothing else in the run path waits on a human: the governance
+  gates are code and run automatically, the stewardship digest is
+  notify-only, and no steward, engineer, or admin action sits between
+  "run" and "report."
+- **Critical to engineering: the AI engineer, plus the platform engineer**
+  who turns merged infrastructure changes into deployed stacks. Two
+  functions, no more.
+- **Critical to nothing, accountable for much: the steward.** Their signoff
+  governs what enters the system (admission, *before* any run), their policy
+  is enforced *during* runs by the gates in code, and they audit *after*.
+  A steward being unavailable stops the admission of a new source — never a
+  report.
+- **The admin is a dormant recovery path, not a dependency.** No routine
+  process — running, engineering, deploying, admitting — requires it. Its
+  two remaining acts are seating people (a one-time `sts:AssumeRole` grant
+  per person per seat) and recovering the system if the deploy channel
+  itself breaks. If the admin is being used on a normal day, something is
+  misdesigned.
 
-So the recurring acts are delegated to named seats, and the admin's remaining
-jobs are the ones that *should* be rare: deploying infrastructure changes,
-seating people (granting a principal the right to assume a seat), and
-break-glass. The delegation that exists today:
+## Who deploys: the deployer seat
 
-- **Data admission, people admission, audit reading** → the **steward seat**
-  (`intelligence-engine-dev-steward`, from `steward.yaml`) — see below.
-- **Everyday engineering** → the **workbench seat** — code, builds, reruns.
-- **Deploys** are the one act still on the admin, and the intended successor
-  is not a person: a CI/CD deployer role (GitHub Actions OIDC → CloudFormation
-  on `intelligence-engine-*` stacks only), making deploys merge-gated and
-  demoting the admin to genuine break-glass.
+Deploys are the most routine critical act in the system, so they get their own
+seat rather than the admin's keys — the standard two-role CloudFormation
+pattern, from `deployer.yaml`:
 
-To wear the steward hat rather than the admin one for routine acts, assume the
-role (a logged STS call) — most simply as a named profile:
+| Role | What it is |
+|---|---|
+| `deployer` | The platform engineer's seat (assumed like the steward's). Can operate CloudFormation **on `intelligence-engine-*` stacks only**, start image builds, and write the stage-config SSM parameter. It can mutate **nothing directly** — no direct S3, no direct IAM, no direct anything. |
+| `cfn-exec` | The execution role CloudFormation itself assumes to create stack resources. Broad on purpose (stacks legitimately create IAM roles, KMS keys, trails) — but its trust policy names only `cloudformation.amazonaws.com`, so **no human or workload can assume it**. It acts only when a template says so. |
+
+The net property: **infrastructure changes flow through exactly one channel —
+a template, deployed as a logged stack operation.** A deployer could author a
+template that widens IAM; that risk is inherent to deploying and is mitigated
+where it belongs: templates ride through git with diffs and authors, every
+stack operation lands in CloudTrail, and the seat can be revoked. What the
+deployer *cannot* do is change anything quietly — no direct-write path exists
+that would leave no diff.
+
+Working from the seats is a named profile per hat (assumption is a logged STS
+call; sessions cap at 4 hours):
 
 ```ini
 # ~/.aws/config
@@ -61,17 +84,32 @@ role (a logged STS call) — most simply as a named profile:
 role_arn = arn:aws:iam::<account>:role/intelligence-engine-dev-steward
 source_profile = intelligence-dev
 region = us-east-1
+
+[profile intelligence-deployer]
+role_arn = arn:aws:iam::<account>:role/intelligence-engine-dev-deployer
+source_profile = intelligence-dev
+region = us-east-1
 ```
 
-Seating a second person as steward later is one `sts:AssumeRole` grant on
-their principal — not a new role, not a policy change.
+```bash
+# deploys from the deployer seat go through the exec role:
+./infrastructure/deploy.sh --profile intelligence-deployer \
+  --cfn-role arn:aws:iam::<account>:role/intelligence-engine-dev-cfn-exec
+```
+
+Seating a second person on any seat is one `sts:AssumeRole` grant on their
+principal — not a new role, not a policy change. The merge-gated CI/CD
+variant (GitHub Actions OIDC assuming the deployer seat) remains the natural
+next step; it changes *who triggers* deploys, not the channel they flow
+through.
 
 ---
 
 ## Runtime identities
 
-Thirteen roles exist, all named `intelligence-engine-dev-*`, all defined in
-this repo. None can touch IAM or CloudFormation. Grouped by what they are for:
+Fifteen roles exist, all named `intelligence-engine-dev-*`, all defined in
+this repo. Outside the deploy channel described above, none can touch IAM or
+CloudFormation. Grouped by what they are for:
 
 ### People-facing seats
 
@@ -79,6 +117,7 @@ this repo. None can touch IAM or CloudFormation. Grouped by what they are for:
 |---|---|---|---|
 | `workbench` | EC2 (the AI engineer's box, reached via SSM only — no SSH exists) | Invoke Bedrock; read/write the project bucket and run table; push images to ECR; start CodeBuild builds; read stacks, logs, metrics | Deploy or modify any stack; touch IAM; touch billing; touch non-project resources |
 | `steward` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Admit data (`landing-write`); admit people (create/disable console users in the project Cognito pool); read the stewardship log and CloudTrail | Deploy; touch IAM; write to any lakehouse tier; invoke models; reach the vault. The steward governs — it does not operate the pipeline |
+| `deployer` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Operate CloudFormation on `intelligence-engine-*` stacks (through `cfn-exec`); start image builds; write stage config | Mutate any resource directly; operate any non-project stack; assume `cfn-exec` itself |
 | `author` | EC2 (a second, narrower seat from `author-seat.yaml` — the beginning of per-person seats) | A subset of the workbench grants | Same exclusions, smaller surface |
 
 The **consultant is not an IAM identity at all.** Consultants sign in through
@@ -114,6 +153,7 @@ across a tier boundary always means crossing into a different role.
 | `workflow` | Step Functions | Start/observe the CodeBuild stage tasks; nothing else |
 | `wf-approval` | Lambda | Record a pending approval + task token in the run table; write its own logs. ~The smallest role in the account, on purpose — it handles human-approval tokens |
 | `codebuild` | CodeBuild (image build) | Build and push the console image |
+| `cfn-exec` | CloudFormation only (its trust policy admits no human and no workload) | Create/update stack resources when a template says so — the far end of the deploy channel |
 | `databricks-uc` | Databricks Unity Catalog (external ID trust) | Read the lakehouse in place — zero-copy, no export, revocable by deleting one role |
 
 ---
@@ -151,19 +191,20 @@ Notable absences are load-bearing:
 
 ## The human functions, mapped onto the seats
 
-The twelve roles above are *machine* identities. The people questions — who
+The fifteen roles above are *machine* identities. The people questions — who
 governs the data, who uploads datasets, who engineers the pipelines — map onto
 a deliberately small set of human functions. The design goal is that **adding
 a person means attaching existing policies to a seat, never minting new
 roles.**
 
-| Function | Who / what today | How it works |
-|---|---|---|
-| **Deployer / account owner** | The one human admin (SSO) | Deploys stacks, seats people, breaks glass — and by design does *nothing recurring*. The only identity that can change boundaries. |
-| **Data steward (governs + admits)** | The steward seat (`sts:AssumeRole`) + the standing decision gates | Holds the three recurring acts that would otherwise make the admin an active operator: **admitting data** (`landing-write` — admission is the steward's decision, so the grant follows the accountability), **admitting people** (console user management in Cognito), and **reading the audit surface** (stewardship log, CloudTrail). Changing what the *gates* enforce remains a code change — diff, review, redeploy. |
-| **AI engineer (builds/adjusts)** | The workbench seat (Claude Code + full toolchain, SSM-only) | Edits stages, rebuilds images, reruns the pipeline, inspects everything. Cannot deploy — infra changes go back through git to the deployer. |
-| **Data scientist / analyst** | Databricks via the `databricks-uc` role | Reads the lakehouse zero-copy through Unity Catalog. Never holds write on anything. |
-| **Consultant (consumes)** | Cognito user in the hosted console | Not an IAM identity at all; the app acts for them within its own scoped role. |
+| Function | Who / what today | How it works | Critical to |
+|---|---|---|---|
+| **Platform engineer (deploys)** | The deployer seat (`sts:AssumeRole`) | Turns merged template changes into deployed stacks, through `cfn-exec` — the only channel by which boundaries change. Mutates nothing directly. | Engineering |
+| **Data steward (governs + admits)** | The steward seat (`sts:AssumeRole`) + the standing decision gates | **Admitting data** (`landing-write` — admission is the steward's decision, so the grant follows the accountability), **admitting people** (console user management in Cognito), and **reading the audit surface** (stewardship log, CloudTrail). Their policy is enforced during runs by the gates *in code* — the steward signs off on what may enter, not on each run. Changing what the gates enforce is a code change — diff, review, redeploy. | Nothing at runtime — admission only |
+| **AI engineer (builds/adjusts)** | The workbench seat (Claude Code + full toolchain, SSM-only) | Edits stages, rebuilds images, reruns the pipeline, inspects everything. Cannot deploy — infra changes go back through git to the platform engineer. | Engineering |
+| **Data scientist / analyst** | Databricks via the `databricks-uc` role | Reads the lakehouse zero-copy through Unity Catalog. Never holds write on anything. | Nothing |
+| **Consultant (consumes + approves)** | Cognito user in the hosted console | Not an IAM identity at all; the app acts for them within its own scoped role. Their checkpoint decisions are the one human dependency in the run path — on their own report, by design. | Execution |
+| **Account admin** | SSO, dormant | Seats people (one grant per person per seat); recovers the system if the deploy channel breaks. Used on a normal day = design failure. | Nothing, by design |
 
 Why this is enough, and why it should resist growing: every end-to-end
 activity — admit → conform → build products → analyze → consume → audit — has
@@ -190,7 +231,7 @@ lifecycle, human-first:
 | 7 | Approve checkpoints, request revisions | Consultant (human-in-the-loop by design) | `wf-approval` records it |
 | 8 | Onboard people (console logins) | Data steward | steward seat |
 | 9 | Audit afterward | Steward / auditor | steward seat (log + CloudTrail) |
-| 10 | Change the system itself | Platform engineer (deployer) | admin today; CI/CD role as successor |
+| 10 | Change the system itself | Platform engineer | deployer seat, through `cfn-exec` |
 
 A machine role is never accountable for anything — it is the enumerated
 identity a human's work executes under. `product-builder` is the data
@@ -208,7 +249,7 @@ workable beyond an AI-centric setup:
 
 | Traditional title | Sits at | Notes |
 |---|---|---|
-| Platform / DevOps engineer | Deployer (admin today, CI/CD role as successor) | Owns `infrastructure/`; the only function that changes boundaries |
+| Platform / DevOps engineer | Deployer seat | Owns `infrastructure/`; the only function that changes boundaries, and only through templates |
 | Data engineer | Workbench seat + Databricks | The conform/build stages are ordinary Python over S3 + Glue; nothing requires an agent — Claude Code on the workbench is leverage, not a prerequisite |
 | AI engineer | Workbench seat | Same seat as the data engineer, different work: prompts, stages, evals, the model layer |
 | Analytics engineer / BI analyst | Databricks (read-only via Unity Catalog) | SQL over the derived tier; never needs AWS credentials at all |
@@ -216,11 +257,11 @@ workable beyond an AI-centric setup:
 | Security / compliance auditor | Steward seat (read side) or a read-only SSO permission set | Everything they need is readable: CloudTrail, the stewardship log, this repo |
 | Engagement lead / product owner | The hosted console (Cognito) | Runs, checkpoints, approvals — no cloud access involved |
 
-Two people can cover all of it (admin+steward hats on one, engineer on
+Two people can cover all of it (steward+deployer hats on one, engineer on
 another); a seven-person traditional team maps on without a single new role.
-The one convention to hold: **one hat at a time** — the person holding admin
-assumes the steward role for steward work, so the audit trail reflects the
-function, not the person.
+The one convention to hold: **one hat at a time** — a person wears the
+steward seat for steward work and the deployer seat for deploys, never raw
+admin for either, so the audit trail reflects the function, not the person.
 
 ---
 
@@ -231,6 +272,9 @@ function, not the person.
 | Workbench edits a stack to widen its own role | No `cloudformation:*Stack*`, no `iam:*` — the API call is denied |
 | App console rewrites guardrails at runtime | Guardrail editing is read-only when deployed; config changes require a commit and redeploy |
 | Stage code writes back to its input tier | The role running it does not hold that tier's write policy |
+| Deployer mutates a resource directly, leaving no diff | The seat holds no direct-mutation grants at all — verified by probe (direct IAM write, direct S3 write: both denied). Everything it does is a stack operation on a template |
+| Deployer authors a template that widens IAM | Not closed by IAM — inherent to deploying. Mitigated where it belongs: templates ride through git with diffs and authors, every stack operation is CloudTrail-logged, and the seat is revocable. This is the one path that relies on review rather than denial, and it is named here so nobody mistakes it for closed |
+| A human assumes `cfn-exec` to use its broad grants | Its trust policy admits only `cloudformation.amazonaws.com` — verified by probe (denied) |
 | Anything covers its tracks | CloudTrail (multi-region, log-file validation, object-level data events on foundational/derived/vault) delivers to a locked bucket the runtime roles cannot write to |
 | Long-lived key theft | There are no long-lived keys: SSO for the human, instance roles for EC2, service roles for everything else |
 

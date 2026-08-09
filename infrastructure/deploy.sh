@@ -31,6 +31,11 @@ WITH_WORKBENCH=0
 TAG=""
 BUILD_MODE="auto"   # auto | local | remote
 LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-30}"
+# When deploying from the deployer seat (which cannot create resources
+# directly), CloudFormation must act through its exec role. Pass the
+# cfn-exec role ARN from the deployer stack's outputs. Admin deploys can
+# omit it. Auto-set from CFN_ROLE_ARN in the environment if present.
+CFN_ROLE="${CFN_ROLE_ARN:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -41,6 +46,7 @@ while [[ $# -gt 0 ]]; do
     --with-app)  WITH_APP=1;       shift ;;
     --with-workbench) WITH_WORKBENCH=1; shift ;;
     --build)     BUILD_MODE="$2";  shift 2 ;;
+    --cfn-role)  CFN_ROLE="$2";    shift 2 ;;
     --dry-run)   DRY_RUN=1;        shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -89,6 +95,7 @@ deploy_stack() {
     --capabilities CAPABILITY_NAMED_IAM
     --no-fail-on-empty-changeset
     --tags $TAGS)
+  [[ -n "$CFN_ROLE" ]] && cmd+=(--role-arn "$CFN_ROLE")
 
   if [[ $DRY_RUN -eq 1 ]]; then
     printf '   would run: %s\n' "${cmd[*]}"

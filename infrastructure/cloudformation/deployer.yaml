@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - deployer seat (routine deploys without the admin)
+
+# Deploys are the most routine critical act in the system, so routing them
+# through AdministratorAccess made the admin an active operator - the same
+# failure the steward seat fixed for data and people admission. This stack
+# finishes the job with the standard two-role CloudFormation pattern:
+#
+#   deployer  - the human seat. Can operate CloudFormation on
+#               intelligence-engine-* stacks and nothing else: no direct S3,
+#               no direct IAM, no direct anything. Plus the deploy-adjacent
+#               plumbing deploy.sh needs (start image builds, read build
+#               logs, write the stage-config SSM parameter).
+#
+#   cfn-exec  - the service role CloudFormation itself assumes to create
+#               resources. Broad on purpose (stacks create IAM roles, KMS
+#               keys, trails), but NO human or workload can assume it - its
+#               trust policy names only cloudformation.amazonaws.com, so it
+#               acts only when a template says so.
+#
+# What this changes about the access model's one rule: boundaries now change
+# through exactly one channel - a template, deployed as a logged stack
+# operation, by a seat that can do nothing else. A deployer *could* author a
+# template that widens IAM; that risk is inherent to deployment and is
+# mitigated where it belongs - templates ride through git with diffs and
+# authors, every stack operation lands in CloudTrail, and the break-glass
+# admin can revoke the seat. What the deployer cannot do is mutate anything
+# quietly: no direct writes exist to leave no diff.
+#
+# The admin's remaining jobs are now genuinely rare: seating people (one
+# sts:AssumeRole grant), and break-glass when the deploy channel itself is
+# broken.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+Resources:
+
+  # CloudFormation's execution identity. Trust policy is the entire security
+  # story: only the CloudFormation service can use it, and CloudFormation
+  # only acts on templates.
+  CfnExecRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-cfn-exec
+      Description: Assumed by CloudFormation only, to create/update project stack resources
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # Broad, like CDK's bootstrap exec role and for the same reason: the
+        # stacks legitimately create IAM roles, KMS keys, trails, user pools.
+        # The constraint is the trust policy above, not this attachment.
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  DeployerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-deployer
+      Description: Platform-engineer seat - operates CloudFormation on project stacks, nothing directly
+      MaxSessionDuration: 14400
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: deploy-project-stacks
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: OperateProjectStacks
+                Effect: Allow
+                Action: cloudformation:*
+                Resource:
+                  - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/intelligence-engine-*/*
+              - Sid: StacklessCfnCalls
+                Effect: Allow
+                Action:
+                  - cloudformation:ListStacks
+                  - cloudformation:ListExports
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:GetTemplateSummary
+                Resource: '*'
+              - Sid: HandCfnItsExecRole
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt CfnExecRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: cloudformation.amazonaws.com
+        - PolicyName: deploy-adjacent-plumbing
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: StartImageAndStageBuilds
+                Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                Resource: !Sub arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/intelligence-engine-${Environment}-*
+              - Sid: UploadBuildSource
+                Effect: Allow
+                Action: [s3:PutObject, s3:GetObject]
+                Resource:
+                  Fn::Sub:
+                    - '${B}/build/*'
+                    - B:
+                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+              - Sid: ResolveImageDigests
+                Effect: Allow
+                Action:
+                  - ecr:DescribeImages
+                  - ecr:DescribeRepositories
+                Resource: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/intelligence-engine-${Environment}*
+              - Sid: ReadBuildLogs
+                Effect: Allow
+                Action:
+                  - logs:GetLogEvents
+                  - logs:DescribeLogStreams
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/intelligence-engine-${Environment}-*
+              - Sid: WriteStageConfig
+                Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:GetParameter
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/intelligence-engine/${Environment}/*
+              - Sid: DeployScriptLookups
+                Effect: Allow
+                Action:
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeSubnets
+                Resource: '*'
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+  DeployerRoleArn:
+    Description: Assume this to deploy (a named CLI profile is the ergonomic path)
+    Value: !GetAtt DeployerRole.Arn
+  CfnExecRoleArn:
+    Description: Pass as --role-arn / --cfn-role on stack operations
+    Value: !GetAtt CfnExecRole.Arn

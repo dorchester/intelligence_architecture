@@ -94,16 +94,23 @@ Stacks are ordered by dependency. `deploy.sh` handles the base set:
 ./infrastructure/deploy.sh --with-workbench
 ```
 
-The governance, workflow and LLM-control stacks deploy directly:
+The governance, workflow, LLM-control and deployer stacks deploy directly:
 
 ```bash
-for s in governance llm-controls workflow author-seat; do
+for s in governance llm-controls workflow author-seat deployer; do
   aws cloudformation deploy --profile intelligence-dev --region us-east-1 \
     --stack-name intelligence-engine-dev-$s \
     --template-file infrastructure/cloudformation/$s.yaml \
     --capabilities CAPABILITY_NAMED_IAM --parameter-overrides Environment=dev
 done
 ```
+
+> The `deployer` stack is the last act that *needs* admin. It seats a
+> deployer role that operates CloudFormation on project stacks only, through
+> a `cfn-exec` role no human can assume — after which routine deploys run as
+> `./infrastructure/deploy.sh --profile intelligence-deployer --cfn-role
+> <CfnExecRoleArn>` and the admin goes dormant. See
+> [`access-model.md`](access-model.md).
 
 The steward seat deploys after `app`, because its people-admission grant is
 scoped to the console's Cognito pool:
