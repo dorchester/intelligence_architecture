@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - author seat (IAM identity for the authoring persona)
+
+# The third persona. The consultant consumes reports; the engineer builds the
+# system; the author does the judgement work in the middle - entity decisions,
+# value mapping, narrative drafting, the human passes between build stages.
+#
+# The author's mutations flow through Git, exactly like the engineer's, but
+# their AWS identity is deliberately narrower: read artifacts, invoke Bedrock,
+# open SSM sessions. No deploys, no image pushes, no writes to any data
+# domain. If an author needs to change the system, they open a pull request.
+#
+# In the pilot, one person plays every persona and the engineer workbench
+# hosts authoring work. This role exists now so the production split is a
+# one-line instance-profile swap, not a redesign.
+#
+# Cost: nothing. A role bills nothing until an instance wears it.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+Resources:
+
+  AuthorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-author
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: author-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: InvokeClaude
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/us.anthropic.*
+                  - !Sub arn:aws:bedrock:*:${AWS::AccountId}:application-inference-profile/*
+                  - arn:aws:bedrock:*::foundation-model/anthropic.*
+              - Sid: ReadArtifacts
+                Effect: Allow
+                Action: [s3:GetObject, s3:ListBucket]
+                Resource:
+                  - Fn::ImportValue: !Sub intelligence-engine-${Environment}-artifacts-arn
+                  - Fn::Sub:
+                      - '${A}/*'
+                      - A:
+                          Fn::ImportValue: !Sub intelligence-engine-${Environment}-artifacts-arn
+              - Sid: ReadDatasets
+                Effect: Allow
+                Action: [s3:GetObject]
+                Resource:
+                  Fn::Sub:
+                    - '${B}/datasets/*'
+                    - B:
+                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  AuthorInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub intelligence-engine-${Environment}-author
+      Roles: [!Ref AuthorRole]
+
+Outputs:
+  AuthorRoleArn:
+    Value: !GetAtt AuthorRole.Arn
+  AuthorInstanceProfileArn:
+    Description: Attach to a workbench-pattern instance to seat an author
+    Value: !GetAtt AuthorInstanceProfile.Arn

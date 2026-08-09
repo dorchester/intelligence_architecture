@@ -1,0 +1,195 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - AWS side of the Databricks integration
+
+# The AWS half of the Databricks setup. The Databricks half is Terraform under
+# infrastructure/databricks/, because Databricks account resources are not
+# CloudFormation resources.
+#
+# Two things live here:
+#   1. The IAM role Unity Catalog assumes to read the workforce datasets in
+#      place. No data is copied into Databricks.
+#   2. Encrypted SSM parameters holding the Databricks OAuth credentials, plus
+#      permission for the workbench to read them. SSM SecureString is used
+#      rather than Secrets Manager because it is free at this scale and the
+#      secret is machine-to-machine, not rotated on a schedule.
+#
+# Cost: nothing. No resource here bills.
+#
+# --- Why this deploys twice ---
+# Two separate chicken-and-egg problems land in the same trust policy, so one
+# second pass resolves both.
+#
+#   1. Databricks issues the STS external ID when the storage credential is
+#      created, which is necessarily after this role exists.
+#   2. Databricks requires the role to trust itself, but IAM rejects a trust
+#      policy naming a principal that does not exist yet - which the role
+#      does not, while it is being created.
+#
+#   pass 1  deploy as-is           -> role exists, Databricks cannot assume it
+#   create the storage credential  -> Databricks returns the external ID
+#   pass 2  deploy with            -> ExternalId=<real> EnableSelfAssume=true
+#
+# Between the passes the role is deliberately unusable: a placeholder external
+# ID must never be a working credential.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+  ExternalId:
+    Type: String
+    Default: '0000'
+    Description: >-
+      STS external ID issued by Databricks for the storage credential.
+      Placeholder on the first pass; set to the real value on the second.
+
+  DatabricksAccountId:
+    Type: String
+    Default: ''
+    Description: Databricks account ID (not a secret - safe in stack parameters)
+
+  EnableSelfAssume:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['false', 'true']
+    Description: >-
+      Set true on the second pass. IAM cannot validate a trust policy naming
+      this role until the role exists, so it is added after creation.
+
+Conditions:
+  HasAccountId: !Not [!Equals [!Ref DatabricksAccountId, '']]
+  SelfAssume: !Equals [!Ref EnableSelfAssume, 'true']
+
+Resources:
+
+  # Unity Catalog assumes this role to read the dataset bucket. The trust
+  # policy names Databricks' own control-plane role, which is a fixed,
+  # published ARN - not this account.
+  UnityCatalogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-databricks-uc
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          Fn::If:
+            - SelfAssume
+            - - Sid: DatabricksControlPlane
+                Effect: Allow
+                Principal:
+                  AWS: arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL
+                Action: sts:AssumeRole
+                Condition:
+                  StringEquals:
+                    sts:ExternalId: !Ref ExternalId
+              # Databricks has required the role to trust itself since Jan 2025.
+              # A credential whose role cannot self-assume is rejected outright.
+              - Sid: SelfAssume
+                Effect: Allow
+                Principal:
+                  AWS: !Sub arn:aws:iam::${AWS::AccountId}:role/intelligence-engine-${Environment}-databricks-uc
+                Action: sts:AssumeRole
+                Condition:
+                  StringEquals:
+                    sts:ExternalId: !Ref ExternalId
+            - - Sid: DatabricksControlPlane
+                Effect: Allow
+                Principal:
+                  AWS: arn:aws:iam::414351767826:role/unity-catalog-prod-UCMasterRole-14S5ZJVKOTYTL
+                Action: sts:AssumeRole
+                Condition:
+                  StringEquals:
+                    sts:ExternalId: !Ref ExternalId
+      Policies:
+        - PolicyName: read-workforce-datasets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Read-only on purpose. The generator and the running app own
+              # this bucket; Unity Catalog is a reader of it, never a manager.
+              # Letting UC manage a path that other identities also write is
+              # how you end up fighting the governance model.
+              - Sid: ReadDatasets
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource:
+                  Fn::Sub:
+                    - '${B}/datasets/*'
+                    - B:
+                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+              - Sid: ListBucket
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource:
+                  Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+                Condition:
+                  StringLike:
+                    s3:prefix: ['datasets/*', 'datasets']
+              - Sid: SelfAssume
+                Effect: Allow
+                Action: sts:AssumeRole
+                Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/intelligence-engine-${Environment}-databricks-uc
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # Non-secret, but useful to have resolvable from the workbench.
+  AccountIdParameter:
+    Type: AWS::SSM::Parameter
+    Condition: HasAccountId
+    Properties:
+      Name: !Sub /intelligence-engine/${Environment}/databricks/account_id
+      Type: String
+      Value: !Ref DatabricksAccountId
+      Description: Databricks account ID
+      Tags:
+        Application: intelligence-engine
+
+  # Let the workbench read the Databricks credentials, and nothing else under
+  # SSM. The client secret itself is written out of band - see the note in
+  # infrastructure/databricks/README.md - so it never passes through a
+  # CloudFormation parameter, where it would be visible in stack history.
+  WorkbenchDatabricksAccess:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub intelligence-engine-${Environment}-databricks-params
+      Roles:
+        - !Sub intelligence-engine-${Environment}-workbench
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [ssm:GetParameter, ssm:GetParameters, ssm:GetParametersByPath]
+            Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/intelligence-engine/${Environment}/databricks/*
+          - Effect: Allow
+            Action: kms:Decrypt
+            Resource: !Sub arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/ssm
+          # So the engineer can hand the role ARN to Databricks when creating
+          # the storage credential.
+          - Effect: Allow
+            Action: iam:GetRole
+            Resource: !GetAtt UnityCatalogRole.Arn
+
+Outputs:
+  UnityCatalogRoleArn:
+    Description: Use this as the IAM role for the Databricks storage credential
+    Value: !GetAtt UnityCatalogRole.Arn
+  DatasetPrefix:
+    Description: External location URL to register in Unity Catalog
+    Value:
+      Fn::Sub:
+        - 's3://${B}/datasets/'
+        - B:
+            Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-name
+  ParameterPath:
+    Value: !Sub /intelligence-engine/${Environment}/databricks/

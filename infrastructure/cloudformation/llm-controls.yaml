@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - LLM usage controls (attribution + spend ceiling)
+
+# The LLM surface is more than a model ID: it needs per-client attribution,
+# a spend ceiling, and known quotas.
+#
+# Per-client attribution uses Bedrock application inference profiles - a
+# named, tagged wrapper around a cross-region profile. Invoking through the
+# wrapper makes every CloudWatch metric attributable to that client with no
+# application-side accounting. Two demo-client profiles below prove the
+# pattern; production creates one pair per engagement.
+#
+# Attribution today is metrics-level. Billing-level attribution additionally
+# requires activating cost-allocation tags in the billing console, which is
+# an account setting this project deliberately does not touch.
+#
+# The budget is an alert ceiling, not a hard cutoff. A hard cutoff (budget
+# action detaching invoke permissions) is a production decision - silently
+# severing a live engagement's model access is worse than an alert.
+#
+# Invocation logging (full prompts and responses) remains prepared but
+# DISABLED in observability-logging.yaml - enabling it is a privacy decision,
+# not an engineering one.
+#
+# Cost: nothing. Profiles are free; two budgets are within the free tier.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+  BudgetEmail:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: Email for spend alerts. Empty skips budget creation.
+
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 40
+    Description: Monthly account spend ceiling for alerting
+
+Conditions:
+  HasBudgetEmail: !Not [!Equals [!Ref BudgetEmail, '']]
+
+Resources:
+
+  # ---------- per-client attribution (pattern proof) ----------
+
+  DemoClientHaikuProfile:
+    Type: AWS::Bedrock::ApplicationInferenceProfile
+    Properties:
+      InferenceProfileName: !Sub intelligence-engine-${Environment}-client-demo-haiku
+      Description: Demo client attribution wrapper for Haiku 4.5
+      ModelSource:
+        CopyFrom: !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0
+      Tags:
+        - Key: client_id
+          Value: client-demo
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+
+  DemoClientSonnetProfile:
+    Type: AWS::Bedrock::ApplicationInferenceProfile
+    Properties:
+      InferenceProfileName: !Sub intelligence-engine-${Environment}-client-demo-sonnet
+      Description: Demo client attribution wrapper for Sonnet 4.6
+      ModelSource:
+        CopyFrom: !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-4-6
+      Tags:
+        - Key: client_id
+          Value: client-demo
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ---------- spend ceiling ----------
+
+  MonthlySpendBudget:
+    Type: AWS::Budgets::Budget
+    Condition: HasBudgetEmail
+    Properties:
+      Budget:
+        BudgetName: !Sub intelligence-engine-${Environment}-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetEmail
+
+Outputs:
+  DemoHaikuProfileArn:
+    Description: Invoke through this ARN to attribute usage to the demo client
+    Value: !GetAtt DemoClientHaikuProfile.InferenceProfileArn
+  DemoSonnetProfileArn:
+    Value: !GetAtt DemoClientSonnetProfile.InferenceProfileArn

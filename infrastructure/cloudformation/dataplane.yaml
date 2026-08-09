@@ -1,0 +1,449 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - partitioned data plane with hard IAM walls
+
+# Four data domains plus a sensitive vault, each its own bucket so the
+# boundary is IAM-enforceable rather than a prefix convention:
+#
+#   landing    external vendor deliveries arrive here; write-only for vendors
+#   lakehouse  curated row-level data (silver) and aggregates (gold)
+#   artifacts  build outputs; written only by stages that passed QA gates
+#   site       assembled report site content, served privately
+#   vault      sensitive datasets; dedicated KMS key, NO read grants until
+#              a privacy review signs off - the walls exist before the data
+#
+# Two rules this encodes:
+#   1. Row-level reads are enumerated grants (the managed policies below),
+#      never blanket bucket access. "Aggregates only" is an OUTPUT rule and
+#      is enforced by the QA-gate validators, because IAM cannot inspect
+#      aggregation level.
+#   2. Human uploads and vendor deliveries are audited: object-created events
+#      on landing and vault flow to a log group via EventBridge.
+#
+# Cost: storage only. Nothing here bills while empty.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+Resources:
+
+  # ---------- domain buckets ----------
+
+  LandingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub intelligence-engine-${Environment}-landing-${AWS::AccountId}
+      VersioningConfiguration: {Status: Enabled}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      NotificationConfiguration:
+        EventBridgeConfiguration: {EventBridgeEnabled: true}
+      LifecycleConfiguration:
+        Rules:
+          # Raw deliveries are re-obtainable from the vendor; don't hoard them.
+          - Id: ExpireRawDeliveries
+            Status: Enabled
+            ExpirationInDays: 90
+            NoncurrentVersionExpiration: {NoncurrentDays: 7}
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  LakehouseBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub intelligence-engine-${Environment}-lakehouse-${AWS::AccountId}
+      VersioningConfiguration: {Status: Enabled}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      NotificationConfiguration:
+        EventBridgeConfiguration: {EventBridgeEnabled: true}
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub intelligence-engine-${Environment}-artifacts-${AWS::AccountId}
+      VersioningConfiguration: {Status: Enabled}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: TierOldArtifacts
+            Status: Enabled
+            Transitions:
+              - {StorageClass: INTELLIGENT_TIERING, TransitionInDays: 30}
+          - Id: ExpireAthenaResults
+            Prefix: athena-results/
+            Status: Enabled
+            ExpirationInDays: 30
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub intelligence-engine-${Environment}-site-${AWS::AccountId}
+      VersioningConfiguration: {Status: Enabled}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      # Private. Serving happens through CloudFront with an origin access
+      # control when the hub site exists - never by opening the bucket.
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # ---------- sensitive vault ----------
+
+  VaultKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub Intelligence Engine ${Environment} - sensitive dataset vault
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          # Root retains key administration. No decrypt grants exist yet:
+          # they are added per-identity after the privacy review signs off,
+          # which is the point - the wall goes up before the data goes in.
+          - Sid: KeyAdministration
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: kms:*
+            Resource: '*'
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  VaultKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub alias/intelligence-engine-${Environment}-vault
+      TargetKeyId: !Ref VaultKey
+
+  VaultBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub intelligence-engine-${Environment}-vault-${AWS::AccountId}
+      VersioningConfiguration: {Status: Enabled}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref VaultKey
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      NotificationConfiguration:
+        EventBridgeConfiguration: {EventBridgeEnabled: true}
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # ---------- TLS-only, uniformly ----------
+
+  LandingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LandingBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt LandingBucket.Arn
+              - !Sub '${LandingBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  LakehouseBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LakehouseBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt LakehouseBucket.Arn
+              - !Sub '${LakehouseBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  ArtifactsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ArtifactsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt ArtifactsBucket.Arn
+              - !Sub '${ArtifactsBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt SiteBucket.Arn
+              - !Sub '${SiteBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  VaultBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref VaultBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt VaultBucket.Arn
+              - !Sub '${VaultBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  # ---------- enumerated grants (attach to stage roles; none by default) ----------
+
+  LandingDeliveryWritePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub intelligence-engine-${Environment}-landing-write
+      Description: Write-only delivery into landing. For vendor principals - no read-back.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [s3:PutObject]
+            Resource: !Sub '${LandingBucket.Arn}/*'
+
+  LakehouseSilverReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub intelligence-engine-${Environment}-silver-read
+      Description: >-
+        Row-level read on curated data. Attach per build stage that genuinely
+        needs microdata; this is the enumerated grant, not a default.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [s3:GetObject]
+            Resource: !Sub '${LakehouseBucket.Arn}/silver/*'
+          - Effect: Allow
+            Action: [s3:ListBucket]
+            Resource: !GetAtt LakehouseBucket.Arn
+            Condition:
+              StringLike:
+                s3:prefix: ['silver/*', 'silver']
+
+  ArtifactsPublishPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub intelligence-engine-${Environment}-artifacts-publish
+      Description: >-
+        Write build outputs. Held only by the stage that runs after QA gates
+        pass - possession of this policy is what makes the gate no-bypass.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [s3:PutObject, s3:GetObject]
+            Resource: !Sub '${ArtifactsBucket.Arn}/*'
+          - Effect: Allow
+            Action: [s3:ListBucket]
+            Resource: !GetAtt ArtifactsBucket.Arn
+
+  # ---------- audited upload trail ----------
+
+  UploadAuditLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /intelligence-engine/${Environment}/upload-audit
+      RetentionInDays: 90
+
+  UploadAuditLogPolicy:
+    Type: AWS::Logs::ResourcePolicy
+    Properties:
+      PolicyName: !Sub intelligence-engine-${Environment}-upload-audit
+      PolicyDocument: !Sub >-
+        {"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+        "Principal":{"Service":["events.amazonaws.com","delivery.logs.amazonaws.com"]},
+        "Action":["logs:CreateLogStream","logs:PutLogEvents"],
+        "Resource":"${UploadAuditLogGroup.Arn}"}]}
+
+  UploadAuditRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub intelligence-engine-${Environment}-upload-audit
+      Description: Every object created in landing or the vault, on the record
+      State: ENABLED
+      EventPattern:
+        source: [aws.s3]
+        detail-type: [Object Created]
+        detail:
+          bucket:
+            name:
+              - !Ref LandingBucket
+              - !Ref VaultBucket
+      Targets:
+        - Id: audit-log
+          Arn: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/intelligence-engine/${Environment}/upload-audit
+
+  # ---------- interactive governed SQL ----------
+
+  # Entity resolution is diagnostic SQL before anyone knows what to pull.
+  # Athena over the lakehouse gives that a governed, in-account, pay-per-query
+  # home today; a warehouse-native share or Databricks SQL can replace it
+  # later without moving the data.
+
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub intelligence_engine_${Environment}
+        Description: Lakehouse tables for diagnostic and per-client queries
+
+  AthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Sub intelligence-engine-${Environment}
+      Description: Governed query surface over the lakehouse
+      State: ENABLED
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        # A runaway query stops at 10 GB scanned (~5 cents).
+        BytesScannedCutoffPerQuery: 10737418240
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${ArtifactsBucket}/athena-results/
+          EncryptionConfiguration:
+            EncryptionOption: SSE_S3
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+  LandingBucketName:
+    Value: !Ref LandingBucket
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-landing-bucket
+  LakehouseBucketName:
+    Value: !Ref LakehouseBucket
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-lakehouse-bucket
+  ArtifactsBucketName:
+    Value: !Ref ArtifactsBucket
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-artifacts-bucket
+  ArtifactsBucketArn:
+    Value: !GetAtt ArtifactsBucket.Arn
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-artifacts-arn
+  SiteBucketName:
+    Value: !Ref SiteBucket
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-site-bucket
+  VaultBucketName:
+    Value: !Ref VaultBucket
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-vault-bucket
+  VaultKeyArn:
+    Value: !GetAtt VaultKey.Arn
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-vault-key-arn
+  AthenaWorkGroupName:
+    Value: !Ref AthenaWorkGroup
+  GlueDatabaseName:
+    Value: !Sub intelligence_engine_${Environment}
