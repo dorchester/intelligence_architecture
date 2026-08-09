@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Intelligence Engine - Bedrock usage monitoring dashboard
+Description: Intelligence Engine - Bedrock usage monitoring dashboard (all models)
 
 Parameters:
   Environment:
@@ -17,87 +17,19 @@ Resources:
           "widgets": [
             {
               "type": "text",
-              "x": 0,
-              "y": 0,
-              "width": 24,
-              "height": 1,
+              "x": 0, "y": 0, "width": 24, "height": 1,
               "properties": {
-                "markdown": "# Bedrock Claude Opus Usage — ${Environment}\nModels tracked: Opus 4.6, Opus 4.5, Opus 4.1"
+                "markdown": "# Bedrock Usage — All Claude Models | ${Environment}"
               }
             },
             {
               "type": "metric",
-              "x": 0,
-              "y": 1,
-              "width": 5,
-              "height": 4,
+              "x": 0, "y": 1, "width": 4, "height": 4,
               "properties": {
                 "metrics": [
-                  ["AWS/Bedrock", "InputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Input Tokens (excl cache)"}]
-                ],
-                "view": "singleValue",
-                "region": "${AWS::Region}",
-                "period": 86400,
-                "title": "Input Tokens (24h)"
-              }
-            },
-            {
-              "type": "metric",
-              "x": 5,
-              "y": 1,
-              "width": 5,
-              "height": 4,
-              "properties": {
-                "metrics": [
-                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Output Tokens"}]
-                ],
-                "view": "singleValue",
-                "region": "${AWS::Region}",
-                "period": 86400,
-                "title": "Output Tokens (24h)"
-              }
-            },
-            {
-              "type": "metric",
-              "x": 10,
-              "y": 1,
-              "width": 5,
-              "height": 4,
-              "properties": {
-                "metrics": [
-                  ["AWS/Bedrock", "CacheReadInputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Cache Read"}]
-                ],
-                "view": "singleValue",
-                "region": "${AWS::Region}",
-                "period": 86400,
-                "title": "Cache Read Tokens (24h)"
-              }
-            },
-            {
-              "type": "metric",
-              "x": 15,
-              "y": 1,
-              "width": 5,
-              "height": 4,
-              "properties": {
-                "metrics": [
-                  ["AWS/Bedrock", "CacheWriteInputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Cache Write"}]
-                ],
-                "view": "singleValue",
-                "region": "${AWS::Region}",
-                "period": 86400,
-                "title": "Cache Write Tokens (24h)"
-              }
-            },
-            {
-              "type": "metric",
-              "x": 20,
-              "y": 1,
-              "width": 4,
-              "height": 4,
-              "properties": {
-                "metrics": [
-                  ["AWS/Bedrock", "Invocations", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Invocations"}]
+                  ["AWS/Bedrock", "Invocations", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Opus 4.6"}],
+                  ["AWS/Bedrock", "Invocations", "ModelId", "us.anthropic.claude-sonnet-4-6", {"stat": "Sum", "label": "Sonnet 4.6"}],
+                  ["AWS/Bedrock", "Invocations", "ModelId", "us.anthropic.claude-haiku-4-5-20251001-v1:0", {"stat": "Sum", "label": "Haiku 4.5"}]
                 ],
                 "view": "singleValue",
                 "region": "${AWS::Region}",
@@ -107,91 +39,134 @@ Resources:
             },
             {
               "type": "metric",
-              "x": 0,
-              "y": 5,
-              "width": 12,
-              "height": 6,
+              "x": 4, "y": 1, "width": 5, "height": 4,
               "properties": {
                 "metrics": [
-                  ["AWS/Bedrock", "InputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Input (Opus 4.6)"}],
-                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Output (Opus 4.6)"}],
-                  ["AWS/Bedrock", "InputTokenCount", "ModelId", "us.anthropic.claude-opus-4-5-20251101-v1:0", {"stat": "Sum", "label": "Input (Opus 4.5)"}],
-                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-opus-4-5-20251101-v1:0", {"stat": "Sum", "label": "Output (Opus 4.5)"}]
+                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Opus 4.6 Output"}],
+                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-sonnet-4-6", {"stat": "Sum", "label": "Sonnet 4.6 Output"}]
+                ],
+                "view": "singleValue",
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "title": "Output Tokens (24h)"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 9, "y": 1, "width": 5, "height": 4,
+              "properties": {
+                "metrics": [
+                  ["AWS/Bedrock", "CacheReadInputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Cache Read (Opus 4.6)"}]
+                ],
+                "view": "singleValue",
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "title": "Cache Read Tokens (24h)"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 14, "y": 1, "width": 5, "height": 4,
+              "properties": {
+                "metrics": [
+                  ["AWS/Bedrock", "CacheWriteInputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Cache Write (Opus 4.6)"}]
+                ],
+                "view": "singleValue",
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "title": "Cache Write Tokens (24h)"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 19, "y": 1, "width": 5, "height": 4,
+              "properties": {
+                "metrics": [
+                  ["AWS/Bedrock", "InputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Opus 4.6"}],
+                  ["AWS/Bedrock", "InputTokenCount", "ModelId", "us.anthropic.claude-sonnet-4-6", {"stat": "Sum", "label": "Sonnet 4.6"}]
+                ],
+                "view": "singleValue",
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "title": "Input Tokens (24h)"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 5, "width": 12, "height": 6,
+              "properties": {
+                "metrics": [
+                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Opus 4.6 Output"}],
+                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-sonnet-4-6", {"stat": "Sum", "label": "Sonnet 4.6 Output"}],
+                  ["AWS/Bedrock", "CacheReadInputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Opus 4.6 Cache Read"}],
+                  ["AWS/Bedrock", "InputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Opus 4.6 Input"}],
+                  ["AWS/Bedrock", "InputTokenCount", "ModelId", "us.anthropic.claude-sonnet-4-6", {"stat": "Sum", "label": "Sonnet 4.6 Input"}]
                 ],
                 "view": "timeSeries",
                 "stacked": false,
                 "region": "${AWS::Region}",
                 "period": 300,
-                "title": "Input vs Output Tokens Over Time"
+                "title": "Token Usage Over Time (5min)"
               }
             },
             {
               "type": "metric",
-              "x": 12,
-              "y": 5,
-              "width": 12,
-              "height": 6,
+              "x": 12, "y": 5, "width": 12, "height": 6,
               "properties": {
                 "metrics": [
-                  ["AWS/Bedrock", "CacheReadInputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Cache Read (Opus 4.6)"}],
-                  ["AWS/Bedrock", "CacheWriteInputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Cache Write (Opus 4.6)"}]
-                ],
-                "view": "timeSeries",
-                "stacked": false,
-                "region": "${AWS::Region}",
-                "period": 300,
-                "title": "Cache Token Usage Over Time"
-              }
-            },
-            {
-              "type": "metric",
-              "x": 0,
-              "y": 11,
-              "width": 12,
-              "height": 6,
-              "properties": {
-                "metrics": [
-                  ["AWS/Bedrock", "InputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Input (Opus 4.6)"}],
-                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Output (Opus 4.6)"}],
-                  ["AWS/Bedrock", "CacheReadInputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Cache Read (Opus 4.6)"}],
-                  ["AWS/Bedrock", "CacheWriteInputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Cache Write (Opus 4.6)"}]
+                  ["AWS/Bedrock", "Invocations", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Opus 4.6"}],
+                  ["AWS/Bedrock", "Invocations", "ModelId", "us.anthropic.claude-sonnet-4-6", {"stat": "Sum", "label": "Sonnet 4.6"}],
+                  ["AWS/Bedrock", "Invocations", "ModelId", "us.anthropic.claude-haiku-4-5-20251001-v1:0", {"stat": "Sum", "label": "Haiku 4.5"}],
+                  ["AWS/Bedrock", "Invocations", "ModelId", "us.anthropic.claude-opus-4-5-20251101-v1:0", {"stat": "Sum", "label": "Opus 4.5"}],
+                  ["AWS/Bedrock", "Invocations", "ModelId", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", {"stat": "Sum", "label": "Sonnet 4.5"}]
                 ],
                 "view": "timeSeries",
                 "stacked": true,
                 "region": "${AWS::Region}",
-                "period": 3600,
-                "title": "Daily Token Volume (Hourly)"
+                "period": 300,
+                "title": "Invocations by Model (5min)"
               }
             },
             {
               "type": "metric",
-              "x": 12,
-              "y": 11,
-              "width": 12,
-              "height": 6,
+              "x": 0, "y": 11, "width": 12, "height": 6,
               "properties": {
                 "metrics": [
-                  ["AWS/Bedrock", "Invocations", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Opus 4.6"}],
-                  ["AWS/Bedrock", "Invocations", "ModelId", "us.anthropic.claude-opus-4-5-20251101-v1:0", {"stat": "Sum", "label": "Opus 4.5"}],
-                  ["AWS/Bedrock", "Invocations", "ModelId", "us.anthropic.claude-opus-4-1-20250805-v1:0", {"stat": "Sum", "label": "Opus 4.1"}]
+                  ["AWS/Bedrock", "CacheReadInputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Cache Read"}],
+                  ["AWS/Bedrock", "CacheWriteInputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Cache Write"}]
                 ],
                 "view": "timeSeries",
                 "stacked": false,
                 "region": "${AWS::Region}",
                 "period": 300,
-                "title": "Invocations by Model"
+                "title": "Prompt Cache Usage (Opus 4.6)"
               }
             },
             {
               "type": "metric",
-              "x": 0,
-              "y": 17,
-              "width": 8,
-              "height": 6,
+              "x": 12, "y": 11, "width": 12, "height": 6,
               "properties": {
                 "metrics": [
-                  ["AWS/Bedrock", "InvocationClientErrors", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Client Errors (Opus 4.6)"}],
-                  ["AWS/Bedrock", "InvocationClientErrors", "ModelId", "us.anthropic.claude-opus-4-1-20250805-v1:0", {"stat": "Sum", "label": "Client Errors (Opus 4.1)"}]
+                  ["AWS/Bedrock", "InvocationLatency", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Average", "label": "Opus 4.6 Avg"}],
+                  ["AWS/Bedrock", "InvocationLatency", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "p95", "label": "Opus 4.6 p95"}],
+                  ["AWS/Bedrock", "InvocationLatency", "ModelId", "us.anthropic.claude-sonnet-4-6", {"stat": "Average", "label": "Sonnet 4.6 Avg"}],
+                  ["AWS/Bedrock", "TimeToFirstToken", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Average", "label": "Opus 4.6 TTFT"}]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 300,
+                "title": "Latency & Time to First Token"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 17, "width": 12, "height": 5,
+              "properties": {
+                "metrics": [
+                  ["AWS/Bedrock", "InvocationClientErrors", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Opus 4.6 Client Errors"}],
+                  ["AWS/Bedrock", "InvocationClientErrors", "ModelId", "us.anthropic.claude-sonnet-4-6", {"stat": "Sum", "label": "Sonnet 4.6 Client Errors"}],
+                  ["AWS/Bedrock", "InvocationClientErrors", "ModelId", "us.anthropic.claude-opus-4-1-20250805-v1:0", {"stat": "Sum", "label": "Opus 4.1 Errors"}]
                 ],
                 "view": "timeSeries",
                 "stacked": false,
@@ -202,61 +177,20 @@ Resources:
             },
             {
               "type": "metric",
-              "x": 8,
-              "y": 17,
-              "width": 8,
-              "height": 6,
+              "x": 12, "y": 17, "width": 12, "height": 5,
               "properties": {
                 "metrics": [
-                  ["AWS/Bedrock", "InvocationLatency", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Average", "label": "Avg Latency (Opus 4.6)"}],
-                  ["AWS/Bedrock", "InvocationLatency", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "p95", "label": "p95 Latency (Opus 4.6)"}],
-                  ["AWS/Bedrock", "InvocationLatency", "ModelId", "us.anthropic.claude-opus-4-5-20251101-v1:0", {"stat": "Average", "label": "Avg Latency (Opus 4.5)"}]
+                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Opus 4.6"}],
+                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-sonnet-4-6", {"stat": "Sum", "label": "Sonnet 4.6"}],
+                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-opus-4-5-20251101-v1:0", {"stat": "Sum", "label": "Opus 4.5"}],
+                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", {"stat": "Sum", "label": "Sonnet 4.5"}],
+                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-haiku-4-5-20251001-v1:0", {"stat": "Sum", "label": "Haiku 4.5"}]
                 ],
                 "view": "timeSeries",
-                "stacked": false,
-                "region": "${AWS::Region}",
-                "period": 300,
-                "title": "Invocation Latency"
-              }
-            },
-            {
-              "type": "metric",
-              "x": 16,
-              "y": 17,
-              "width": 8,
-              "height": 6,
-              "properties": {
-                "metrics": [
-                  ["AWS/Bedrock", "TimeToFirstToken", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Average", "label": "Avg TTFT (Opus 4.6)"}],
-                  ["AWS/Bedrock", "TimeToFirstToken", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "p95", "label": "p95 TTFT (Opus 4.6)"}]
-                ],
-                "view": "timeSeries",
-                "stacked": false,
-                "region": "${AWS::Region}",
-                "period": 300,
-                "title": "Time to First Token"
-              }
-            },
-            {
-              "type": "metric",
-              "x": 0,
-              "y": 23,
-              "width": 24,
-              "height": 6,
-              "properties": {
-                "metrics": [
-                  ["AWS/Bedrock", "InputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Input (Opus 4.6)"}],
-                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-opus-4-6-v1", {"stat": "Sum", "label": "Output (Opus 4.6)"}],
-                  ["AWS/Bedrock", "InputTokenCount", "ModelId", "us.anthropic.claude-opus-4-5-20251101-v1:0", {"stat": "Sum", "label": "Input (Opus 4.5)"}],
-                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-opus-4-5-20251101-v1:0", {"stat": "Sum", "label": "Output (Opus 4.5)"}],
-                  ["AWS/Bedrock", "InputTokenCount", "ModelId", "us.anthropic.claude-opus-4-1-20250805-v1:0", {"stat": "Sum", "label": "Input (Opus 4.1)"}],
-                  ["AWS/Bedrock", "OutputTokenCount", "ModelId", "us.anthropic.claude-opus-4-1-20250805-v1:0", {"stat": "Sum", "label": "Output (Opus 4.1)"}]
-                ],
-                "view": "timeSeries",
-                "stacked": false,
+                "stacked": true,
                 "region": "${AWS::Region}",
                 "period": 3600,
-                "title": "Token Usage by Model (All Opus)"
+                "title": "Output Tokens by Model (Hourly)"
               }
             }
           ]
