@@ -146,7 +146,7 @@ def main(client_id: str) -> None:
     # these come from a census or a client-supplied headcount table.
     targets = {
         "seniority_level": {"Entry": 0.34, "Mid": 0.38, "Senior": 0.20,
-                            "Director": 0.06, "Executive": 0.02},
+                            "Director": 0.06, "VP/Executive": 0.02},
     }
     present = set(df["seniority_level"].dropna().unique())
     targets["seniority_level"] = {k: v for k, v in targets["seniority_level"].items()
