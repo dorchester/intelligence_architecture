@@ -274,12 +274,20 @@ No DynamoDB grant. Stages communicate through S3 artifacts and build exit
 codes only. Intentional (it keeps the runs table owned by the approval path),
 but it means a stage cannot post progress.
 
-### 3.3 The stage image is consumed as `:latest`
+### 3.3 Resolved — executions pin an image digest
 
-The CodeBuild project pins `…/stages:latest`. Remote console builds have a
-strong provenance property — source is packaged by `git archive` of committed
-state, so every image maps to a checkout-able commit — and `:latest` weakens
-it here. Pinning stage images by digest per execution would close the gap.
+`stage_image` is now a **required** field in the execution input and is passed
+to every stage as `ImageOverride`. There is deliberately no default: an
+execution cannot run without naming the image it ran on.
+
+```json
+"stage_image": "<account>.dkr.ecr.<region>.amazonaws.com/intelligence-engine-dev-stages@sha256:<digest>"
+```
+
+`remote_build.sh --stage-image` prints the digest line after the tag line, so
+the value is available at build time. A tag can be moved after the fact; a
+digest is the image's commit-equivalent, and it restores end to end the
+provenance the `git archive` source packaging gives the console build.
 
 ### 3.4 Two checkpoint *positions*, each revisable
 
@@ -295,11 +303,27 @@ There is no console UI and no screenshot context at the approval moment.
 Approving means reading a token from DynamoDB and calling `send-task-success`.
 Anyone with the token can approve; authorization is IAM on the state machine.
 
-### 3.6 Stage egress is unrestricted
+### 3.6 Stage egress is open — a decision, not an oversight
 
-CodeBuild runs with default internet access. If stages must not reach the
-public internet, that requires a VPC configuration — which reintroduces the
-NAT gateway cost (~$32/month) the current design deliberately avoids.
+CodeBuild stages run with default internet access. Recording the decision
+explicitly, because silence here reads as an accident:
+
+**Accepted for this environment.** Confining stages to a VPC means private
+subnets plus either a NAT gateway (~$32/month standing, against a design whose
+entire cost story is scale-to-zero) or a set of interface endpoints for S3,
+ECR, SSM, KMS, Logs, Bedrock and STS — roughly $7/month each, so comparable
+cost and materially more to maintain.
+
+What makes it tolerable is that egress is not the control doing the work here.
+The data boundary is enforced by IAM: a stage can only read `silver/*`, and it
+cannot reach the vault at all. An exfiltration path would need credentials the
+role does not hold.
+
+**What would change the answer:** real client microdata in silver, or a
+vendor credential landing in the SSM namespace. Either makes open egress the
+weakest link, and at that point the interface-endpoint variant — not NAT — is
+the right build. It is a day of work, not a redesign, and the enumerated
+grants already name every service the endpoint list would need.
 
 ### 3.7 Architecture is split
 
