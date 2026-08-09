@@ -105,6 +105,20 @@ for s in governance llm-controls workflow author-seat; do
 done
 ```
 
+The steward seat deploys after `app`, because its people-admission grant is
+scoped to the console's Cognito pool:
+
+```bash
+aws cloudformation deploy --profile intelligence-dev --region us-east-1 \
+  --stack-name intelligence-engine-dev-steward \
+  --template-file infrastructure/cloudformation/steward.yaml \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides Environment=dev "UserPoolId=$(aws cloudformation describe-stacks \
+      --profile intelligence-dev --region us-east-1 \
+      --stack-name intelligence-engine-dev-app \
+      --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text)"
+```
+
 Then write the one parameter every stage resolves from:
 
 ```bash
@@ -241,12 +255,19 @@ aws glue get-table --profile intelligence-dev \
 https://<ServiceUrl from the app stack>
 ```
 
-Cognito allows no self-signup. Create a login once, then set a password:
+Cognito allows no self-signup. Creating a login is a *people-admission* act,
+which belongs to the steward seat (see
+[`access-model.md`](access-model.md)) — assume it, create the user, then set a
+permanent password so the undeliverable temp-password flow never starts:
 
 ```bash
-aws cognito-idp admin-create-user --profile intelligence-dev \
+aws cognito-idp admin-create-user --profile intelligence-steward \
   --user-pool-id <UserPoolId> --username you@example.com \
   --user-attributes Name=email,Value=you@example.com Name=email_verified,Value=true
+
+aws cognito-idp admin-set-user-password --profile intelligence-steward \
+  --user-pool-id <UserPoolId> --username you@example.com \
+  --password '<their-initial-password>' --permanent
 ```
 
 Four things worth doing deliberately:

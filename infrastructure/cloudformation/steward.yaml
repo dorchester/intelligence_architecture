@@ -1,0 +1,148 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - data steward seat (delegated operations, so the admin can be break-glass)
+
+# The access model's rule is that no runtime identity can change the system's
+# boundaries. This stack addresses the rule's corollary: if every recurring
+# critical act routes through the admin, the admin is not break-glass - it is
+# an active operator, which is its own governance failure.
+#
+# The steward role holds the three recurring acts that were previously
+# admin-only, and nothing else:
+#
+#   1. Data admission   - landing-write: the right to place a new source drop.
+#                         Admission is the steward's decision anyway; this
+#                         makes the IAM grant follow the accountability.
+#   2. People admission - create/disable console users in the project's
+#                         Cognito pool. Onboarding a consultant is routine,
+#                         not privileged.
+#   3. Audit reading    - the stewardship log and CloudTrail lookups. Pipeline
+#                         roles deliberately cannot read the log they write;
+#                         the steward is the identity that reads it.
+#
+# What it deliberately cannot do: deploy, touch IAM, write to any lakehouse
+# tier, invoke models, or reach the vault. The steward governs; it does not
+# operate the pipeline.
+#
+# Assumption is by explicit grant: the role trusts the account, and a human
+# is seated by granting their principal sts:AssumeRole on this role's ARN.
+# Every assumption is a logged STS call. With one human today, the value is
+# wearing the narrow hat for routine acts - and seating a second person later
+# is one grant, not a new role.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+  UserPoolId:
+    Type: String
+    Default: ''
+    Description: >-
+      Cognito user pool of the hosted console (from the app stack's
+      UserPoolId output). Leave empty if the app stack is not deployed;
+      the people-admission grant is simply omitted.
+
+Conditions:
+  HasUserPool: !Not [!Equals [!Ref UserPoolId, '']]
+
+Resources:
+
+  # The audit-reading grant, as a named policy so its holder list stays
+  # legible. Note there is still no stewardship-read on any pipeline role:
+  # the log is append-only from the inside, and readable only from this seat.
+  StewardshipReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub intelligence-engine-${Environment}-stewardship-read
+      Description: Read the stewardship log and look up audit events - the steward's view
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ReadStewardshipLog
+            Effect: Allow
+            Action: [s3:GetObject]
+            Resource:
+              Fn::Sub:
+                - '${B}/stewardship/*'
+                - B:
+                    Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+          - Sid: ListStewardshipLog
+            Effect: Allow
+            Action: [s3:ListBucket]
+            Resource:
+              Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+            Condition:
+              StringLike:
+                s3:prefix: 'stewardship/*'
+          - Sid: LookupAuditEvents
+            Effect: Allow
+            Action:
+              - cloudtrail:LookupEvents
+              - cloudtrail:GetTrailStatus
+              - cloudtrail:DescribeTrails
+            Resource: '*'
+          - Sid: ReadStewardshipCatalog
+            Effect: Allow
+            Action:
+              - glue:GetDatabase
+              - glue:GetTables
+              - glue:GetTable
+              - glue:GetPartitions
+            Resource:
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/ie_${Environment}_stewardship
+              - !Sub arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/ie_${Environment}_stewardship/*
+
+  StewardRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-steward
+      Description: Delegated data-steward seat - data admission, people admission, audit reading
+      MaxSessionDuration: 14400   # a working session, not a standing login
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # Data admission: the only write this seat holds, and it is the
+        # narrowest one in the data plane - the L1 drop zone.
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-landing-write
+        - !Ref StewardshipReadPolicy
+      Policies:
+        - !If
+          - HasUserPool
+          - PolicyName: people-admission
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Sid: ManageConsoleUsers
+                  Effect: Allow
+                  Action:
+                    - cognito-idp:AdminCreateUser
+                    - cognito-idp:AdminSetUserPassword
+                    - cognito-idp:AdminDisableUser
+                    - cognito-idp:AdminEnableUser
+                    - cognito-idp:AdminDeleteUser
+                    - cognito-idp:AdminGetUser
+                    - cognito-idp:ListUsers
+                  Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPoolId}
+          - !Ref AWS::NoValue
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+  StewardRoleArn:
+    Description: Assume this to act as steward (aws sts assume-role, or a named CLI profile)
+    Value: !GetAtt StewardRole.Arn
+  StewardshipReadPolicyArn:
+    Description: The audit-reading grant, attachable to future steward seats
+    Value: !Ref StewardshipReadPolicy
