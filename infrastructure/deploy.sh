@@ -16,6 +16,7 @@
 #   ./infrastructure/deploy.sh                    # base stacks only
 #   ./infrastructure/deploy.sh --with-app         # everything, including hosting
 #   ./infrastructure/deploy.sh --with-app --build remote   # force CodeBuild
+#   ./infrastructure/deploy.sh --with-workbench          # engineer EC2 via SSM
 #   ./infrastructure/deploy.sh --with-app --tag v3
 #   ./infrastructure/deploy.sh --dry-run
 #
@@ -26,6 +27,7 @@ REGION="${AWS_REGION:-us-east-1}"
 ENVIRONMENT="dev"
 DRY_RUN=0
 WITH_APP=0
+WITH_WORKBENCH=0
 TAG=""
 BUILD_MODE="auto"   # auto | local | remote
 LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-30}"
@@ -37,6 +39,7 @@ while [[ $# -gt 0 ]]; do
     --region)    REGION="$2";      shift 2 ;;
     --tag)       TAG="$2";         shift 2 ;;
     --with-app)  WITH_APP=1;       shift ;;
+    --with-workbench) WITH_WORKBENCH=1; shift ;;
     --build)     BUILD_MODE="$2";  shift 2 ;;
     --dry-run)   DRY_RUN=1;        shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -60,6 +63,7 @@ echo "  profile      ${PROFILE}"
 echo "  region       ${REGION}"
 echo "  environment  ${ENVIRONMENT}"
 echo "  hosted app   $([[ $WITH_APP -eq 1 ]] && echo yes || echo 'no (--with-app to include)')"
+echo "  workbench    $([[ $WITH_WORKBENCH -eq 1 ]] && echo yes || echo 'no (--with-workbench to include)')"
 echo
 
 if [[ $DRY_RUN -eq 0 ]]; then
@@ -154,6 +158,26 @@ if [[ $WITH_APP -eq 1 ]]; then
   fi
 fi
 
+if [[ $WITH_WORKBENCH -eq 1 ]]; then
+  # The engineer workbench. Placed in the default VPC's first public subnet so
+  # no networking has to be created and no NAT gateway is involved.
+  echo "── engineer workbench"
+  VPC_ID="$(aws ec2 describe-vpcs --profile "$PROFILE" --region "$REGION" \
+              --filters Name=isDefault,Values=true \
+              --query 'Vpcs[0].VpcId' --output text 2>/dev/null)"
+  if [[ -z "$VPC_ID" || "$VPC_ID" == "None" ]]; then
+    echo "   no default VPC found; deploy workbench.yaml with explicit" >&2
+    echo "   VpcId and SubnetId parameters instead" >&2
+  else
+    SUBNET_ID="$(aws ec2 describe-subnets --profile "$PROFILE" --region "$REGION" \
+                   --filters "Name=vpc-id,Values=${VPC_ID}" \
+                             Name=map-public-ip-on-launch,Values=true \
+                   --query 'Subnets[0].SubnetId' --output text 2>/dev/null)"
+    echo "   vpc ${VPC_ID}  subnet ${SUBNET_ID}"
+    deploy_stack workbench workbench.yaml "VpcId=${VPC_ID}" "SubnetId=${SUBNET_ID}"
+  fi
+fi
+
 if [[ $DRY_RUN -eq 1 ]]; then
   echo "Dry run complete — nothing was deployed."
   exit 0
@@ -182,7 +206,8 @@ echo
 echo "Stack outputs"
 echo "─────────────"
 ALL=("${BASE_STACKS[@]}")
-[[ $WITH_APP -eq 1 ]] && ALL+=(ecr app)
+[[ $WITH_APP -eq 1 ]] && ALL+=(ecr build app)
+[[ $WITH_WORKBENCH -eq 1 ]] && ALL+=(workbench)
 for suffix in "${ALL[@]}"; do
   aws cloudformation describe-stacks \
     --profile "$PROFILE" --region "$REGION" --stack-name "${PREFIX}-${suffix}" \

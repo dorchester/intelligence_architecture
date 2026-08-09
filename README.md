@@ -104,6 +104,30 @@ aws cloudformation delete-stack --stack-name intelligence-engine-dev-app \
   --profile intelligence-dev
 ```
 
+### The engineer workbench
+
+```bash
+./infrastructure/deploy.sh --with-workbench
+aws ssm start-session --target <InstanceId> --profile intelligence-dev
+```
+
+An EC2 instance where the engineering happens — Claude Code, the repository,
+the AWS CLI, the Databricks CLI, and Terraform, all inside the account rather
+than on a laptop.
+
+- **No SSH.** No key pair exists, and the security group has **zero inbound
+  rules**. Access is Session Manager over outbound HTTPS, and every session is
+  recorded in CloudTrail. This is the shape a firm's DevOps team will accept:
+  no console, no bastion, no open port.
+- **No NAT gateway.** A public subnet with an auto-assigned IP costs cents;
+  a NAT gateway would be ~$32/month for the same egress.
+- **Auto-stops.** A CloudWatch alarm stops the instance after an hour of low
+  CPU, so forgetting about it costs the EBS volume and nothing else.
+
+The instance role is broader than the App Runner one — this identity builds and
+deploys — but still scoped to this project's bucket, table, and repository,
+with read-only access to logs and metrics.
+
 ---
 
 ## Workforce datasets
@@ -210,6 +234,7 @@ All CloudFormation-managed, tagged `Application=intelligence-engine`.
 | `…-dev-ecr` | ECR repository — scan on push, keeps 5 images | per GB |
 | `…-dev-build` | CodeBuild project — builds the image in AWS | per build (~2¢) |
 | `…-dev-app` | App Runner service + Cognito user pool | **~$5–10/mo** |
+| `…-dev-workbench` | Engineer EC2 reached via SSM, auto-stops when idle | ~$0.02/hr running, ~$0.80/mo stopped |
 
 The first four idle at zero. `…-dev-app` is the only standing cost, and deleting
 that one stack removes it without touching data or datasets.

@@ -1,0 +1,276 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - engineer workbench (EC2 reached via SSM, no SSH)
+
+# The engineer's working environment. Claude Code, the repository, the AWS CLI
+# and the Databricks CLI all run here rather than on a laptop, so engineering
+# happens inside the account boundary with an audit trail.
+#
+# Deliberate properties:
+#   - No SSH, no key pair, no inbound rules at all. Access is
+#     `aws ssm start-session`, which is outbound-only and logged in CloudTrail.
+#   - No NAT gateway. The instance sits in a public subnet with an
+#     auto-assigned public IP, which costs cents rather than ~$32/month.
+#   - Auto-stops after sustained idle, so forgetting to shut it down costs
+#     pennies instead of a monthly bill.
+#   - Encrypted EBS, IMDSv2 required, non-root work directory.
+#
+# Cost when running: ~$0.022/hr (t4g.small + public IPv4).
+# Cost when stopped:  ~$0.80/month for the EBS volume alone.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC for the workbench (the default VPC is fine)
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet - must auto-assign public IPs for SSM to connect
+
+  InstanceType:
+    Type: String
+    Default: t4g.small
+    AllowedValues: [t4g.small, t4g.medium, t4g.large]
+    Description: ARM Graviton. Claude Code and the toolchain all run on arm64.
+
+  VolumeSizeGb:
+    Type: Number
+    Default: 20
+    MinValue: 10
+    MaxValue: 100
+
+  IdleStopPeriods:
+    Type: Number
+    Default: 12
+    MinValue: 2
+    MaxValue: 288
+    Description: >-
+      Consecutive 5-minute periods of low CPU before the instance stops.
+      12 = one hour. CloudFormation cannot do arithmetic, so this is counted
+      in periods rather than minutes to keep the alarm honest.
+
+  RepositoryUrl:
+    Type: String
+    Default: https://github.com/dorchester/intelligence_architecture.git
+    Description: Cloned on first boot
+
+  LatestAmi:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64
+    Description: Resolved at deploy time - never a hardcoded AMI id
+
+Resources:
+
+  # No inbound rules. SSM works entirely over outbound HTTPS.
+  WorkbenchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Engineer workbench - egress only, no inbound access
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS to AWS APIs, GitHub, package registries
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP for package repositories
+      Tags:
+        - Key: Name
+          Value: !Sub intelligence-engine-${Environment}-workbench
+        - Key: Application
+          Value: intelligence-engine
+
+  # What the engineer can do from the workbench. Broader than the App Runner
+  # instance role on purpose - this identity builds and deploys the system -
+  # but still scoped to this project's resources and read-only on billing.
+  WorkbenchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-workbench
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # Enables Session Manager. AWS-managed, SSM-scoped.
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: engineer-project-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: InvokeClaude
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                  - bedrock:ListFoundationModels
+                  - bedrock:ListInferenceProfiles
+                Resource: '*'
+              - Sid: ProjectBucket
+                Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject, s3:ListBucket]
+                Resource:
+                  - Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+                  - Fn::Sub:
+                      - '${B}/*'
+                      - B:
+                          Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+              - Sid: RunState
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - Fn::ImportValue: !Sub intelligence-engine-${Environment}-table-arn
+                  - Fn::Sub:
+                      - '${T}/index/*'
+                      - T:
+                          Fn::ImportValue: !Sub intelligence-engine-${Environment}-table-arn
+              - Sid: BuildAndShip
+                Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                Resource: '*'
+              - Sid: ObserveOnly
+                Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:ListStacks
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - logs:GetLogEvents
+                  - logs:FilterLogEvents
+                  - cloudwatch:GetMetricData
+                  - cloudwatch:GetMetricStatistics
+                  - apprunner:DescribeService
+                  - apprunner:ListServices
+                Resource: '*'
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  WorkbenchInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub intelligence-engine-${Environment}-workbench
+      Roles: [!Ref WorkbenchRole]
+
+  Workbench:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmi
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref WorkbenchInstanceProfile
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds: [!Ref WorkbenchSecurityGroup]
+      # No KeyName on purpose: no SSH key exists to leak or rotate.
+      MetadataOptions:
+        HttpTokens: required          # IMDSv2 only
+        HttpPutResponseHopLimit: 1
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: !Ref VolumeSizeGb
+            VolumeType: gp3
+            Encrypted: true
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          dnf update -y
+          dnf install -y git python3.12 python3.12-pip nodejs npm jq tmux
+
+          # Claude Code, so the engineer works with an agent inside the account
+          npm install -g @anthropic-ai/claude-code || true
+
+          # Databricks CLI (v1.x) for bundles and workspace automation
+          curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh || true
+
+          # Terraform, for the Databricks account-level resources that
+          # CloudFormation cannot express
+          dnf install -y dnf-plugins-core || true
+          dnf config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo || true
+          dnf install -y terraform || true
+
+          # The repository, owned by the interactive user rather than root
+          sudo -u ec2-user bash -lc '
+            cd ~
+            git clone ${RepositoryUrl} intelligence_architecture || true
+            cd intelligence_architecture
+            python3.12 -m venv .venv
+            .venv/bin/pip install --upgrade pip
+            .venv/bin/pip install -e ".[dev]" || true
+            echo "export AWS_REGION=${AWS::Region}" >> ~/.bashrc
+            echo "export ENVIRONMENT=${Environment}" >> ~/.bashrc
+            echo "cd ~/intelligence_architecture && source .venv/bin/activate" >> ~/.bashrc
+          '
+      Tags:
+        - Key: Name
+          Value: !Sub intelligence-engine-${Environment}-workbench
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # Forgetting to stop the box should cost pennies, not a monthly bill.
+  IdleStopAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub intelligence-engine-${Environment}-workbench-idle
+      AlarmDescription: Stop the workbench after sustained idle CPU
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref Workbench
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: !Ref IdleStopPeriods
+      DatapointsToAlarm: !Ref IdleStopPeriods
+      Threshold: 3
+      ComparisonOperator: LessThanThreshold
+      # Missing data means the instance is already stopped - not a reason to act.
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Sub arn:aws:automate:${AWS::Region}:ec2:stop
+
+Outputs:
+  InstanceId:
+    Description: Connect with - aws ssm start-session --target <this>
+    Value: !Ref Workbench
+  ConnectCommand:
+    Value: !Sub aws ssm start-session --target ${Workbench} --profile intelligence-dev
+  StartCommand:
+    Value: !Sub aws ec2 start-instances --instance-ids ${Workbench} --profile intelligence-dev
+  StopCommand:
+    Value: !Sub aws ec2 stop-instances --instance-ids ${Workbench} --profile intelligence-dev
+  RoleArn:
+    Value: !GetAtt WorkbenchRole.Arn
