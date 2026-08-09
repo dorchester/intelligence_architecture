@@ -31,6 +31,18 @@ Resources:
             Transitions:
               - StorageClass: INTELLIGENT_TIERING
                 TransitionInDays: 30
+          # Source zips uploaded for CodeBuild are disposable the moment the
+          # build finishes; without this they accumulate forever.
+          - Id: ExpireBuildSources
+            Prefix: build/
+            Status: Enabled
+            ExpirationInDays: 7
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+          - Id: AbortIncompleteUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
       Tags:
         - Key: Application
           Value: intelligence-engine

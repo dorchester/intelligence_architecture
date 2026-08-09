@@ -28,6 +28,7 @@ DRY_RUN=0
 WITH_APP=0
 TAG=""
 BUILD_MODE="auto"   # auto | local | remote
+LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-30}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -157,6 +158,26 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo "Dry run complete — nothing was deployed."
   exit 0
 fi
+
+# ---------- log retention ----------
+# App Runner and CodeBuild create their own log groups, which default to
+# "never expire". CloudFormation cannot set retention on a group it does not
+# own, so it is applied here — still reproducible, still in version control.
+echo "── log retention (${LOG_RETENTION_DAYS}d)"
+for lg in $(aws logs describe-log-groups \
+              --profile "$PROFILE" --region "$REGION" \
+              --query "logGroups[?contains(logGroupName,'${PREFIX}')].logGroupName" \
+              --output text 2>/dev/null); do
+  current=$(aws logs describe-log-groups --profile "$PROFILE" --region "$REGION" \
+              --log-group-name-pattern "$lg" \
+              --query "logGroups[0].retentionInDays" --output text 2>/dev/null)
+  if [[ "$current" != "$LOG_RETENTION_DAYS" ]]; then
+    aws logs put-retention-policy --profile "$PROFILE" --region "$REGION" \
+      --log-group-name "$lg" --retention-in-days "$LOG_RETENTION_DAYS" 2>/dev/null \
+      && echo "   set ${lg}"
+  fi
+done
+echo
 
 echo "Stack outputs"
 echo "─────────────"

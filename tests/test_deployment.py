@@ -90,7 +90,29 @@ def test_bucket_stays_private():
 def test_dockerfile_runs_as_non_root():
     text = (BASE_DIR / "Dockerfile").read_text(encoding="utf-8")
     assert "USER engine" in text
-    assert "--workers" in text and '"1"' in text, "must stay single-worker"
+
+
+def test_gunicorn_stays_single_worker():
+    """A second worker would not share the in-process run registry."""
+    from webapp import gunicorn_conf
+
+    assert gunicorn_conf.workers == 1
+    assert gunicorn_conf.threads > 1, "concurrency comes from threads, not workers"
+
+
+def test_health_check_excluded_from_access_log():
+    """App Runner polls /healthz every 20s; logging it is 4,320 lines a day."""
+    import logging
+
+    from webapp.gunicorn_conf import _SkipHealthCheck
+
+    f = _SkipHealthCheck()
+
+    def rec(msg):
+        return logging.LogRecord("gunicorn.access", logging.INFO, "", 0, msg, None, None)
+
+    assert f.filter(rec('GET /healthz HTTP/1.1" 200')) is False
+    assert f.filter(rec('GET /engineer/ HTTP/1.1" 200')) is True
 
 
 # ---------- runtime configuration ----------
