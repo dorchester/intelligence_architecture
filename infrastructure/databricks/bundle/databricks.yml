@@ -1,0 +1,41 @@
+# Declarative Automation Bundle: workspace assets as version-controlled code.
+#
+# Deploy from the engineer workbench (auth comes from SSM via apply.sh's
+# environment pattern):
+#
+#   cd infrastructure/databricks/bundle
+#   databricks bundle deploy -t dev
+#   databricks bundle run profile_enrichment -t dev
+#
+# The job reads through a catalog view created by setup.sql, so no bucket
+# name (which embeds the AWS account id) ever appears in this repository.
+
+bundle:
+  name: intelligence-engine
+
+variables:
+  warehouse_id:
+    description: Serverless SQL warehouse (auto-stop 1 min)
+    default: "3dffbfab9d338fdd"
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://dbc-5ed8f841-a20d.cloud.databricks.com
+
+resources:
+  jobs:
+    profile_enrichment:
+      name: profile-enrichment
+      description: >-
+        Batch LLM enrichment over workforce profiles read in place from S3.
+        Demonstrates ai_query as the managed alternative to a hand-rolled
+        concurrency/retry loop.
+      tasks:
+        - task_key: enrich
+          sql_task:
+            warehouse_id: ${var.warehouse_id}
+            file:
+              path: ./sql/enrich_profiles.sql

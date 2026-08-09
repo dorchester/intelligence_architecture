@@ -1,0 +1,14 @@
+-- One-time workspace setup: a schema and views over the external location.
+--
+-- Run via the statement API or a SQL editor after the external location
+-- exists. The bucket path is injected at execution time (see the deploy
+-- notes) precisely so it never lives in this repository.
+--
+--   CREATE SCHEMA IF NOT EXISTS <catalog>.intelligence_engine;
+--   CREATE OR REPLACE VIEW <catalog>.intelligence_engine.sterling_profiles AS
+--     SELECT * FROM read_files('s3://<bucket>/datasets/sterling-pharma/profiles.jsonl',
+--                              format => 'json');
+--
+-- Views keep storage topology out of every downstream query: jobs and
+-- notebooks reference intelligence_engine.sterling_profiles and nothing else.
+SELECT 'see comment - executed with the bucket name injected at runtime';
