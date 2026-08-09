@@ -112,7 +112,7 @@ This is the managed serverless runtime for long-running agent sessions.
 
 ### 3. AI Engineer Development Environment
 
-This is the critical piece. The AI engineer needs to:
+This is the critical piece. The forward-deployed engineer (FDE) needs to:
 - Run Claude Code against the codebase
 - Test Bedrock calls interactively
 - Modify prompts, tools, methodology
@@ -261,7 +261,7 @@ Corporate Network
 8. intelligence-engine-agentcore     # AgentCore agent definition (when ready)
 ```
 
-The AI engineer provides the application code and CloudFormation templates.
+The FDE provides the application code and CloudFormation templates.
 DevOps reviews and deploys infrastructure changes.
 
 ---

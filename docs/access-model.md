@@ -7,6 +7,9 @@ Everything here is enforced in IAM, deployed from the templates in
 `python scripts/iac_coverage.py`. Nothing below is a convention or a
 prompt-level rule.
 
+Per-role working guides — the day-to-day commands for each seat described
+here — live in [`guides/`](guides/).
+
 ---
 
 ## The one rule everything follows
@@ -41,7 +44,7 @@ system?** The design principle here is that almost nobody's should:
   gates are code and run automatically, the stewardship digest is
   notify-only, and no steward, engineer, or admin action sits between
   "run" and "report."
-- **Critical to engineering: the AI engineer, plus the platform engineer**
+- **Critical to engineering: the forward-deployed engineer (FDE), plus the platform engineer**
   who turns merged infrastructure changes into deployed stacks. Two
   functions, no more.
 - **Critical to nothing, accountable for much: the steward.** Their signoff
@@ -115,7 +118,7 @@ CloudFormation. Grouped by what they are for:
 
 | Role | Assumed by | Can | Deliberately cannot |
 |---|---|---|---|
-| `workbench` | EC2 (the AI engineer's box, reached via SSM only — no SSH exists) | Invoke Bedrock; read/write the project bucket and run table; push images to ECR; start CodeBuild builds; read stacks, logs, metrics | Deploy or modify any stack; touch IAM; touch billing; touch non-project resources |
+| `workbench` | EC2 (the FDE's box, reached via SSM only — no SSH exists) | Invoke Bedrock; read/write the project bucket and run table; push images to ECR; start CodeBuild builds; read stacks, logs, metrics | Deploy or modify any stack; touch IAM; touch billing; touch non-project resources |
 | `steward` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Admit data (`landing-write`); admit people (create/disable console users in the project Cognito pool); read the stewardship log and CloudTrail | Deploy; touch IAM; write to any lakehouse tier; invoke models; reach the vault. The steward governs — it does not operate the pipeline |
 | `deployer` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Operate CloudFormation on `intelligence-engine-*` stacks (through `cfn-exec`); start image builds; write stage config | Mutate any resource directly; operate any non-project stack; assume `cfn-exec` itself |
 | `author` | EC2 (a second, narrower seat from `author-seat.yaml` — the beginning of per-person seats) | A subset of the workbench grants | Same exclusions, smaller surface |
@@ -201,7 +204,7 @@ roles.**
 |---|---|---|---|
 | **Platform engineer (deploys)** | The deployer seat (`sts:AssumeRole`) | Turns merged template changes into deployed stacks, through `cfn-exec` — the only channel by which boundaries change. Mutates nothing directly. | Engineering |
 | **Data steward (governs + admits)** | The steward seat (`sts:AssumeRole`) + the standing decision gates | **Admitting data** (`landing-write` — admission is the steward's decision, so the grant follows the accountability), **admitting people** (console user management in Cognito), and **reading the audit surface** (stewardship log, CloudTrail). Their policy is enforced during runs by the gates *in code* — the steward signs off on what may enter, not on each run. Changing what the gates enforce is a code change — diff, review, redeploy. | Nothing at runtime — admission only |
-| **AI engineer (builds/adjusts)** | The workbench seat (Claude Code + full toolchain, SSM-only) | Edits stages, rebuilds images, reruns the pipeline, inspects everything. Cannot deploy — infra changes go back through git to the platform engineer. | Engineering |
+| **Forward-deployed engineer / FDE (builds/adjusts)** | The workbench seat (Claude Code + full toolchain, SSM-only) | Edits stages, rebuilds images, reruns the pipeline, inspects everything. Cannot deploy — infra changes go back through git to the platform engineer. | Engineering |
 | **Data scientist / analyst** | Databricks via the `databricks-uc` role | Reads the lakehouse zero-copy through Unity Catalog. Never holds write on anything. | Nothing |
 | **Consultant (consumes + approves)** | Cognito user in the hosted console | Not an IAM identity at all; the app acts for them within its own scoped role. Their checkpoint decisions are the one human dependency in the run path — on their own report, by design. | Execution |
 | **Account admin** | SSO, dormant | Seats people (one grant per person per seat); recovers the system if the deploy channel breaks. Used on a normal day = design failure. | Nothing, by design |
@@ -226,7 +229,7 @@ lifecycle, human-first:
 | 2 | Conform it (L1→L2: identifiers dropped, schema registered) | Data engineer | `conformance` |
 | 3 | Build data products (L3 aggregates, L4 vectors/graph) | Data engineer / product owner — each derived table names its `ie.owner` in catalog metadata | `product-builder` |
 | 4 | Validate the products | Analyst / data scientist | Databricks, read-only |
-| 5 | Build & tune the report pipeline (stages, prompts, evals) | AI engineer | workbench; runs as `stage-runner` |
+| 5 | Build & tune the report pipeline (stages, prompts, evals) | Forward-deployed engineer (FDE) | workbench; runs as `stage-runner` |
 | 6 | Run the report | Consultant / engagement lead | console → `workflow` → `stage-runner` |
 | 7 | Approve checkpoints, request revisions | Consultant (human-in-the-loop by design) | `wf-approval` records it |
 | 8 | Onboard people (console logins) | Data steward | steward seat |
@@ -251,7 +254,7 @@ workable beyond an AI-centric setup:
 |---|---|---|
 | Platform / DevOps engineer | Deployer seat | Owns `infrastructure/`; the only function that changes boundaries, and only through templates |
 | Data engineer | Workbench seat + Databricks | The conform/build stages are ordinary Python over S3 + Glue; nothing requires an agent — Claude Code on the workbench is leverage, not a prerequisite |
-| AI engineer | Workbench seat | Same seat as the data engineer, different work: prompts, stages, evals, the model layer |
+| Forward-deployed engineer (FDE) | Workbench seat | Same seat as the data engineer, different work: prompts, stages, evals, the model layer |
 | Analytics engineer / BI analyst | Databricks (read-only via Unity Catalog) | SQL over the derived tier; never needs AWS credentials at all |
 | Data steward / governance lead | Steward seat | Admission and audit, no pipeline power |
 | Security / compliance auditor | Steward seat (read side) or a read-only SSO permission set | Everything they need is readable: CloudTrail, the stewardship log, this repo |

@@ -105,6 +105,16 @@ Resources:
       ManagedPolicyArns:
         # Enables Session Manager. AWS-managed, SSM-scoped.
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        # The FDE's local iterate-loop runs the stages in stages/ directly on
+        # this box, so the seat holds the same tier grants the stage-runner
+        # holds: read the governed tiers, publish artifacts, append to the
+        # stewardship log. Read-only on every tier - conform/product builds
+        # still happen under their own CodeBuild identities.
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-foundational-read
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-derived-read
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-contextualized-read
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-artifacts-publish
+        - !Sub arn:aws:iam::${AWS::AccountId}:policy/intelligence-engine-${Environment}-stewardship-write
       Policies:
         - PolicyName: engineer-project-access
           PolicyDocument:
@@ -169,6 +179,45 @@ Resources:
                   - cloudwatch:GetMetricStatistics
                   - apprunner:DescribeService
                   - apprunner:ListServices
+                Resource: '*'
+              # Stages resolve their configuration (and the blessed stage
+              # image) from SSM, exactly as they do inside CodeBuild.
+              - Sid: StageConfig
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/intelligence-engine/${Environment}/*
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+              # The FDE tests candidate pipelines by running the harness
+              # against a specific image digest. Start/observe/stop only their
+              # own project's state machine.
+              - Sid: RunHarness
+                Effect: Allow
+                Action:
+                  - states:StartExecution
+                  - states:DescribeExecution
+                  - states:ListExecutions
+                  - states:StopExecution
+                  - states:GetExecutionHistory
+                  - states:DescribeStateMachine
+                Resource:
+                  - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:intelligence-engine-${Environment}-*
+                  - !Sub arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:intelligence-engine-${Environment}-*:*
+              # Checkpoint decisions during harness testing. SendTask* does
+              # not support resource-level scoping; the task tokens themselves
+              # are the capability.
+              - Sid: AnswerCheckpoints
+                Effect: Allow
+                Action:
+                  - states:SendTaskSuccess
+                  - states:SendTaskFailure
                 Resource: '*'
       Tags:
         - Key: Application

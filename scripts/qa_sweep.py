@@ -126,6 +126,22 @@ def main() -> int:
               "MidpointDecision" in states and "ReviseMidpointStages" in states)
         check("executions pin an image digest",
               '"ImageOverride.$": "$.stage_image"' in d["definition"])
+    # The blessed image is what runs when no candidate is named. It must
+    # exist, be digest-pinned, and point at an image actually in ECR -
+    # a dangling default would fail the next consultant run.
+    try:
+        blessed = s.client("ssm").get_parameter(
+            Name=f"/intelligence-engine/{args.env}/stages/blessed-image")["Parameter"]["Value"]
+        if "@sha256:" not in blessed:
+            check("blessed stage image digest-pinned", False, blessed)
+        else:
+            repo, digest = blessed.split("@", 1)
+            repo_name = repo.split("/", 1)[1]
+            s.client("ecr").describe_images(
+                repositoryName=repo_name, imageIds=[{"imageDigest": digest}])
+            check("blessed stage image exists in ECR", True, digest[:19] + "...")
+    except Exception as e:  # noqa: BLE001
+        check("blessed stage image resolvable", False, type(e).__name__)
 
     print("\n=== resources that bill while idle ===")
     ec2 = s.client("ec2")
