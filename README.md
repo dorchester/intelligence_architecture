@@ -361,6 +361,7 @@ is the front door — a designed landing page over everything below.
 - [`docs/architecture-report.html`](docs/architecture-report.html) — full visual walkthrough
 - [`docs/samples/`](docs/samples/) — real system output, readable without AWS
 - [`docs/integration-contract.md`](docs/integration-contract.md) — **the boundary between this substrate and a workload that runs on it**: exact IAM grants, execution input shape, approval mechanics, and the seams that are genuinely open
+- [`docs/access-model.md`](docs/access-model.md) — **who can do what, and who deliberately cannot**: every identity, every grant, why no runtime role can deploy, and how to verify it all against live IAM
 - [`docs/predictive-workflow-readiness.md`](docs/predictive-workflow-readiness.md) — how this substrate maps to an episodic report-generation workflow, and what remains
 - [`docs/corporate-deployment-architecture.md`](docs/corporate-deployment-architecture.md) — target model for a firm where DevOps owns infrastructure
 - [`docs/bedrock-usage-monitoring.md`](docs/bedrock-usage-monitoring.md) — token and cost monitoring

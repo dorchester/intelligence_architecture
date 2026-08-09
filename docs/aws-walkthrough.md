@@ -275,6 +275,22 @@ browser, and the guardrail surface.
 > which contradicts the rule every other change here follows. Edit
 > `guardrails/config.yaml` and redeploy.
 
+The web view is the *observation* surface. The engineer's actual working seat
+is the **workbench** — an EC2 box inside the account (SSM access only, no SSH)
+with Claude Code, the AWS CLI, the Databricks CLI, and Terraform preinstalled
+and the repo cloned at first boot:
+
+```bash
+aws ec2 start-instances --instance-ids <workbench-id> --profile intelligence-dev
+aws ssm start-session   --target <workbench-id>       --profile intelligence-dev
+# then, inside:
+sudo su - ec2-user && cd /work/intelligence_architecture && claude
+```
+
+The instance role is the credential — no keys are configured or stored. What
+that seat can and cannot do (notably: it cannot deploy, on purpose) is the
+subject of [`access-model.md`](access-model.md).
+
 ---
 
 ## 8. The workflow harness
