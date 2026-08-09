@@ -1,16 +1,13 @@
 """Consultant-facing web UI for the Intelligence Engine.
 
-Provides a minimal interface for selecting or creating a client, starting a run,
-approving checkpoints with feedback, and viewing the final report.
-All artifacts are persisted to disk. Bedrock is used for narrative and data generation.
+A pre-engagement intelligence tool for management consultants specializing in
+organization, workforce, and change. Generates research-backed briefings about
+prospective or current clients using publicly available information.
 """
 
 from __future__ import annotations
 
-import csv
-import io
 import json
-import random
 import threading
 import time
 import uuid
@@ -25,37 +22,13 @@ app = Flask(__name__)
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-CLIENTS_DIR = BASE_DIR / "sample_data" / "clients"
 RUNS_DIR = BASE_DIR / "runs"
 
-# In-memory run state (V0 — production would use DynamoDB)
+# In-memory run state
 runs: dict[str, dict] = {}
 
 
-def load_clients() -> list[dict]:
-    manifest_path = CLIENTS_DIR / "manifest.json"
-    if manifest_path.exists():
-        return json.loads(manifest_path.read_text())
-    return []
-
-
-def save_client_to_manifest(client_id: str, client_name: str, industry: str):
-    """Add a new client to the manifest."""
-    manifest_path = CLIENTS_DIR / "manifest.json"
-    clients = load_clients()
-    clients.append({"client_id": client_id, "client_name": client_name, "industry": industry})
-    manifest_path.write_text(json.dumps(clients, indent=2))
-
-
-def get_client_meta(client_id: str) -> dict | None:
-    meta_path = CLIENTS_DIR / f"{client_id}.json"
-    if meta_path.exists():
-        return json.loads(meta_path.read_text())
-    return None
-
-
 def get_bedrock_model():
-    """Get a configured Bedrock model instance."""
     from agent.model import BedrockModel, ModelConfig
     config = ModelConfig(model_id="us.anthropic.claude-sonnet-4-6", profile="intelligence-dev")
     return BedrockModel(config)
@@ -65,50 +38,34 @@ def get_bedrock_model():
 
 @app.route("/")
 def index():
-    clients = load_clients()
-    recent_runs = sorted(runs.values(), key=lambda r: r["created_at"], reverse=True)[:8]
-    return render_template("index.html", clients=clients, recent_runs=recent_runs)
+    recent_runs = sorted(runs.values(), key=lambda r: r["created_at"], reverse=True)[:10]
+    return render_template("index.html", recent_runs=recent_runs)
 
 
 @app.route("/run/start", methods=["POST"])
 def start_run():
-    """Start a new run for an existing client."""
-    client_id = request.form["client_id"]
-    client_meta = get_client_meta(client_id)
-    if not client_meta:
-        return "Client not found", 404
+    company_name = request.form.get("company_name", "").strip()
+    engagement_context = request.form.get("engagement_context", "").strip()
 
-    run_id = str(uuid.uuid4())
-    run = _create_run_record(run_id, client_id, client_meta["client_name"], client_meta.get("industry", ""))
-    runs[run_id] = run
-
-    thread = threading.Thread(target=_execute_run, args=(run,), daemon=True)
-    thread.start()
-
-    return redirect(url_for("run_status", run_id=run_id))
-
-
-@app.route("/run/start-custom", methods=["POST"])
-def start_custom_run():
-    """Start a run for a new custom client — generates synthetic data via LLM."""
-    client_name = request.form.get("client_name", "").strip()
-    industry = request.form.get("industry", "").strip()
-
-    if not client_name:
+    if not company_name:
         return redirect(url_for("index"))
 
-    # Create a client ID from the name
-    client_id = "client-" + client_name.lower().replace(" ", "-").replace(".", "")[:30]
-
-    # Check if this client already has data
-    csv_path = CLIENTS_DIR / f"{client_id}.csv"
-    if not csv_path.exists():
-        # Generate synthetic data for this client
-        _generate_client_data_with_llm(client_id, client_name, industry)
-
     run_id = str(uuid.uuid4())
-    run = _create_run_record(run_id, client_id, client_name, industry)
-    run["custom_client"] = True
+    run = {
+        "run_id": run_id,
+        "company_name": company_name,
+        "engagement_context": engagement_context,
+        "stage": "initialized",
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
+        "checkpoints": [],
+        "current_checkpoint": None,
+        "feedback_history": [],
+        "log": [],
+        "research": {},
+        "output_path": None,
+        "model_used": None,
+        "artifacts": [],
+    }
     runs[run_id] = run
 
     thread = threading.Thread(target=_execute_run, args=(run,), daemon=True)
@@ -127,7 +84,6 @@ def run_status(run_id: str):
 
 @app.route("/run/<run_id>/engineer")
 def engineer_view(run_id: str):
-    """Engineer/technical view of a run."""
     run = runs.get(run_id)
     if not run:
         return "Run not found", 404
@@ -146,14 +102,13 @@ def approve_checkpoint(run_id: str):
     cp["feedback"] = feedback
     cp["resolved_at"] = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
 
-    # Store feedback in the run log and persist to working artifacts
     if feedback:
-        run["log"].append(f"Operator feedback: \"{feedback}\"")
+        run["log"].append(f"Consultant direction: \"{feedback}\"")
         run["feedback_history"].append({"checkpoint": cp["name"], "feedback": feedback})
 
     run["checkpoints"].append(cp)
     run["current_checkpoint"] = None
-    run["log"].append(f"Checkpoint approved")
+    run["log"].append("Approved — continuing")
 
     return redirect(url_for("run_status", run_id=run_id))
 
@@ -164,16 +119,15 @@ def reject_checkpoint(run_id: str):
     if not run or not run["current_checkpoint"]:
         return redirect(url_for("run_status", run_id=run_id))
 
-    reason = request.form.get("reason", "").strip() or "Rejected by operator"
+    reason = request.form.get("reason", "").strip() or "Stopped by consultant"
     cp = run["current_checkpoint"]
     cp["status"] = "rejected"
     cp["reason"] = reason
     cp["resolved_at"] = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
-
     run["checkpoints"].append(cp)
     run["current_checkpoint"] = None
     run["stage"] = "rejected"
-    run["log"].append(f"Rejected: {reason}")
+    run["log"].append(f"Stopped: {reason}")
 
     return redirect(url_for("run_status", run_id=run_id))
 
@@ -183,11 +137,10 @@ def view_report(run_id: str):
     run = runs.get(run_id)
     if not run or not run["output_path"]:
         return "Report not available yet", 404
-
     report_path = Path(run["output_path"])
     if report_path.exists():
         return report_path.read_text(encoding="utf-8")
-    return "Report file not found on disk", 404
+    return "Report file not found", 404
 
 
 @app.route("/api/run/<run_id>/status")
@@ -198,396 +151,433 @@ def api_run_status(run_id: str):
     return jsonify(run)
 
 
-# ============ LLM DATA GENERATION ============
-
-def _generate_client_data_with_llm(client_id: str, client_name: str, industry: str):
-    """Use Bedrock to generate realistic synthetic workforce data for a custom client."""
-    CLIENTS_DIR.mkdir(parents=True, exist_ok=True)
-
-    prompt = f"""Generate a realistic synthetic workforce dataset for a company called "{client_name}" in the {industry or 'general'} industry.
-
-Return a JSON object with this exact structure:
-{{
-  "headcount": <number between 80 and 300>,
-  "departments": ["dept1", "dept2", ...],
-  "titles_by_dept": {{
-    "dept1": ["Title A", "Title B", ...],
-    ...
-  }}
-}}
-
-Requirements:
-- 5-8 departments appropriate for a {industry or 'general industry'} company
-- 3-5 job titles per department, ranging from junior to senior
-- Department names should reflect the actual industry
-- Make it realistic for a mid-to-large company in this sector
-
-Return ONLY the JSON object, no other text."""
-
-    try:
-        model = get_bedrock_model()
-        response = model.invoke(
-            messages=[{"role": "user", "content": prompt}],
-            system="You are a workforce data generator. Return only valid JSON.",
-            temperature=0.7,
-        )
-
-        # Parse the JSON from the response
-        json_str = response.strip()
-        if json_str.startswith("```"):
-            json_str = json_str.split("\n", 1)[1].rsplit("```", 1)[0]
-        spec = json.loads(json_str)
-
-    except Exception as e:
-        # Fallback: generate generic data without LLM
-        spec = {
-            "headcount": 120,
-            "departments": ["Engineering", "Sales", "Operations", "HR", "Finance", "Marketing"],
-            "titles_by_dept": {
-                "Engineering": ["Software Engineer", "Senior Engineer", "Engineering Manager", "VP Engineering"],
-                "Sales": ["Account Executive", "Sales Manager", "VP Sales"],
-                "Operations": ["Operations Analyst", "Operations Manager", "VP Operations"],
-                "HR": ["HR Generalist", "HR Business Partner", "CHRO"],
-                "Finance": ["Financial Analyst", "Controller", "CFO"],
-                "Marketing": ["Marketing Coordinator", "Marketing Manager", "VP Marketing"],
-            },
-        }
-
-    # Generate the CSV from the spec
-    _write_client_csv(client_id, client_name, industry, spec)
-
-
-FIRST_NAMES = [
-    "Alex", "Jordan", "Casey", "Taylor", "Morgan", "Riley", "Quinn", "Avery",
-    "Dakota", "Jamie", "Skyler", "Rowan", "Charlie", "Emerson", "Finley",
-    "Harper", "Sage", "Blair", "Reese", "Peyton", "Drew", "Cameron", "Hayden",
-    "Logan", "Parker", "Kai", "River", "Phoenix", "Marley", "Lennon",
-    "Remy", "Aspen", "Ellis", "Tatum", "Shiloh", "Wren", "Sutton", "Oakley",
-]
-LAST_NAMES = [
-    "Chen", "Patel", "Kim", "Santos", "Williams", "Johnson", "Rivera",
-    "Fischer", "Park", "Nguyen", "Davis", "Campbell", "Thompson", "Burke",
-    "Torres", "Yamamoto", "Clarke", "Okafor", "Morrison", "Zhang",
-    "Garcia", "Anderson", "Lee", "Martinez", "Brown", "Wilson", "Jackson",
-]
-
-
-def _write_client_csv(client_id: str, client_name: str, industry: str, spec: dict):
-    """Write a synthetic workforce CSV and metadata JSON from a spec."""
-    headcount = spec.get("headcount", 120)
-    departments = spec.get("departments", [])
-    titles_by_dept = spec.get("titles_by_dept", {})
-
-    rows = []
-    emp_id = 1
-    base_per_dept = headcount // len(departments)
-    remainder = headcount % len(departments)
-
-    for i, dept in enumerate(departments):
-        dept_count = base_per_dept + (1 if i < remainder else 0)
-        titles = titles_by_dept.get(dept, ["Employee"])
-
-        for _ in range(dept_count):
-            first = random.choice(FIRST_NAMES)
-            last = random.choice(LAST_NAMES)
-            title = random.choice(titles)
-            age = random.randint(22, 62)
-            tenure = round(random.uniform(0.3, min(age - 21, 20.0)), 1)
-
-            if tenure < 1.5:
-                risk = random.choices(["High", "Medium", "Low"], weights=[50, 35, 15])[0]
-            elif tenure < 4:
-                risk = random.choices(["High", "Medium", "Low"], weights=[15, 50, 35])[0]
-            else:
-                risk = random.choices(["High", "Medium", "Low"], weights=[5, 25, 70])[0]
-
-            rows.append({
-                "employee_id": f"E{emp_id:04d}",
-                "name": f"{first} {last}",
-                "department": dept,
-                "title": title,
-                "age": age,
-                "tenure_years": tenure,
-                "turnover_risk": risk,
-            })
-            emp_id += 1
-
-    # Write CSV
-    csv_path = CLIENTS_DIR / f"{client_id}.csv"
-    with open(csv_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["employee_id", "name", "department", "title", "age", "tenure_years", "turnover_risk"])
-        writer.writeheader()
-        writer.writerows(rows)
-
-    # Write metadata
-    meta = {
-        "client_id": client_id,
-        "client_name": client_name,
-        "industry": industry,
-        "headcount": len(rows),
-        "departments": departments,
-        "generated": True,
-    }
-    (CLIENTS_DIR / f"{client_id}.json").write_text(json.dumps(meta, indent=2))
-
-    # Update manifest
-    save_client_to_manifest(client_id, client_name, industry)
-
-
 # ============ RUN EXECUTION ============
 
-def _create_run_record(run_id: str, client_id: str, client_name: str, industry: str) -> dict:
-    return {
-        "run_id": run_id,
-        "client_id": client_id,
-        "client_name": client_name,
-        "industry": industry,
-        "stage": "initialized",
-        "created_at": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
-        "checkpoints": [],
-        "current_checkpoint": None,
-        "feedback_history": [],
-        "log": [],
-        "metrics": None,
-        "output_path": None,
-        "model_used": None,
-        "artifacts": [],
-    }
-
-
 def _execute_run(run: dict):
-    """Execute the full analysis workflow with 5 checkpoints."""
-    from tools.basic_analysis import run_workforce_analysis
-    from tools.chart import generate_headcount_chart
-    from tools.report import render_report
-    from agent.context import RunContext, Stage
+    """Execute the intelligence workflow:
+    1. Research the company's org/workforce via LLM
+    2. Identify organizational risks and opportunities
+    3. Generate strategic recommendations
+    4. Produce a formatted intelligence briefing
+    """
     from storage.local import LocalStorage
+    from agent.context import RunContext
 
     run_id = run["run_id"]
-    client_id = run["client_id"]
-    csv_path = CLIENTS_DIR / f"{client_id}.csv"
+    company = run["company_name"]
+    context = run["engagement_context"]
 
-    if not csv_path.exists():
-        run["stage"] = "error"
-        run["log"].append(f"ERROR: No data file found for {client_id}")
-        return
-
-    # Set up storage
     storage = LocalStorage(base_dir=RUNS_DIR)
+    client_id = "company-" + company.lower().replace(" ", "-").replace(".", "")[:30]
     ctx = RunContext(
         client_id=client_id,
-        client_name=run["client_name"],
+        client_name=company,
         storage=storage,
         run_id=run_id,
     )
 
-    # ===== STAGE 1: Load data =====
-    run["stage"] = "data_loaded"
-    csv_data = csv_path.read_bytes()
-    artifact_path = ctx.write_artifact("input", f"{client_id}.csv", csv_data)
-    run["artifacts"].append(artifact_path)
-    run["log"].append(f"Input data loaded ({len(csv_data)} bytes)")
+    model = get_bedrock_model()
+    run["model_used"] = model.model_id
 
-    # Get basic stats for the checkpoint description
-    import pandas as pd
-    df = pd.read_csv(csv_path)
-    row_count = len(df)
-    dept_count = df["department"].nunique()
+    # ===== PHASE 1: Company Research =====
+    run["stage"] = "researching"
+    run["log"].append(f"Researching {company}...")
 
-    # ===== CHECKPOINT 1: Confirm scope =====
-    _wait_for_checkpoint(run, "scope_confirmation",
-        "Confirm Engagement Scope",
-        f"Client: {run['client_name']}\n"
-        f"Industry: {run['industry']}\n"
-        f"Dataset: {row_count} employee records across {dept_count} departments\n\n"
-        f"Analysis will include:\n"
-        f"  - Headcount and department distribution\n"
-        f"  - Tenure and age statistics\n"
-        f"  - Turnover risk assessment\n"
-        f"  - AI-generated executive narrative\n\n"
-        f"Approve to begin analysis.")
+    research = _research_company(model, company, context)
+    run["research"] = research
+    ctx.write_artifact("working", "research.json", json.dumps(research, indent=2).encode())
+    run["artifacts"].append("working/research.json")
+    run["log"].append(f"Research complete: {research.get('employee_count', 'Unknown')} employees, "
+                      f"{research.get('industry', 'Unknown')} sector")
+
+    # ===== CHECKPOINT 1: Validate research =====
+    _wait_for_checkpoint(run, "research_validation",
+        "Validate Company Research",
+        f"Company: {research.get('full_name', company)}\n"
+        f"Industry: {research.get('industry', 'Unknown')}\n"
+        f"Headquarters: {research.get('headquarters', 'Unknown')}\n"
+        f"Employees: {research.get('employee_count', 'Unknown')}\n"
+        f"Revenue: {research.get('revenue', 'Unknown')}\n\n"
+        f"Key business segments:\n{_format_list(research.get('segments', []))}\n\n"
+        f"Recent developments:\n{_format_list(research.get('recent_developments', []))}\n\n"
+        f"Does this look accurate? Add corrections or additional context in the feedback box.")
     if run["stage"] == "rejected":
         return
 
-    # ===== STAGE 2: Run analysis =====
-    run["stage"] = "analyzing"
-    run["log"].append("Running deterministic workforce analysis...")
-    metrics = run_workforce_analysis(csv_path)
+    # Incorporate any corrections
+    corrections = _get_feedback_for(run, "research_validation")
 
-    # Persist metrics
-    metrics_json = json.dumps(metrics, indent=2)
-    metrics_path = ctx.write_artifact("working", "metrics.json", metrics_json.encode())
-    run["artifacts"].append(metrics_path)
-    run["metrics"] = {k: v for k, v in metrics.items() if k != "department_breakdown"}
-    run["log"].append(f"Analysis complete: {metrics['total_headcount']} employees, "
-                      f"{metrics['department_count']} departments")
+    # ===== PHASE 2: Organizational Analysis =====
+    run["stage"] = "analyzing_org"
+    run["log"].append("Analyzing organizational structure and workforce dynamics...")
 
-    # Include feedback from checkpoint 1 in the log
-    _log_prior_feedback(run, "scope_confirmation")
+    org_analysis = _analyze_organization(model, company, research, context, corrections)
+    ctx.write_artifact("working", "org_analysis.json", json.dumps(org_analysis, indent=2).encode())
+    run["artifacts"].append("working/org_analysis.json")
+    run["log"].append("Organizational analysis complete")
 
-    # ===== CHECKPOINT 2: Review analysis =====
-    _wait_for_checkpoint(run, "analysis_review",
-        "Review Analysis Results",
-        f"Key findings:\n"
-        f"  Total headcount: {metrics['total_headcount']}\n"
-        f"  Departments: {metrics['department_count']}\n"
-        f"  Largest department: {metrics['largest_department']} "
-        f"({metrics['largest_department_pct']:.1f}% of workforce)\n"
-        f"  Average tenure: {metrics['avg_tenure_years']:.1f} years\n"
-        f"  Median tenure: {metrics['median_tenure_years']:.1f} years\n"
-        f"  High turnover risk: {metrics['turnover_risk_high_pct']:.1f}% of employees\n"
-        f"  Average age: {metrics['avg_age']:.0f}\n\n"
-        f"Approve to generate visualizations.")
+    # ===== CHECKPOINT 2: Review org analysis =====
+    _wait_for_checkpoint(run, "org_review",
+        "Review Organizational Analysis",
+        f"Organizational Structure:\n{org_analysis.get('structure_summary', '')}\n\n"
+        f"Workforce Composition:\n{org_analysis.get('workforce_summary', '')}\n\n"
+        f"Key Organizational Challenges:\n{_format_list(org_analysis.get('challenges', []))}\n\n"
+        f"Talent & Workforce Risks:\n{_format_list(org_analysis.get('workforce_risks', []))}\n\n"
+        f"Provide direction if you want the analysis to focus on specific areas.")
     if run["stage"] == "rejected":
         return
 
-    # ===== STAGE 3: Generate chart =====
-    run["stage"] = "charting"
-    run["log"].append("Generating department headcount visualization...")
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmp:
-        chart_path = generate_headcount_chart(metrics, Path(tmp))
-        chart_data = chart_path.read_bytes()
-    chart_artifact = ctx.write_artifact("working", "headcount_by_department.png", chart_data)
-    run["artifacts"].append(chart_artifact)
-    run["log"].append(f"Chart saved ({len(chart_data)} bytes)")
+    focus_direction = _get_feedback_for(run, "org_review")
 
-    # ===== CHECKPOINT 3: Approve visualization =====
-    _wait_for_checkpoint(run, "visualization_review",
-        "Review Visualization",
-        f"Department headcount bar chart has been generated.\n\n"
-        f"Top departments by size:\n" +
-        "\n".join(f"  - {dept}: {count}" for dept, count in
-                  sorted(metrics["department_breakdown"].items(), key=lambda x: -x[1])[:5]) +
-        f"\n\nApprove to proceed with AI narrative generation.\n"
-        f"The narrative will interpret these findings for an executive audience.")
+    # ===== PHASE 3: Strategic Opportunities =====
+    run["stage"] = "identifying_opportunities"
+    run["log"].append("Identifying strategic opportunities for engagement...")
+
+    opportunities = _identify_opportunities(model, company, research, org_analysis, context, focus_direction)
+    ctx.write_artifact("working", "opportunities.json", json.dumps(opportunities, indent=2).encode())
+    run["artifacts"].append("working/opportunities.json")
+    run["log"].append(f"Identified {len(opportunities.get('opportunities', []))} potential engagement areas")
+
+    # ===== CHECKPOINT 3: Prioritize opportunities =====
+    opps_text = ""
+    for i, opp in enumerate(opportunities.get("opportunities", []), 1):
+        opps_text += f"{i}. {opp.get('title', '')}\n   {opp.get('description', '')}\n   Impact: {opp.get('impact', '')}\n\n"
+
+    _wait_for_checkpoint(run, "opportunity_review",
+        "Review & Prioritize Opportunities",
+        f"Potential Engagement Areas:\n\n{opps_text}"
+        f"Indicate which opportunities to emphasize in the final briefing, "
+        f"or add areas the analysis missed.")
     if run["stage"] == "rejected":
         return
 
-    # ===== STAGE 4: Generate narrative via Bedrock =====
-    run["stage"] = "generating_narrative"
-    run["log"].append("Invoking Claude via Amazon Bedrock for narrative...")
+    priority_guidance = _get_feedback_for(run, "opportunity_review")
 
-    # Incorporate any operator feedback into the narrative prompt
-    feedback_context = _get_all_feedback(run)
-    narrative = _generate_narrative_with_feedback(ctx, metrics, run, feedback_context)
+    # ===== PHASE 4: Generate Intelligence Briefing =====
+    run["stage"] = "generating_briefing"
+    run["log"].append("Generating intelligence briefing...")
 
-    narrative_path = ctx.write_artifact("working", "narrative.txt", narrative.encode())
-    run["artifacts"].append(narrative_path)
-    run["log"].append(f"Narrative generated ({len(narrative)} chars) via {run['model_used']}")
+    briefing = _generate_briefing(model, company, research, org_analysis, opportunities, context,
+                                  _get_all_feedback(run), priority_guidance)
+    ctx.write_artifact("working", "briefing.md", briefing.encode())
+    run["artifacts"].append("working/briefing.md")
+    run["log"].append(f"Briefing drafted ({len(briefing)} chars)")
 
-    # ===== CHECKPOINT 4: Review narrative =====
-    _wait_for_checkpoint(run, "narrative_review",
-        "Review Narrative Draft",
-        f"{narrative}\n\n"
-        f"---\n"
-        f"Model: {run['model_used']}\n\n"
-        f"Approve to render the final report, or provide feedback for revision.")
+    # ===== CHECKPOINT 4: Review briefing =====
+    _wait_for_checkpoint(run, "briefing_review",
+        "Review Intelligence Briefing",
+        f"{briefing[:3000]}{'...' if len(briefing) > 3000 else ''}\n\n"
+        f"---\nApprove to render the final HTML report. "
+        f"Add feedback to adjust tone, emphasis, or missing points.")
     if run["stage"] == "rejected":
         return
 
-    # Check if operator gave feedback on narrative — if so, regenerate
-    narrative_feedback = _get_feedback_for(run, "narrative_review")
-    if narrative_feedback:
-        run["log"].append(f"Revising narrative based on feedback: \"{narrative_feedback}\"")
-        narrative = _revise_narrative(ctx, metrics, run, narrative, narrative_feedback)
-        ctx.write_artifact("working", "narrative_revised.txt", narrative.encode())
-        run["log"].append("Narrative revised")
+    briefing_feedback = _get_feedback_for(run, "briefing_review")
+    if briefing_feedback:
+        run["log"].append("Revising briefing based on feedback...")
+        briefing = _revise_briefing(model, briefing, briefing_feedback)
+        ctx.write_artifact("working", "briefing_revised.md", briefing.encode())
+        run["artifacts"].append("working/briefing_revised.md")
+        run["log"].append("Briefing revised")
 
-    # ===== STAGE 5: Render report =====
+    # ===== PHASE 5: Render HTML Report =====
     run["stage"] = "rendering"
-    run["log"].append("Rendering final HTML report...")
-    report_html = render_report(ctx, metrics, narrative, chart_data)
-    output_path = ctx.write_artifact("output", "report.html", report_html.encode("utf-8"))
+    run["log"].append("Rendering HTML report...")
+
+    html_report = _render_intelligence_report(model, company, research, briefing)
+    output_path = ctx.write_artifact("output", "intelligence_briefing.html", html_report.encode())
     run["output_path"] = output_path
-    run["artifacts"].append(output_path)
-    run["log"].append(f"Report written to: {output_path}")
+    run["artifacts"].append("output/intelligence_briefing.html")
+    run["log"].append(f"Report saved: {output_path}")
 
-    # Persist feedback history alongside the report
-    feedback_path = ctx.write_artifact("output", "feedback_log.json",
-                                       json.dumps(run["feedback_history"], indent=2).encode())
-    run["artifacts"].append(feedback_path)
-
-    # ===== CHECKPOINT 5: Final approval =====
+    # ===== CHECKPOINT 5: Final delivery =====
     _wait_for_checkpoint(run, "final_review",
-        "Final Report Review",
-        f"The intelligence report has been generated and is ready for delivery.\n\n"
-        f"Artifacts produced:\n"
-        f"  - input/{client_id}.csv\n"
-        f"  - working/metrics.json\n"
-        f"  - working/headcount_by_department.png\n"
-        f"  - working/narrative.txt\n"
-        f"  - output/report.html\n"
-        f"  - output/feedback_log.json\n\n"
-        f"Approve to mark this engagement as complete.")
+        "Approve for Delivery",
+        "The intelligence briefing is ready.\n\n"
+        "Click 'View Report' below to review the formatted output.\n"
+        "Approve to mark this engagement intelligence as complete.")
     if run["stage"] == "rejected":
         return
 
     run["stage"] = "completed"
-    run["log"].append("Engagement complete.")
+    run["log"].append("Intelligence briefing complete and approved for use.")
 
 
-def _generate_narrative_with_feedback(ctx, metrics: dict, run: dict, feedback_context: str) -> str:
-    """Generate narrative using Bedrock, incorporating operator feedback."""
-    from agent.agent import SYSTEM_PROMPT, NARRATIVE_TEMPLATE
+# ============ LLM CALLS ============
 
-    prompt = NARRATIVE_TEMPLATE.replace("{{client_name}}", ctx.client_name)
-    prompt = prompt.replace("{{total_headcount}}", str(metrics["total_headcount"]))
-    prompt = prompt.replace("{{department_count}}", str(metrics["department_count"]))
-    prompt = prompt.replace("{{largest_department}}", metrics["largest_department"])
-    prompt = prompt.replace("{{largest_department_pct}}", f"{metrics['largest_department_pct']:.1f}")
-    prompt = prompt.replace("{{avg_tenure_years}}", f"{metrics['avg_tenure_years']:.1f}")
-    prompt = prompt.replace("{{median_tenure_years}}", f"{metrics['median_tenure_years']:.1f}")
-    prompt = prompt.replace("{{turnover_risk_high_pct}}", f"{metrics['turnover_risk_high_pct']:.1f}")
+def _research_company(model, company: str, engagement_context: str) -> dict:
+    prompt = f"""You are a management consulting researcher. Research the following company based on your knowledge (up to your training cutoff). Provide factual, publicly available information only.
 
-    if feedback_context:
-        prompt += f"\n\nThe consultant reviewing this work has provided the following guidance:\n{feedback_context}\nIncorporate this context where relevant."
+Company: {company}
+{f"Engagement context: {engagement_context}" if engagement_context else ""}
 
-    try:
-        model = get_bedrock_model()
-        narrative = model.invoke(
-            messages=[{"role": "user", "content": prompt}],
-            system=SYSTEM_PROMPT,
-        )
-        run["model_used"] = model.model_id
-        ctx.model_id = model.model_id
-        return narrative
-    except Exception as e:
-        run["model_used"] = "stub (Bedrock unavailable)"
-        ctx.model_id = "stub"
-        run["log"].append(f"Bedrock error: {e}")
-        return (
-            f"This analysis covers {metrics['total_headcount']} employees across "
-            f"{metrics['department_count']} departments for {ctx.client_name}. "
-            f"The workforce shows concentration in {metrics['largest_department']} "
-            f"({metrics['largest_department_pct']:.1f}% of headcount). "
-            f"Average tenure is {metrics['avg_tenure_years']:.1f} years with "
-            f"{metrics['turnover_risk_high_pct']:.1f}% flagged as high turnover risk."
-        )
+Return a JSON object with these fields:
+{{
+  "full_name": "Official company name",
+  "industry": "Primary industry/sector",
+  "headquarters": "City, State/Country",
+  "employee_count": "Approximate number (be specific, e.g. '~155,000' or '40,000-45,000')",
+  "revenue": "Most recent annual revenue if public",
+  "founded": "Year",
+  "public_private": "Public (ticker) or Private",
+  "ceo": "Current CEO name",
+  "segments": ["Business segment 1", "Business segment 2", ...],
+  "recent_developments": [
+    "Major recent event/transformation 1",
+    "Major recent event/transformation 2",
+    "Major recent event/transformation 3"
+  ],
+  "workforce_context": "2-3 sentences about workforce composition, known challenges, recent layoffs/hiring, union status, etc.",
+  "organizational_context": "2-3 sentences about org structure, recent reorgs, leadership changes, operating model"
+}}
+
+Be precise about employee counts — use real publicly reported figures. If you're unsure, say "estimated" and give your best figure with a range. Do NOT make up small numbers for large companies.
+
+Return ONLY valid JSON."""
+
+    response = model.invoke(
+        messages=[{"role": "user", "content": prompt}],
+        system="You are a factual research assistant for management consultants. Return only valid JSON. Be precise about company size and financials based on publicly available information.",
+        max_tokens=2000,
+    )
+    return _parse_json_response(response)
 
 
-def _revise_narrative(ctx, metrics: dict, run: dict, original: str, feedback: str) -> str:
-    """Revise narrative incorporating operator feedback."""
-    prompt = (
-        f"Here is a workforce analysis narrative that was generated:\n\n"
-        f"{original}\n\n"
-        f"The reviewing consultant provided this feedback:\n\"{feedback}\"\n\n"
-        f"Please revise the narrative to address this feedback. "
-        f"Maintain the same professional tone and factual grounding."
+def _analyze_organization(model, company: str, research: dict, context: str, corrections: str | None) -> dict:
+    prompt = f"""You are an organizational effectiveness consultant analyzing {company} for a potential engagement.
+
+Company research:
+{json.dumps(research, indent=2)}
+
+{f"Engagement context: {context}" if context else ""}
+{f"Consultant corrections/additions: {corrections}" if corrections else ""}
+
+Provide a detailed organizational analysis. Return JSON:
+{{
+  "structure_summary": "3-4 sentences describing the likely organizational structure (divisions, reporting, operating model)",
+  "workforce_summary": "3-4 sentences about workforce composition (white collar/blue collar split, geographic distribution, key talent segments)",
+  "challenges": [
+    "Organizational challenge 1 (specific to this company)",
+    "Organizational challenge 2",
+    "Organizational challenge 3",
+    "Organizational challenge 4"
+  ],
+  "workforce_risks": [
+    "Specific workforce/talent risk 1",
+    "Specific workforce/talent risk 2",
+    "Specific workforce/talent risk 3"
+  ],
+  "culture_indicators": "2-3 sentences about known cultural attributes, Glassdoor themes, employer brand",
+  "transformation_readiness": "Assessment of organization's readiness/appetite for change based on recent history"
+}}
+
+Base everything on publicly available information and reasonable professional inference. Be specific to this company — no generic consulting platitudes."""
+
+    response = model.invoke(
+        messages=[{"role": "user", "content": prompt}],
+        system="You are a senior organizational effectiveness consultant. Provide specific, actionable analysis grounded in facts.",
+        max_tokens=2500,
+    )
+    return _parse_json_response(response)
+
+
+def _identify_opportunities(model, company: str, research: dict, org_analysis: dict,
+                           context: str, focus_direction: str | None) -> dict:
+    prompt = f"""You are a business development partner at a management consulting firm specializing in organization, workforce, and change management.
+
+Client: {company}
+Research: {json.dumps(research, indent=2)}
+Organizational Analysis: {json.dumps(org_analysis, indent=2)}
+{f"Engagement context: {context}" if context else ""}
+{f"Consultant's focus direction: {focus_direction}" if focus_direction else ""}
+
+Identify 4-6 specific consulting engagement opportunities for this client. These should be areas where an organization/workforce/change consultancy could deliver measurable value.
+
+Return JSON:
+{{
+  "opportunities": [
+    {{
+      "title": "Short title (e.g. 'Post-Merger Integration Support')",
+      "description": "2-3 sentences on what the engagement would involve",
+      "impact": "Expected business impact (quantify where possible)",
+      "urgency": "High/Medium/Low",
+      "service_line": "e.g. Org Design, Workforce Transformation, Change Management, Talent Strategy, Operating Model"
+    }}
+  ]
+}}
+
+Be specific to this company's situation. Reference their actual challenges and recent developments."""
+
+    response = model.invoke(
+        messages=[{"role": "user", "content": prompt}],
+        system="You are a senior consulting partner identifying real engagement opportunities. Be commercially minded and specific.",
+        max_tokens=3000,
+    )
+    return _parse_json_response(response)
+
+
+def _generate_briefing(model, company: str, research: dict, org_analysis: dict,
+                      opportunities: dict, context: str, all_feedback: str, priority_guidance: str | None) -> str:
+    prompt = f"""Write a pre-engagement intelligence briefing for a management consulting team about to engage with {company}.
+
+Company Research:
+{json.dumps(research, indent=2)}
+
+Organizational Analysis:
+{json.dumps(org_analysis, indent=2)}
+
+Engagement Opportunities:
+{json.dumps(opportunities, indent=2)}
+
+{f"Engagement context: {context}" if context else ""}
+{f"Consultant's priority guidance: {priority_guidance}" if priority_guidance else ""}
+{f"Prior consultant feedback during analysis: {all_feedback}" if all_feedback else ""}
+
+Write a 800-1200 word intelligence briefing structured as:
+
+1. EXECUTIVE SUMMARY (3-4 sentences positioning the client situation)
+
+2. COMPANY OVERVIEW (key facts, recent trajectory, leadership)
+
+3. ORGANIZATIONAL LANDSCAPE
+   - Structure and operating model
+   - Workforce composition and dynamics
+   - Culture and talent signals
+
+4. STRATEGIC CHALLENGES & RISKS
+   - The 3-4 most pressing organizational/workforce challenges
+   - Why they matter now
+
+5. ENGAGEMENT OPPORTUNITIES
+   - Prioritized recommendations for where to focus
+   - Expected value/impact for each
+
+6. PREPARATION NOTES
+   - Key stakeholders to map
+   - Sensitive topics to navigate carefully
+   - Competitive intelligence (other consultancies likely involved)
+
+Write for a senior consultant audience. Be direct, specific, and commercially aware. No filler. Every sentence should inform a decision or action."""
+
+    return model.invoke(
+        messages=[{"role": "user", "content": prompt}],
+        system="You are writing an internal intelligence briefing for senior management consultants. Be incisive, specific, and action-oriented. No consultant jargon without substance.",
+        max_tokens=4000,
     )
 
+
+def _revise_briefing(model, original: str, feedback: str) -> str:
+    prompt = f"""Revise this intelligence briefing based on consultant feedback.
+
+Original briefing:
+{original}
+
+Feedback:
+"{feedback}"
+
+Revise accordingly. Maintain the same structure and professional tone."""
+
+    return model.invoke(
+        messages=[{"role": "user", "content": prompt}],
+        system="You are revising a consulting intelligence briefing. Maintain quality and specificity.",
+        max_tokens=4000,
+    )
+
+
+def _render_intelligence_report(model, company: str, research: dict, briefing: str) -> str:
+    """Render the briefing as a professional HTML document."""
+    import re
+    from jinja2 import Template
+
+    # Convert markdown-style briefing to HTML sections
+    html_body = briefing.replace("\n\n", "</p><p>").replace("\n", "<br>")
+    html_body = f"<p>{html_body}</p>"
+
+    # Bold section headers
+    html_body = re.sub(r'<p>(\d+\.\s+[A-Z][A-Z &/\-]+)', r'<h2>\1</h2><p>', html_body)
+    html_body = re.sub(r'<br>(\d+\.\s+[A-Z][A-Z &/\-]+)', r'</p><h2>\1</h2><p>', html_body)
+
+    # Format bullet points
+    html_body = re.sub(r'<br>\s*[-•]\s*', r'</p><li>', html_body)
+    html_body = re.sub(r'<p>\s*[-•]\s*', r'<li>', html_body)
+
+    template = Template("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelligence Briefing — {{ company }}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            max-width: 850px; margin: 3rem auto; padding: 0 2rem;
+            color: #1a1a2e; line-height: 1.75; font-size: 15px;
+        }
+        header { border-bottom: 3px solid #1a1a2e; padding-bottom: 1.5rem; margin-bottom: 2rem; }
+        h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 0.25rem; }
+        .meta { color: #6b7280; font-size: 0.85rem; }
+        h2 { font-size: 1.1rem; font-weight: 700; margin-top: 2rem; margin-bottom: 0.5rem; color: #1a1a2e;
+             border-left: 3px solid #3b82f6; padding-left: 0.75rem; }
+        p { margin-bottom: 0.75rem; }
+        li { margin-bottom: 0.4rem; margin-left: 1.5rem; }
+        .badge { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.6rem;
+                 border-radius: 4px; background: #eef2ff; color: #3b82f6; text-transform: uppercase; }
+        footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;
+                 font-size: 0.75rem; color: #9ca3af; }
+    </style>
+</head>
+<body>
+    <header>
+        <span class="badge">Pre-Engagement Intelligence</span>
+        <h1>{{ company }}</h1>
+        <div class="meta">
+            {{ industry }} | {{ employee_count }} employees | Generated {{ timestamp }}
+        </div>
+    </header>
+    <main>{{ body }}</main>
+    <footer>
+        Generated by Intelligence Engine | Model: {{ model }} | Confidential — For internal use only
+    </footer>
+</body>
+</html>""")
+
+    return template.render(
+        company=company,
+        industry=research.get("industry", ""),
+        employee_count=research.get("employee_count", "Unknown"),
+        timestamp=time.strftime("%B %d, %Y"),
+        body=html_body,
+        model="Claude Sonnet 4.6 via Amazon Bedrock",
+    )
+
+
+# ============ HELPERS ============
+
+def _parse_json_response(response: str) -> dict:
+    text = response.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
     try:
-        model = get_bedrock_model()
-        return model.invoke(
-            messages=[{"role": "user", "content": prompt}],
-            system="You are revising a workforce analysis narrative based on consultant feedback. Keep it grounded in the data.",
-        )
-    except Exception:
-        return original  # Keep original if revision fails
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # Try to find JSON object in the response
+        import re
+        match = re.search(r'\{[\s\S]*\}', text)
+        if match:
+            try:
+                return json.loads(match.group())
+            except json.JSONDecodeError:
+                pass
+        return {"error": "Failed to parse response", "raw": response[:500]}
+
+
+def _format_list(items: list) -> str:
+    if not items:
+        return "  (none identified)"
+    return "\n".join(f"  - {item}" for item in items)
 
 
 def _wait_for_checkpoint(run: dict, name: str, title: str, description: str):
-    """Pause execution at a checkpoint until operator responds."""
     run["stage"] = "waiting_for_approval"
     run["current_checkpoint"] = {
         "name": name,
@@ -596,21 +586,12 @@ def _wait_for_checkpoint(run: dict, name: str, title: str, description: str):
         "status": "pending",
         "requested_at": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
     }
-    run["log"].append(f"Awaiting approval: {title}")
-
+    run["log"].append(f"Awaiting review: {title}")
     while run["current_checkpoint"] is not None and run["stage"] != "rejected":
         time.sleep(0.3)
 
 
-def _log_prior_feedback(run: dict, checkpoint_name: str):
-    """Log feedback from a specific checkpoint if any was given."""
-    for cp in run["checkpoints"]:
-        if cp["name"] == checkpoint_name and cp.get("feedback"):
-            run["log"].append(f"Incorporating feedback from {checkpoint_name}: \"{cp['feedback']}\"")
-
-
 def _get_feedback_for(run: dict, checkpoint_name: str) -> str | None:
-    """Get feedback text for a specific checkpoint."""
     for cp in run["checkpoints"]:
         if cp["name"] == checkpoint_name and cp.get("feedback"):
             return cp["feedback"]
@@ -618,7 +599,6 @@ def _get_feedback_for(run: dict, checkpoint_name: str) -> str | None:
 
 
 def _get_all_feedback(run: dict) -> str:
-    """Collect all operator feedback so far into a single string."""
     parts = []
     for cp in run["checkpoints"]:
         if cp.get("feedback"):
@@ -629,11 +609,8 @@ def _get_all_feedback(run: dict) -> str:
 # ============ MAIN ============
 
 if __name__ == "__main__":
-    clients = load_clients()
-    print(f"Intelligence Engine — Consultant UI")
-    print(f"  Clients: {len(clients)}")
-    print(f"  Bedrock: us.anthropic.claude-sonnet-4-6 via intelligence-dev profile")
-    print(f"  Runs dir: {RUNS_DIR}")
+    print("Intelligence Engine — Pre-Engagement Intelligence Tool")
+    print(f"  Model: us.anthropic.claude-sonnet-4-6 via Bedrock")
     print(f"  URL: http://localhost:5000")
     print()
     app.run(debug=False, port=5000)

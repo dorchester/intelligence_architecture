@@ -19,141 +19,115 @@
             --green: #10b981;
             --purple: #8b5cf6;
             --orange: #f59e0b;
-            --cyan: #06b6d4;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            -webkit-font-smoothing: antialiased;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; -webkit-font-smoothing: antialiased;
         }
-        .shell { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; }
+        .shell { max-width: 700px; margin: 0 auto; padding: 4rem 2rem; }
         header { margin-bottom: 3rem; }
-        header h1 { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.25rem; }
-        header p { color: var(--text-muted); font-size: 0.9rem; }
-        .section-title {
-            font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 1rem;
-        }
-        .client-grid { display: grid; grid-template-columns: 1fr; gap: 0.6rem; margin-bottom: 2.5rem; }
-        .client-card {
-            background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-            padding: 1.1rem 1.4rem; display: flex; align-items: center; justify-content: space-between;
-            transition: all 0.15s ease; cursor: pointer;
-        }
-        .client-card:hover { border-color: var(--blue); transform: translateY(-1px); box-shadow: 0 2px 12px rgba(59,130,246,0.06); }
-        .client-info h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.1rem; }
-        .client-info .industry { font-size: 0.78rem; color: var(--text-secondary); }
-        .start-btn {
-            background: var(--blue); color: #fff; border: none; border-radius: 7px;
-            padding: 0.5rem 1.1rem; font-size: 0.78rem; font-weight: 600;
-            cursor: pointer; transition: background 0.15s; font-family: inherit;
-        }
-        .start-btn:hover { background: #2563eb; }
+        header h1 { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.4rem; }
+        header p { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; max-width: 560px; }
 
-        /* Custom client form */
-        .custom-form {
-            background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-            padding: 1.5rem; margin-bottom: 2.5rem;
+        /* New engagement form */
+        .engagement-form {
+            background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+            padding: 2rem; margin-bottom: 3rem;
         }
-        .custom-form h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 1rem; }
-        .form-row { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
-        .form-field { flex: 1; min-width: 180px; }
-        .form-field label {
-            display: block; font-size: 0.7rem; font-weight: 600; color: var(--text-muted);
-            text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem;
+        .engagement-form h2 {
+            font-size: 1rem; font-weight: 700; margin-bottom: 1.25rem;
         }
-        .form-field input {
+        .field { margin-bottom: 1.25rem; }
+        .field:last-of-type { margin-bottom: 1.5rem; }
+        .field label {
+            display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem;
+        }
+        .field input, .field textarea {
             width: 100%; background: var(--surface); border: 1px solid var(--border);
-            border-radius: 7px; padding: 0.55rem 0.75rem; font-size: 0.85rem;
+            border-radius: 8px; padding: 0.7rem 0.9rem; font-size: 0.9rem;
             color: var(--text); font-family: inherit; transition: border-color 0.15s;
         }
-        .form-field input:focus { outline: none; border-color: var(--blue); }
-        .form-field input::placeholder { color: var(--text-muted); }
-        .custom-form .start-btn { margin-top: 0; align-self: flex-end; padding: 0.55rem 1.5rem; }
-        .form-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; }
+        .field input:focus, .field textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 2px rgba(59,130,246,0.08); }
+        .field input::placeholder, .field textarea::placeholder { color: var(--text-muted); }
+        .field textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+        .field .hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem; }
+        .submit-btn {
+            background: var(--blue); color: #fff; border: none; border-radius: 8px;
+            padding: 0.7rem 2rem; font-size: 0.88rem; font-weight: 600;
+            cursor: pointer; font-family: inherit; transition: all 0.15s; width: 100%;
+        }
+        .submit-btn:hover { background: #2563eb; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.2); }
 
         /* Recent runs */
-        .recent-runs { margin-top: 1rem; }
-        .run-row {
+        .section-title {
+            font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.75rem;
+        }
+        .run-list { list-style: none; }
+        .run-item {
             display: flex; align-items: center; gap: 1rem;
-            padding: 0.7rem 0; border-bottom: 1px solid var(--border); font-size: 0.82rem;
+            padding: 0.75rem 0; border-bottom: 1px solid rgba(38,45,61,0.5); font-size: 0.85rem;
         }
-        .run-row:last-child { border-bottom: none; }
-        .run-row a { color: var(--blue); text-decoration: none; font-weight: 500; font-family: monospace; font-size: 0.78rem; }
-        .run-row a:hover { text-decoration: underline; }
-        .run-row .client-name { color: var(--text); flex: 1; }
-        .status-pill {
+        .run-item:last-child { border-bottom: none; }
+        .run-item a { color: var(--blue); text-decoration: none; font-weight: 600; }
+        .run-item a:hover { text-decoration: underline; }
+        .run-item .company { flex: 1; color: var(--text); }
+        .pill {
             font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.55rem;
-            border-radius: 100px; text-transform: uppercase; letter-spacing: 0.03em;
+            border-radius: 100px; text-transform: uppercase;
         }
-        .status-pill.completed { background: rgba(16,185,129,0.1); color: var(--green); }
-        .status-pill.running { background: rgba(59,130,246,0.1); color: var(--blue); }
-        .status-pill.waiting { background: rgba(245,158,11,0.1); color: var(--orange); }
-        .status-pill.rejected { background: rgba(239,68,68,0.1); color: #ef4444; }
+        .pill.completed { background: rgba(16,185,129,0.1); color: var(--green); }
+        .pill.waiting { background: rgba(245,158,11,0.1); color: var(--orange); }
+        .pill.running { background: rgba(59,130,246,0.1); color: var(--blue); }
+        .pill.rejected { background: rgba(239,68,68,0.1); color: #ef4444; }
     </style>
 </head>
 <body>
 <div class="shell">
     <header>
         <h1>Intelligence Engine</h1>
-        <p>Select a client or enter a new one to begin a workforce intelligence engagement</p>
+        <p>Pre-engagement intelligence for management consultants. Enter a company to generate an organizational and workforce briefing before your next engagement.</p>
     </header>
 
-    <!-- Custom client entry -->
-    <div class="custom-form">
-        <h3>New Client</h3>
-        <form action="/run/start-custom" method="POST">
-            <div class="form-row">
-                <div class="form-field">
-                    <label>Client Name</label>
-                    <input type="text" name="client_name" placeholder="e.g. Apex Financial Group" required>
-                </div>
-                <div class="form-field">
-                    <label>Industry</label>
-                    <input type="text" name="industry" placeholder="e.g. Financial Services">
-                </div>
-                <button type="submit" class="start-btn">Generate &amp; Run</button>
+    <div class="engagement-form">
+        <h2>New Intelligence Briefing</h2>
+        <form action="/run/start" method="POST">
+            <div class="field">
+                <label>Company</label>
+                <input type="text" name="company_name" placeholder="e.g. Eli Lilly, FedEx, Hilton Worldwide" required autofocus>
+                <p class="hint">Enter the full company name. The engine will research their organization, workforce dynamics, and identify engagement opportunities.</p>
             </div>
-            <p class="form-hint">Enter any company name. The engine will use AI to generate realistic synthetic workforce data for that industry, then run the full analysis.</p>
-        </form>
-    </div>
-
-    <!-- Pre-configured clients -->
-    <div class="section-title">Pre-configured Clients</div>
-    <div class="client-grid">
-        {% for client in clients %}
-        <form action="/run/start" method="POST" class="client-card" onclick="this.submit()">
-            <input type="hidden" name="client_id" value="{{ client.client_id }}">
-            <div class="client-info">
-                <h3>{{ client.client_name }}</h3>
-                <span class="industry">{{ client.industry }}</span>
+            <div class="field">
+                <label>Engagement Context (Optional)</label>
+                <textarea name="engagement_context" placeholder="e.g. 'They're going through a post-merger integration and reached out about org design support' or 'Preparing for initial pitch on workforce transformation'"></textarea>
+                <p class="hint">Any context about why you're researching this company. This shapes the analysis toward relevant opportunities.</p>
             </div>
-            <button type="submit" class="start-btn">Start Run</button>
+            <button type="submit" class="submit-btn">Generate Intelligence Briefing</button>
         </form>
-        {% endfor %}
     </div>
 
     {% if recent_runs %}
-    <div class="recent-runs">
-        <div class="section-title">Recent Runs</div>
+    <div class="section-title">Recent Briefings</div>
+    <ul class="run-list">
         {% for run in recent_runs %}
-        <div class="run-row">
-            <a href="/run/{{ run.run_id }}">{{ run.run_id[:8] }}</a>
-            <span class="client-name">{{ run.client_name }}</span>
-            <span class="status-pill
+        <li class="run-item">
+            <a href="/run/{{ run.run_id }}">{{ run.company_name }}</a>
+            <span class="company">{{ run.created_at[:10] }}</span>
+            <span class="pill
                 {%- if run.stage == 'completed' %} completed
                 {%- elif run.stage == 'waiting_for_approval' %} waiting
                 {%- elif run.stage == 'rejected' %} rejected
                 {%- else %} running{% endif %}">
-                {% if run.stage == 'waiting_for_approval' %}awaiting approval
+                {% if run.stage == 'waiting_for_approval' %}needs input
+                {%- elif run.stage == 'completed' %}complete
                 {%- else %}{{ run.stage.replace('_', ' ') }}{% endif %}
             </span>
-        </div>
+        </li>
         {% endfor %}
-    </div>
+    </ul>
     {% endif %}
 </div>
 </body>

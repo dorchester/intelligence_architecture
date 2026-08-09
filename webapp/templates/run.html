@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run {{ run.run_id[:8] }} — {{ run.client_name }}</title>
+    <title>{{ run.company_name }} — Intelligence Briefing</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
@@ -143,11 +143,11 @@
     <a href="/" class="back-link">&larr; All clients</a>
 
     <div class="run-header">
-        <h1>{{ run.client_name }}</h1>
+        <h1>{{ run.company_name }}</h1>
         <div class="run-meta">
-            <span>Run <code>{{ run.run_id[:8] }}</code></span>
+            <span><code>{{ run.run_id[:8] }}</code></span>
             <span>{{ run.created_at }}</span>
-            {% if run.industry %}<span>{{ run.industry }}</span>{% endif %}
+            {% if run.engagement_context %}<span style="color:var(--text-secondary);">{{ run.engagement_context[:80] }}{% if run.engagement_context|length > 80 %}...{% endif %}</span>{% endif %}
         </div>
     </div>
 
@@ -207,9 +207,9 @@
     </div>
 
     <!-- Report link -->
-    {% if run.stage == 'completed' and run.output_path %}
+    {% if run.output_path %}
     <a href="/run/{{ run.run_id }}/report" class="report-link" target="_blank">
-        View Final Report &rarr;
+        View Intelligence Briefing &rarr;
     </a>
     {% endif %}
 
