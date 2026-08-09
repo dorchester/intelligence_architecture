@@ -11,7 +11,6 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any
 
 from agent.context import RunContext, Stage
 from agent.model import BedrockModel
@@ -237,7 +236,6 @@ class AgentEngine:
     def _tool_workforce_analysis(self, filename: str) -> str:
         """Run workforce analysis on an input file."""
         import tempfile
-        import pandas as pd
         from tools.basic_analysis import run_workforce_analysis
 
         data = self.ctx.read_artifact("input", filename)

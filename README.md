@@ -1,149 +1,120 @@
 # Intelligence Engine
 
-An agentic analytical workflow that combines deterministic Python analysis with
-LLM-driven interpretation to produce structured intelligence reports.
+A pre-engagement intelligence tool for management consultants specializing in
+organization, workforce, and change. Enter a real company name — the engine
+researches it via Claude on Amazon Bedrock, analyzes organizational dynamics,
+identifies engagement opportunities, and produces a professional intelligence
+briefing with 5 human-in-the-loop checkpoints.
 
-## What This Is
+## What This Does
 
-The Intelligence Engine follows a methodology-driven workflow:
+1. **Research** a real company (headcount, revenue, segments, recent developments)
+2. **Analyze** organizational structure, workforce risks, and culture signals
+3. **Identify** 4-6 specific consulting engagement opportunities
+4. **Draft** an 800-1200 word intelligence briefing for senior consultants
+5. **Render** a professional HTML report ready for internal circulation
 
-1. **Ingest** structured data for a client.
-2. **Analyze** it using deterministic, tested Python tools.
-3. **Interpret** results using an LLM agent (Amazon Bedrock / Claude).
-4. **Generate** a formatted HTML report with metrics, charts, and narrative.
-
-The agent reads a Markdown methodology playbook, reasons about each step, and
-invokes tools via the Bedrock tool-use API. Each run is isolated, traceable,
-and reproducible at the deterministic layer.
-
-## Architecture (Summary)
-
-```
-┌──────────────┐     ┌───────────────────┐     ┌──────────────┐
-│  Methodology │────▶│   Agent Engine     │────▶│   Report     │
-│  Playbooks   │     │  (Bedrock Claude)  │     │  (S3 HTML)   │
-└──────────────┘     │  reasons + tools   │     └──────────────┘
-                     └─────┬─────────┬────┘
-                           │         │
-                     ┌─────▼───┐ ┌───▼──────────┐
-                     │  Tools  │ │  Run State   │
-                     │ (Python)│ │  (DynamoDB)  │
-                     └─────────┘ └──────────────┘
-```
-
-- **Tools** are pure Python functions — deterministic, tested, versioned.
-- **Methodology** is version-controlled Markdown that guides agent reasoning.
-- **Agent** orchestrates the workflow via Bedrock tool-use API.
-- **State** is tracked in DynamoDB with checkpoint support.
-- **Artifacts** are stored in S3 with client/run isolation.
-
-See [docs/architecture.md](docs/architecture.md) for the full architectural breakdown.
+At each phase, the consultant can validate findings, correct errors, redirect
+focus, and shape the final output through feedback that feeds into subsequent
+LLM calls.
 
 ## Quick Start
 
-### Prerequisites
-
-- Python 3.11+
-- AWS CLI configured with profile `intelligence-dev` (for AWS features)
-
-### Install
-
 ```bash
 pip install -e ".[dev]"
+python webapp/app.py
 ```
 
-### Run Tests (No AWS Required)
+Open http://localhost:5000 — enter any company name (e.g. "FedEx", "Eli Lilly",
+"General Motors") and walk through the 5-checkpoint workflow.
 
-```bash
-pytest -v
+## Architecture
+
+```
+Consultant (localhost:5000)
+    |
+    |-- Phase 1: Company Research ------ Claude Sonnet 4.6 via Bedrock
+    |-- Phase 2: Org Analysis ---------- Claude Sonnet 4.6 via Bedrock
+    |-- Phase 3: Opportunities --------- Claude Sonnet 4.6 via Bedrock
+    |-- Phase 4: Briefing Draft -------- Claude Sonnet 4.6 via Bedrock
+    '-- Phase 5: HTML Report ----------- Jinja2 template
+         |
+         '-- All artifacts stored in runs/{company}/{run_id}/
 ```
 
-### Run Locally (No AWS)
+**AWS Services Used:**
+- Amazon Bedrock (Claude Sonnet 4.6 inference)
+- S3 (run artifact storage, CloudFormation-managed)
+- DynamoDB (run state and checkpoints, CloudFormation-managed)
+- CloudWatch (Bedrock usage monitoring dashboard)
 
-```bash
-python run_local.py
-```
+## Two Interfaces
 
-### Run with Bedrock Narrative (Requires AWS)
-
-```bash
-python run_local.py --use-bedrock
-```
-
-### Full AWS End-to-End
-
-```bash
-python orchestrator.py run --auto-approve
-```
-
-This will:
-- Create a unique run scoped by client_id and run_id
-- Upload synthetic input to S3
-- Pause at a checkpoint (auto-approved with flag)
-- Run the agent through the methodology playbook
-- Generate analysis, chart, narrative, and HTML report
-- Store all artifacts in S3
-- Track full lifecycle in DynamoDB
-
-### Check Status / Download
-
-```bash
-python orchestrator.py status <run_id>
-python orchestrator.py download <run_id>
-```
+| URL | Who | Purpose |
+|-----|-----|---------|
+| `localhost:5000` | Consultant | Start briefings, approve checkpoints, view reports |
+| `localhost:5000/engineer` | Engineer | System dashboard, all runs, infrastructure status, run inspection |
 
 ## Project Structure
 
 ```
 intelligence_architecture/
-├── agent/              — agent engine, model abstraction, run context
-├── methodology/        — workflow playbooks (Markdown)
-├── tools/              — deterministic analytical tools (Python)
-├── prompts/            — LLM prompt templates
-├── templates/          — HTML report templates (Jinja2)
-├── storage/            — storage abstraction (local + S3)
-├── state/              — DynamoDB run state management
+├── webapp/             — Flask web UI (primary entry point)
+│   ├── app.py          — routes, LLM orchestration, checkpoint logic
+│   └── templates/      — Jinja2 HTML (index, run, engineer, engineer_run)
+├── agent/              — agent engine, model abstraction, context
+├── tools/              — deterministic analytical tools (pandas, matplotlib)
+├── storage/            — storage abstraction (local filesystem + S3)
+├── state/              — DynamoDB run state manager
+├── methodology/        — Markdown playbooks (version-controlled)
+├── prompts/            — system prompt + narrative templates
 ├── infrastructure/     — CloudFormation templates
-│   └── cloudformation/
-├── config/             — configuration (example only)
-├── sample_data/        — synthetic/fictional data for testing
-├── tests/              — automated tests
-├── docs/               — architecture and design documentation
-├── orchestrator.py     — full AWS orchestrator with checkpoints
-├── run_local.py        — local runner (optional Bedrock)
-└── run_s3.py           — S3-backed runner
+├── scripts/            — Bedrock usage reporting, data generation
+├── docs/               — architecture, decisions, corporate deployment
+├── tests/              — pytest suite (17 tests)
+├── orchestrator.py     — CLI path (S3 + DynamoDB + agent engine)
+└── CLAUDE.md           — context file for Claude Code sessions
 ```
 
 ## Key Design Decisions
 
-1. **Deterministic analysis is separated from LLM narrative.** Tools produce
-   reproducible metrics; the LLM interprets them.
+1. **LLM does real research** — not fake data generation. Uses Claude's knowledge
+   to produce accurate company intelligence.
+2. **5 human checkpoints** — consultant validates, corrects, and directs at each phase.
+3. **Feedback compounds** — operator input at checkpoint N feeds into phases N+1, N+2, etc.
+4. **Deterministic tools separated from reasoning** — analytical code is tested and versioned.
+5. **Run isolation** — client/run prefix structure enforced by storage interface.
+6. **Infrastructure as code** — all AWS resources in CloudFormation.
 
-2. **Methodology lives in Markdown, not rigid code.** Playbooks guide the agent's
-   reasoning without reducing it to a mechanical DAG.
+## AWS Setup
 
-3. **Run isolation is structural.** Client/run prefix in storage and state.
-   Never trust-based.
+```bash
+# Verify credentials
+aws sts get-caller-identity --profile intelligence-dev
 
-4. **Agent uses tool-use API.** Maps directly to AgentCore Runtime's model.
+# Deploy infrastructure (already done in dev)
+aws cloudformation deploy --profile intelligence-dev --region us-east-1 \
+  --template-file infrastructure/cloudformation/storage.yaml \
+  --stack-name intelligence-engine-dev-storage --parameter-overrides Environment=dev
+```
 
-5. **Infrastructure is code.** CloudFormation stacks, not manual resources.
+See `docs/build-status.md` for full resource inventory.
 
-See [docs/decisions.md](docs/decisions.md) for the full decision log.
+## Tests
 
-## Security
+```bash
+pytest -v                    # 17 tests (no AWS needed)
+python scripts/bedrock_usage.py --profile intelligence-dev --hours 24  # Usage report
+```
 
-See [docs/security-boundaries.md](docs/security-boundaries.md).
+## Documentation
 
-Key principle: **prompts are not a security boundary**. Data isolation, code
-immutability, and execution sandboxing are enforced by infrastructure, not
-instructions.
-
-## Status
-
-**V0 — AWS Thin Slice Complete.** Full end-to-end with S3, DynamoDB, Bedrock
-agent reasoning, deterministic tools, checkpoint approval, and HTML report
-generation. See [docs/build-status.md](docs/build-status.md) for details.
+- [CLAUDE.md](CLAUDE.md) — session continuity for Claude Code
+- [docs/build-status.md](docs/build-status.md) — milestones, resources, next steps
+- [docs/corporate-deployment-architecture.md](docs/corporate-deployment-architecture.md) — target corporate model
+- [docs/bedrock-usage-monitoring.md](docs/bedrock-usage-monitoring.md) — monitoring setup
+- [docs/decisions.md](docs/decisions.md) — architectural decision log
+- [docs/v0-architecture-report.html](docs/v0-architecture-report.html) — visual architecture report
 
 ## License
 

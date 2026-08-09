@@ -16,13 +16,17 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 
-OPUS_MODELS = [
+TRACKED_MODELS = [
     "us.anthropic.claude-opus-4-6-v1",
     "us.anthropic.claude-opus-4-5-20251101-v1:0",
     "us.anthropic.claude-opus-4-1-20250805-v1:0",
     "us.anthropic.claude-opus-4-7",
     "us.anthropic.claude-opus-4-8",
     "us.anthropic.claude-opus-5",
+    "us.anthropic.claude-sonnet-4-6",
+    "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "us.anthropic.claude-sonnet-4-20250514-v1:0",
+    "us.anthropic.claude-haiku-4-5-20251001-v1:0",
 ]
 
 TOKEN_METRICS = [
@@ -55,7 +59,7 @@ def get_usage(session, hours: int | None = None, days: int | None = None):
     total_seconds = int((end - start).total_seconds())
 
     print(f"\n{'=' * 70}")
-    print(f"  Bedrock Claude Opus Usage — {period_label}")
+    print(f"  Bedrock Claude Usage - {period_label}")
     print(f"  {start.strftime('%Y-%m-%d %H:%M UTC')} to {end.strftime('%Y-%m-%d %H:%M UTC')}")
     print(f"{'=' * 70}\n")
 
@@ -66,7 +70,7 @@ def get_usage(session, hours: int | None = None, days: int | None = None):
     totals = {m: 0 for m in TOKEN_METRICS}
     any_data = False
 
-    for model_id in OPUS_MODELS:
+    for model_id in TRACKED_MODELS:
         row = {}
         has_data = False
         for metric_name in TOKEN_METRICS:
