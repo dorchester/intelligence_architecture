@@ -52,7 +52,7 @@ with `ENGINEER_CONSOLE=0`.
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                    # 61 tests, no AWS needed
+pytest -q                    # 69 tests, no AWS needed
 python webapp/app.py         # → http://localhost:5000
 ```
 
@@ -217,7 +217,7 @@ scripts/
 docs/
   architecture-report.html   full visual walkthrough
   samples/                   real output, no AWS needed
-tests/                       61 tests
+tests/                       69 tests
 ```
 
 ---
@@ -272,12 +272,13 @@ No account IDs appear anywhere in this repository.
 
 Stated plainly:
 
-- **Run state is in-memory.** The DynamoDB table exists and the CLI orchestrator
-  uses it, but the web app keeps runs in a process dictionary. Restarting loses
-  history. This is also why the App Runner service is pinned to a single
-  instance — a second instance would not see runs started by the first. Moving
-  run state to DynamoDB is the prerequisite for scaling, and it is the next
-  substantial piece of work.
+- **Runs are durable at checkpoints.** Every run persists to DynamoDB at each
+  transition, and a run waiting for approval holds no thread — it survives
+  restarts and redeploys, for minutes or days, consuming nothing. Approval is
+  what spawns the next phase. The one seam left: a process death *mid-phase*
+  (during an LLM call) marks the run `interrupted`, preserving everything up
+  to the last checkpoint. The App Runner service stays pinned to one instance
+  because an executing phase is still a process-local thread.
 - **Research is model knowledge, not live retrieval.** Facts come from training
   data and are bounded by the cutoff. Checkpoint 1 exists precisely so a
   consultant validates them.

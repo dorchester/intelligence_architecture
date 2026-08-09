@@ -24,7 +24,7 @@ records what remains.
 | Spend ceiling | **Deployed (alerting)** | Monthly budget, 80% actual / 100% forecasted alerts. A hard cutoff is a production decision |
 | Model quotas verified | **Checked — action needed** | Applied Haiku 4.5 quota is 50 req/min vs a 10,000 default; fine for 8-way concurrency, will throttle high-volume builds. Request an increase before production loads |
 | Invocation logging | **Prepared, disabled** | `observability-logging.yaml` captures full prompts/responses; enabling is a privacy decision, not an engineering one |
-| Durable, authenticated, days-long approvals | **Not built — next** | Cognito (identity), DynamoDB (state), and the checkpoint UX exist; the wait is still an in-process thread. Moving it to durable state is the top open build |
+| Durable, authenticated, days-long approvals | **Built** | Checkpoint waits persist to DynamoDB and hold no thread or compute; approval — minutes or days later, across restarts and redeploys — spawns the next phase. Cognito authenticates the approver on the hosted console |
 | Orchestration substrate for the stage batch | **Open decision** | Days-long zero-compute suspends justify Step Functions under this project's own rules; not built until confirmed |
 | In-account regression replay | **Pattern proven** | CodeBuild runs project containers in-account today; a replay project is a template away |
 | Hub-site serving | **Bucket deployed** | Private site bucket, CloudFront-ready. A public repository mirror of client-derived content is **recommended against** |

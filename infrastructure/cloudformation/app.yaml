@@ -184,6 +184,8 @@ Resources:
                   - dynamodb:GetItem
                   - dynamodb:UpdateItem
                   - dynamodb:Query
+                  # Scan backs the run list; trivial at this table's scale.
+                  - dynamodb:Scan
                 Resource:
                   - Fn::ImportValue: !Sub intelligence-engine-${Environment}-table-arn
                   - Fn::Sub:

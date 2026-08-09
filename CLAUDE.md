@@ -10,7 +10,7 @@ workforce, change). Enter a company → verify it's real → load workforce data
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                          # 61 tests, no AWS
+pytest -q                          # 69 tests, no AWS
 python webapp/app.py               # consultant → :5000, engineer → :5000/engineer
 ENGINEER_CONSOLE=0 python webapp/app.py   # consultant only
 ```
@@ -53,6 +53,7 @@ python scripts/data_generation/generate_all.py --profile intelligence-dev
 webapp/app.py       consultant console + orchestration (4 LLM phases, 5 checkpoints)
 webapp/engineer.py  engineer console — separate Blueprint at /engineer
 webapp/runtime.py   shared state (runs dict, guardrails, AWS accessors)
+webapp/run_store.py DynamoDB run persistence - checkpoint waits survive restarts
 webapp/auth.py      Cognito login — inert unless COGNITO_* env vars are set
 Dockerfile          console image; single worker on purpose (in-process runs)
 guardrails/         YAML-configured rule engine, 14 rules
@@ -134,8 +135,8 @@ python scripts/bedrock_usage.py --profile intelligence-dev --hours 24
 
 ## Known limits
 
-- Web app run state is in-memory (DynamoDB wiring exists but is used by the CLI
-  orchestrator only) — restart loses history
+- Runs are durable at checkpoints (DynamoDB); mid-phase interruption marks the
+  run interrupted rather than resuming the phase
 - Research is model knowledge, not live retrieval
 - Datasets are synthetic
 - No auth, no CI/CD

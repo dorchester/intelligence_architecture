@@ -1151,8 +1151,8 @@ python scripts/bedrock_usage.py --profile intelligence-dev --cost --month-to-dat
 
   <div class="cards">
     <div class="card">
-      <div class="card-h"><div class="card-t">Run state is in-memory</div></div>
-      <div class="card-d">The DynamoDB table and state manager exist and are exercised by the CLI orchestrator, but the web app keeps runs in a process dictionary. Restarting loses history, and it is why the hosted service is pinned to a single instance. Wiring the web app to DynamoDB is the next structural step and the prerequisite for scaling.</div>
+      <div class="card-h"><div class="card-t">Runs are durable at checkpoints</div></div>
+      <div class="card-d">Superseded at checkpoints: every run persists to DynamoDB at each transition, a waiting run holds no thread, and approvals resume work across restarts and redeploys — days-long waits cost nothing. The remaining seam is a death <em>mid-phase</em>, which marks the run interrupted with everything up to the last checkpoint preserved. Executing phases are still process-local threads, so the service stays at one instance.</div>
     </div>
     <div class="card">
       <div class="card-h"><div class="card-t">Research is model knowledge, not live retrieval</div></div>

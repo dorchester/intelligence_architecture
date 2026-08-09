@@ -62,8 +62,9 @@ python scripts/bedrock_usage.py --profile intelligence-dev --hours 24
 
 ## Known limits
 
-1. Web app run state is in-memory — DynamoDB wiring exists but only the CLI
-   orchestrator uses it. Restarting loses run history.
+1. Runs persist to DynamoDB at every transition; checkpoint waits survive
+   restarts and hold no compute. Mid-phase interruptions are detected and
+   marked; the phase itself is not resumable (yet).
 2. Research is model knowledge, not live retrieval. Checkpoint 1 exists so a
    consultant validates it.
 3. Datasets are synthetic — they demonstrate the grounding pattern, not facts
@@ -121,14 +122,16 @@ functional requirements onto this account; the short version:
   bridge (AWS side) and serverless-workspace Terraform.
 - **Verified**: Haiku 4.5 applied quota is 50 req/min (vs 10,000 default) —
   increase needed before high-volume builds.
-- **Next build**: durable days-long approvals (state exists; the wait is
-  still in-process).
+- **Built**: durable approvals — checkpoint waits persist to DynamoDB,
+  survive restarts/redeploys, and hold no thread or compute; approval spawns
+  the next phase. Proven live by killing the process mid-wait.
 - **Open gates**: orchestration substrate, privacy signoff for the vault,
   vendor licence reviews, invocation logging.
 
 ## Next
 
-1. Wire the web app to DynamoDB so runs survive restart — and unpin the instance count
+1. Unpin the App Runner instance count (waits are durable; executing phases
+   are still process-local threads)
 2. CI/CD with secret scanning and staged promotion
 3. AgentCore Runtime for session suspend/resume at checkpoints
 4. Least-privilege IAM roles per persona

@@ -67,7 +67,15 @@ def healthz():
 
 @app.route("/")
 def index():
-    recent_runs = sorted(runs.values(), key=lambda r: r["created_at"], reverse=True)[:10]
+    # Durable runs from the store, overlaid with anything live in memory.
+    merged: dict[str, dict] = {}
+    store = runtime.get_run_store()
+    if store:
+        merged = {r["run_id"]: r for r in store.load_all()}
+    merged.update(runs)
+    recent_runs = sorted(
+        merged.values(), key=lambda r: r.get("created_at", ""), reverse=True
+    )[:10]
     presets = list_preset_companies()
     return render_template(
         "index.html",
@@ -108,6 +116,7 @@ def start_run():
         "run_id": run_id,
         "company_name": company_name,
         "company_id": company_id,
+        "client_ref": "company-" + company_name.lower().replace(" ", "-").replace(".", "")[:30],
         "is_preset": is_preset,
         "engagement_context": engagement_context,
         "stage": "initialized",
@@ -126,16 +135,16 @@ def start_run():
         "revision_counts": {},
     }
     runs[run_id] = run
+    _persist(run)
 
-    thread = threading.Thread(target=_execute_run, args=(run,), daemon=True)
-    thread.start()
+    _spawn(_seg_research, run)
 
     return redirect(url_for("run_status", run_id=run_id))
 
 
 @app.route("/run/<run_id>")
 def run_status(run_id: str):
-    run = runs.get(run_id)
+    run = _get_run(run_id)
     if not run:
         return "Run not found", 404
     return render_template("run.html", run=run)
@@ -143,8 +152,8 @@ def run_status(run_id: str):
 
 @app.route("/run/<run_id>/approve", methods=["POST"])
 def approve_checkpoint(run_id: str):
-    run = runs.get(run_id)
-    if not run or not run["current_checkpoint"]:
+    run = _get_run(run_id)
+    if not run or not run.get("current_checkpoint"):
         return redirect(url_for("run_status", run_id=run_id))
 
     feedback = request.form.get("feedback", "").strip()
@@ -160,6 +169,12 @@ def approve_checkpoint(run_id: str):
     run["checkpoints"].append(cp)
     run["current_checkpoint"] = None
     _log(run, "Approved - continuing")
+    _persist(run)
+
+    # The waiting run holds no thread; approval is what spawns the next phase.
+    next_segment = _NEXT_SEGMENT.get(cp["name"])
+    if next_segment:
+        _spawn(next_segment, run)
 
     return redirect(url_for("run_status", run_id=run_id))
 
@@ -167,8 +182,8 @@ def approve_checkpoint(run_id: str):
 @app.route("/run/<run_id>/revise", methods=["POST"])
 def revise_checkpoint(run_id: str):
     """Send the current phase back for revision with feedback."""
-    run = runs.get(run_id)
-    if not run or not run["current_checkpoint"]:
+    run = _get_run(run_id)
+    if not run or not run.get("current_checkpoint"):
         return redirect(url_for("run_status", run_id=run_id))
 
     feedback = request.form.get("feedback", "").strip()
@@ -184,70 +199,121 @@ def revise_checkpoint(run_id: str):
     run["feedback_history"].append({"checkpoint": cp["name"], "feedback": feedback, "action": "revise"})
     run["checkpoints"].append(cp)
     run["current_checkpoint"] = None
-    # Signal the execution thread to revise (not reject)
-    run["_revision_requested"] = {"checkpoint": cp["name"], "feedback": feedback}
+    _persist(run)
+
+    _spawn(_handle_revision, run, cp["name"], feedback)
 
     return redirect(url_for("run_status", run_id=run_id))
 
 
 @app.route("/run/<run_id>/report")
 def view_report(run_id: str):
-    run = runs.get(run_id)
-    if not run or not run["output_path"]:
+    run = _get_run(run_id)
+    if not run:
         return "Report not available yet", 404
-    report_path = Path(run["output_path"])
-    if report_path.exists():
-        return report_path.read_text(encoding="utf-8")
-    return "Report file not found", 404
+    if run.get("output_path"):
+        report_path = Path(run["output_path"])
+        if report_path.exists():
+            return report_path.read_text(encoding="utf-8")
+    # The rendered HTML also lives in the durable run record, so reports
+    # survive restarts and redeploys even though /tmp does not.
+    if run.get("report_html"):
+        return run["report_html"]
+    return "Report not available yet", 404
 
 
 @app.route("/api/run/<run_id>/status")
 def api_run_status(run_id: str):
-    run = runs.get(run_id)
+    run = _get_run(run_id)
     if not run:
         return jsonify({"error": "not found"}), 404
-    return jsonify(run)
+    # The rendered HTML can be large; the status poller never needs it.
+    slim = {k: v for k, v in run.items() if k not in ("report_html", "dataset_context")}
+    return jsonify(slim)
 
 
 # ============ RUN EXECUTION ============
+#
+# Execution is segmented. Each segment runs from one checkpoint to the next,
+# persists the run, and lets its thread END. A run waiting for approval holds
+# no thread and consumes nothing; approving or requesting a revision is what
+# spawns the next piece of work. Waits survive restarts and redeploys -
+# RUNNING -> WAITING_FOR_APPROVAL -> RUNNING, durable by construction.
 
-def _execute_run(run: dict):
-    """Execute the intelligence workflow:
-    1. Research the company's org/workforce via LLM
-    2. Identify organizational risks and opportunities
-    3. Generate strategic recommendations
-    4. Produce a formatted intelligence briefing
-    """
+WORKING_STAGES = {
+    "initialized", "verifying", "loading_dataset", "researching",
+    "analyzing_org", "identifying_opportunities", "generating_briefing",
+    "rendering",
+}
+
+
+def _persist(run: dict) -> None:
+    store = runtime.get_run_store()
+    if store:
+        store.save(run)
+
+
+def _get_run(run_id: str) -> dict | None:
+    """Fetch a run from memory, falling back to the durable store."""
+    run = runs.get(run_id)
+    if run:
+        return run
+    store = runtime.get_run_store()
+    if not store:
+        return None
+    run = store.load(run_id)
+    if not run:
+        return None
+    if run.get("stage") in WORKING_STAGES:
+        # The thread executing this phase died with the previous process.
+        # Everything up to the last checkpoint is preserved; the phase is not.
+        run["stage"] = "interrupted"
+        _log(run, "Process restarted mid-phase. Progress up to the last "
+                  "checkpoint is preserved; start a new run to continue.")
+    runs[run["run_id"]] = run
+    if run["stage"] == "interrupted":
+        _persist(run)
+    return run
+
+
+def _spawn(fn, run: dict, *args) -> None:
+    threading.Thread(target=_run_protected, args=(fn, run) + args, daemon=True).start()
+
+
+def _run_protected(fn, run: dict, *args) -> None:
     try:
-        _execute_run_inner(run)
+        fn(run, *args)
     except Exception as e:
         run["stage"] = "error"
         _log(run, f"FATAL ERROR: {type(e).__name__}: {str(e).encode('ascii', 'replace').decode()}")
+        _persist(run)
 
 
-def _execute_run_inner(run: dict):
+def _make_ctx(run: dict):
     from storage.local import LocalStorage
     from agent.context import RunContext
 
-    run_id = run["run_id"]
-    company = run["company_name"]
-    context = run["engagement_context"]
-
-    storage = LocalStorage(base_dir=RUNS_DIR)
-    client_id = "company-" + company.lower().replace(" ", "-").replace(".", "")[:30]
-    ctx = RunContext(
-        client_id=client_id,
-        client_name=company,
-        storage=storage,
-        run_id=run_id,
+    return RunContext(
+        client_id=run["client_ref"],
+        client_name=run["company_name"],
+        storage=LocalStorage(base_dir=RUNS_DIR),
+        run_id=run["run_id"],
     )
 
+
+# ----- segment 1: verify, load dataset, research -> checkpoint 1 -----
+
+def _seg_research(run: dict):
+    company = run["company_name"]
+    context = run["engagement_context"]
+    ctx = _make_ctx(run)
     model = get_bedrock_model()
     run["model_used"] = model.model_id
 
     # ===== PHASE 0a: Entity verification (guardrail) =====
     if guardrails.entity_verification_enabled() and not run.get("is_preset"):
         run["stage"] = "verifying"
+        _persist(run)
         _log(run, f"Verifying '{company}' is a real organization...")
         vcfg = guardrails.entity_verification_config()
         verifier = get_bedrock_model(vcfg.get("model", model.model_id))
@@ -259,6 +325,7 @@ def _execute_run_inner(run: dict):
             v = vres.blocking_violations[0]
             _log(run, f"BLOCKED: {v.message}")
             run["blocked_reason"] = f"{v.message}. {v.detail}"
+            _persist(run)
             return
         canonical = vpayload.get("canonical_name")
         if canonical and canonical.lower() != company.lower():
@@ -269,9 +336,11 @@ def _execute_run_inner(run: dict):
     # ===== PHASE 0b: Load workforce dataset =====
     dataset_context = ""
     dataset_summary = None
+    run["dataset_context"] = ""
     company_id = run.get("company_id")
     if company_id:
         run["stage"] = "loading_dataset"
+        _persist(run)
         _log(run, f"Querying workforce dataset for {company_id}...")
         dq = get_dataset_query()
         if dq and dq.has_dataset(company_id):
@@ -281,6 +350,7 @@ def _execute_run_inner(run: dict):
                 _log(run, f"Dataset query failed: {type(e).__name__}")
             if dataset_summary:
                 dataset_context = dataset_summary.to_agent_context()
+                run["dataset_context"] = dataset_context
                 run["dataset_available"] = True
                 run["dataset_summary"] = dataset_summary.to_dict()
                 ctx.write_artifact(
@@ -298,6 +368,7 @@ def _execute_run_inner(run: dict):
 
     # ===== PHASE 1: Company Research =====
     run["stage"] = "researching"
+    _persist(run)
     _log(run, f"Researching {company}...")
 
     research = _research_company(model, company, context, dataset_context)
@@ -325,51 +396,53 @@ def _execute_run_inner(run: dict):
     _log(run, f"Research complete: {research.get('employee_count', 'Unknown')} employees, "
                       f"{research.get('industry', 'Unknown')} sector")
 
-    # ===== CHECKPOINT 1: Validate research =====
-    while True:
-        dataset_block = ""
-        if dataset_summary:
-            dataset_block = (
-                f"\nWORKFORCE DATASET (in scope)\n"
-                f"  {dataset_summary.profiles_analyzed:,} employee profiles, "
-                f"{dataset_summary.postings_analyzed:,} job postings (24 months)\n"
-                f"  Avg tenure {dataset_summary.avg_tenure_years:.1f}y | "
-                f"flight risk {dataset_summary.flight_risk_pct:.0f}% | "
-                f"{dataset_summary.active_postings} open roles\n"
-                f"  Hiring trend: {dataset_summary.hiring_velocity_trend}\n"
-            )
+    _checkpoint_research(run)
 
-        revision = _wait_for_checkpoint(run, "research_validation",
-            "Validate Company Research",
-            f"Company: {research.get('full_name', company)}\n"
-            f"Industry: {research.get('industry', 'Unknown')}\n"
-            f"Headquarters: {research.get('headquarters', 'Unknown')}\n"
-            f"Employees: {research.get('employee_count', 'Unknown')}\n"
-            f"Revenue: {research.get('revenue', 'Unknown')}\n"
-            f"{dataset_block}\n"
-            f"Key business segments:\n{_format_list(research.get('segments', []))}\n\n"
-            f"Recent developments:\n{_format_list(research.get('recent_developments', []))}\n\n"
-            f"Approve if accurate, or request revision with corrections.")
-        if not revision:
-            break
-        if _revision_limit_hit(run, "research_validation"):
-            break
-        _log(run, f"Revising research with feedback...")
-        run["stage"] = "researching"
-        research = _revise_research(model, company, research, revision)
-        run["research"] = research
-        ctx.write_artifact("working", "research.json", json.dumps(research, indent=2).encode())
-        _log(run, "Research revised")
 
+def _checkpoint_research(run: dict):
+    research = run["research"]
+    ds = run.get("dataset_summary") or {}
+    dataset_block = ""
+    if ds:
+        dataset_block = (
+            f"\nWORKFORCE DATASET (in scope)\n"
+            f"  {ds.get('profiles_analyzed', 0):,} employee profiles, "
+            f"{ds.get('postings_analyzed', 0):,} job postings (24 months)\n"
+            f"  Avg tenure {ds.get('avg_tenure_years', 0):.1f}y | "
+            f"flight risk {ds.get('flight_risk_pct', 0):.0f}% | "
+            f"{ds.get('active_postings', 0)} open roles\n"
+            f"  Hiring trend: {ds.get('hiring_velocity_trend', 'Unknown')}\n"
+        )
+    _set_checkpoint(run, "research_validation",
+        "Validate Company Research",
+        f"Company: {research.get('full_name', run['company_name'])}\n"
+        f"Industry: {research.get('industry', 'Unknown')}\n"
+        f"Headquarters: {research.get('headquarters', 'Unknown')}\n"
+        f"Employees: {research.get('employee_count', 'Unknown')}\n"
+        f"Revenue: {research.get('revenue', 'Unknown')}\n"
+        f"{dataset_block}\n"
+        f"Key business segments:\n{_format_list(research.get('segments', []))}\n\n"
+        f"Recent developments:\n{_format_list(research.get('recent_developments', []))}\n\n"
+        f"Approve if accurate, or request revision with corrections.")
+
+
+# ----- segment 2: organizational analysis -> checkpoint 2 -----
+
+def _seg_org(run: dict):
+    company = run["company_name"]
+    ctx = _make_ctx(run)
+    model = get_bedrock_model()
     corrections = _get_feedback_for(run, "research_validation")
 
-    # ===== PHASE 2: Organizational Analysis =====
     run["stage"] = "analyzing_org"
+    _persist(run)
     _log(run, "Analyzing organizational structure and workforce dynamics...")
 
     org_analysis = _analyze_organization(
-        model, company, research, context, corrections, dataset_context
+        model, company, run["research"], run["engagement_context"],
+        corrections, run.get("dataset_context", "")
     )
+    run["org_analysis"] = org_analysis
     ctx.write_artifact("working", "org_analysis.json", json.dumps(org_analysis, indent=2).encode())
     run["artifacts"].append("working/org_analysis.json")
     _record_guardrails(
@@ -379,67 +452,71 @@ def _execute_run_inner(run: dict):
         ),
     )
     _log(run, "Organizational analysis complete")
+    _checkpoint_org(run)
 
-    # ===== CHECKPOINT 2: Review org analysis =====
-    while True:
-        revision = _wait_for_checkpoint(run, "org_review",
-            "Review Organizational Analysis",
-            f"Organizational Structure:\n{org_analysis.get('structure_summary', '')}\n\n"
-            f"Workforce Composition:\n{org_analysis.get('workforce_summary', '')}\n\n"
-            f"Key Organizational Challenges:\n{_format_list(org_analysis.get('challenges', []))}\n\n"
-            f"Talent & Workforce Risks:\n{_format_list(org_analysis.get('workforce_risks', []))}\n\n"
-            f"Approve to continue, or request revision with direction.")
-        if not revision:
-            break
-        if _revision_limit_hit(run, "org_review"):
-            break
-        _log(run, f"Revising org analysis...")
-        run["stage"] = "analyzing_org"
-        org_analysis = _revise_org_analysis(model, company, research, org_analysis, revision)
-        ctx.write_artifact("working", "org_analysis.json", json.dumps(org_analysis, indent=2).encode())
-        _log(run, "Org analysis revised")
 
+def _checkpoint_org(run: dict):
+    org_analysis = run["org_analysis"]
+    _set_checkpoint(run, "org_review",
+        "Review Organizational Analysis",
+        f"Organizational Structure:\n{org_analysis.get('structure_summary', '')}\n\n"
+        f"Workforce Composition:\n{org_analysis.get('workforce_summary', '')}\n\n"
+        f"Key Organizational Challenges:\n{_format_list(org_analysis.get('challenges', []))}\n\n"
+        f"Talent & Workforce Risks:\n{_format_list(org_analysis.get('workforce_risks', []))}\n\n"
+        f"Approve to continue, or request revision with direction.")
+
+
+# ----- segment 3: opportunities -> checkpoint 3 -----
+
+def _seg_opportunities(run: dict):
+    company = run["company_name"]
+    ctx = _make_ctx(run)
+    model = get_bedrock_model()
     focus_direction = _get_feedback_for(run, "org_review")
 
-    # ===== PHASE 3: Strategic Opportunities =====
     run["stage"] = "identifying_opportunities"
+    _persist(run)
     _log(run, "Identifying strategic opportunities for engagement...")
 
     opportunities = _identify_opportunities(
-        model, company, research, org_analysis, context, focus_direction, dataset_context
+        model, company, run["research"], run["org_analysis"],
+        run["engagement_context"], focus_direction, run.get("dataset_context", "")
     )
+    run["opportunities"] = opportunities
     ctx.write_artifact("working", "opportunities.json", json.dumps(opportunities, indent=2).encode())
     run["artifacts"].append("working/opportunities.json")
     _log(run, f"Identified {len(opportunities.get('opportunities', []))} potential engagement areas")
+    _checkpoint_opportunities(run)
 
-    # ===== CHECKPOINT 3: Prioritize opportunities =====
-    while True:
-        opps_text = ""
-        for i, opp in enumerate(opportunities.get("opportunities", []), 1):
-            opps_text += f"{i}. {opp.get('title', '')}\n   {opp.get('description', '')}\n   Impact: {opp.get('impact', '')}\n\n"
 
-        revision = _wait_for_checkpoint(run, "opportunity_review",
-            "Review & Prioritize Opportunities",
-            f"Potential Engagement Areas:\n\n{opps_text}"
-            f"Approve to continue, or request revision with guidance on what to change.")
-        if not revision:
-            break
-        if _revision_limit_hit(run, "opportunity_review"):
-            break
-        _log(run, f"Revising opportunities...")
-        run["stage"] = "identifying_opportunities"
-        opportunities = _revise_opportunities(model, company, research, org_analysis, opportunities, revision)
-        ctx.write_artifact("working", "opportunities.json", json.dumps(opportunities, indent=2).encode())
-        _log(run, "Opportunities revised")
+def _checkpoint_opportunities(run: dict):
+    opps_text = ""
+    for i, opp in enumerate(run["opportunities"].get("opportunities", []), 1):
+        opps_text += f"{i}. {opp.get('title', '')}\n   {opp.get('description', '')}\n   Impact: {opp.get('impact', '')}\n\n"
+    _set_checkpoint(run, "opportunity_review",
+        "Review & Prioritize Opportunities",
+        f"Potential Engagement Areas:\n\n{opps_text}"
+        f"Approve to continue, or request revision with guidance on what to change.")
 
+
+# ----- segment 4: briefing -> checkpoint 4 -----
+
+def _seg_briefing(run: dict):
+    company = run["company_name"]
+    ctx = _make_ctx(run)
+    model = get_bedrock_model()
     priority_guidance = _get_feedback_for(run, "opportunity_review")
 
-    # ===== PHASE 4: Generate Intelligence Briefing =====
     run["stage"] = "generating_briefing"
+    _persist(run)
     _log(run, "Generating intelligence briefing...")
 
-    briefing = _generate_briefing(model, company, research, org_analysis, opportunities, context,
-                                  _get_all_feedback(run), priority_guidance, dataset_context)
+    briefing = _generate_briefing(
+        model, company, run["research"], run["org_analysis"], run["opportunities"],
+        run["engagement_context"], _get_all_feedback(run), priority_guidance,
+        run.get("dataset_context", "")
+    )
+    run["briefing"] = briefing
     ctx.write_artifact("working", "briefing.md", briefing.encode())
     run["artifacts"].append("working/briefing.md")
 
@@ -449,57 +526,138 @@ def _execute_run_inner(run: dict):
     if bres.blocked:
         run["stage"] = "blocked"
         run["blocked_reason"] = bres.blocking_violations[0].message
+        _persist(run)
         return
 
     _log(run, f"Briefing drafted ({len(briefing)} chars)")
+    _checkpoint_briefing(run)
 
-    # ===== CHECKPOINT 4: Review briefing =====
-    while True:
-        revision = _wait_for_checkpoint(run, "briefing_review",
-            "Review Intelligence Briefing",
-            f"{briefing[:3000]}{'...' if len(briefing) > 3000 else ''}\n\n"
-            f"---\nApprove to render the final report, or request revision with feedback.")
-        if not revision:
-            break
-        if _revision_limit_hit(run, "briefing_review"):
-            break
-        _log(run, f"Revising briefing...")
-        run["stage"] = "generating_briefing"
-        briefing = _revise_briefing(model, briefing, revision)
-        ctx.write_artifact("working", "briefing.md", briefing.encode())
-        _log(run, "Briefing revised")
 
-    # ===== PHASE 5: Render HTML Report =====
+def _checkpoint_briefing(run: dict):
+    briefing = run["briefing"]
+    _set_checkpoint(run, "briefing_review",
+        "Review Intelligence Briefing",
+        f"{briefing[:3000]}{'...' if len(briefing) > 3000 else ''}\n\n"
+        f"---\nApprove to render the final report, or request revision with feedback.")
+
+
+# ----- segment 5: render -> checkpoint 5 -----
+
+def _seg_render(run: dict):
+    company = run["company_name"]
+    ctx = _make_ctx(run)
+    model = get_bedrock_model()
+
     run["stage"] = "rendering"
+    _persist(run)
     _log(run, "Rendering HTML report...")
 
-    html_report = _render_intelligence_report(model, company, research, briefing)
+    html_report = _render_intelligence_report(model, company, run["research"], run["briefing"])
+    run["report_html"] = html_report
     output_path = ctx.write_artifact("output", "intelligence_briefing.html", html_report.encode())
     run["output_path"] = output_path
     run["artifacts"].append("output/intelligence_briefing.html")
     _log(run, f"Report saved: {output_path}")
+    _checkpoint_final(run)
 
-    # ===== CHECKPOINT 5: Final delivery =====
-    while True:
-        revision = _wait_for_checkpoint(run, "final_review",
-            "Approve for Delivery",
-            "The intelligence briefing is ready.\n\n"
-            "Click 'View Report' below to review the formatted output.\n"
-            "Approve to complete, or request revision for final adjustments.")
-        if not revision:
-            break
-        if _revision_limit_hit(run, "final_review"):
-            break
-        _log(run, f"Revising final report...")
+
+def _checkpoint_final(run: dict):
+    _set_checkpoint(run, "final_review",
+        "Approve for Delivery",
+        "The intelligence briefing is ready.\n\n"
+        "Click 'View Report' below to review the formatted output.\n"
+        "Approve to complete, or request revision for final adjustments.")
+
+
+def _seg_complete(run: dict):
+    run["stage"] = "completed"
+    _log(run, "Intelligence briefing complete and approved for use.")
+    _persist(run)
+
+
+# ----- revision handling -----
+
+def _handle_revision(run: dict, cp_name: str, feedback: str):
+    """Re-run the phase behind a checkpoint with the consultant's feedback,
+    then present the same checkpoint again. Bounded by the revision limit;
+    at the limit the run proceeds with the current version, matching the
+    pre-durable behaviour."""
+    if _revision_limit_hit(run, cp_name):
+        _log(run, "Revision limit reached - proceeding with the current version")
+        next_segment = _NEXT_SEGMENT.get(cp_name)
+        if next_segment:
+            next_segment(run)
+        return
+
+    company = run["company_name"]
+    ctx = _make_ctx(run)
+    model = get_bedrock_model()
+
+    if cp_name == "research_validation":
+        run["stage"] = "researching"
+        _persist(run)
+        _log(run, "Revising research with feedback...")
+        research = _revise_research(model, company, run["research"], feedback)
+        run["research"] = research
+        ctx.write_artifact("working", "research.json", json.dumps(research, indent=2).encode())
+        _log(run, "Research revised")
+        _checkpoint_research(run)
+
+    elif cp_name == "org_review":
+        run["stage"] = "analyzing_org"
+        _persist(run)
+        _log(run, "Revising org analysis...")
+        org_analysis = _revise_org_analysis(
+            model, company, run["research"], run["org_analysis"], feedback)
+        run["org_analysis"] = org_analysis
+        ctx.write_artifact("working", "org_analysis.json", json.dumps(org_analysis, indent=2).encode())
+        _log(run, "Org analysis revised")
+        _checkpoint_org(run)
+
+    elif cp_name == "opportunity_review":
+        run["stage"] = "identifying_opportunities"
+        _persist(run)
+        _log(run, "Revising opportunities...")
+        opportunities = _revise_opportunities(
+            model, company, run["research"], run["org_analysis"],
+            run["opportunities"], feedback)
+        run["opportunities"] = opportunities
+        ctx.write_artifact("working", "opportunities.json", json.dumps(opportunities, indent=2).encode())
+        _log(run, "Opportunities revised")
+        _checkpoint_opportunities(run)
+
+    elif cp_name == "briefing_review":
         run["stage"] = "generating_briefing"
-        briefing = _revise_briefing(model, briefing, revision)
-        html_report = _render_intelligence_report(model, company, research, briefing)
+        _persist(run)
+        _log(run, "Revising briefing...")
+        briefing = _revise_briefing(model, run["briefing"], feedback)
+        run["briefing"] = briefing
+        ctx.write_artifact("working", "briefing.md", briefing.encode())
+        _log(run, "Briefing revised")
+        _checkpoint_briefing(run)
+
+    elif cp_name == "final_review":
+        run["stage"] = "generating_briefing"
+        _persist(run)
+        _log(run, "Revising final report...")
+        briefing = _revise_briefing(model, run["briefing"], feedback)
+        run["briefing"] = briefing
+        html_report = _render_intelligence_report(model, company, run["research"], briefing)
+        run["report_html"] = html_report
         output_path = ctx.write_artifact("output", "intelligence_briefing.html", html_report.encode())
         run["output_path"] = output_path
         _log(run, "Report revised")
+        _checkpoint_final(run)
 
-    run["stage"] = "completed"
-    _log(run, "Intelligence briefing complete and approved for use.")
+
+# What approval at each checkpoint leads to.
+_NEXT_SEGMENT = {
+    "research_validation": _seg_org,
+    "org_review": _seg_opportunities,
+    "opportunity_review": _seg_briefing,
+    "briefing_review": _seg_render,
+    "final_review": _seg_complete,
+}
 
 
 # ============ LLM CALLS ============
@@ -888,8 +1046,11 @@ def _safe_str(s: str) -> str:
 
 
 def _log(run: dict, msg: str):
-    """Append a safe log entry."""
-    run["log"].append(_safe_str(msg))
+    """Append a safe log entry, bounding growth so runs stay persistable."""
+    log = run["log"]
+    log.append(_safe_str(msg))
+    if len(log) > 300:
+        del log[: len(log) - 300]
 
 
 def _record_guardrails(run: dict, result) -> None:
@@ -914,8 +1075,10 @@ def _revision_limit_hit(run: dict, checkpoint: str) -> bool:
     return False
 
 
-def _wait_for_checkpoint(run: dict, name: str, title: str, description: str) -> str | None:
-    """Wait for consultant response. Returns revision feedback if revision requested, None if approved."""
+def _set_checkpoint(run: dict, name: str, title: str, description: str) -> None:
+    """Park the run at a checkpoint and persist it. The segment's thread ends
+    here; approval or revision spawns the next one. The wait costs nothing
+    and survives restarts."""
     run["stage"] = "waiting_for_approval"
     run["current_checkpoint"] = {
         "name": name,
@@ -925,14 +1088,7 @@ def _wait_for_checkpoint(run: dict, name: str, title: str, description: str) -> 
         "requested_at": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
     }
     _log(run, f"Awaiting review: {title}")
-    while run["current_checkpoint"] is not None:
-        time.sleep(0.3)
-
-    # Check if a revision was requested
-    revision = run.pop("_revision_requested", None)
-    if revision and revision["checkpoint"] == name:
-        return revision["feedback"]
-    return None
+    _persist(run)
 
 
 def _get_feedback_for(run: dict, checkpoint_name: str) -> str | None:

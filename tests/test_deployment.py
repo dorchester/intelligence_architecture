@@ -118,7 +118,7 @@ def test_health_check_excluded_from_access_log():
 # ---------- runtime configuration ----------
 
 def _reload_runtime(monkeypatch, **env):
-    for key in ("AWS_PROFILE_NAME", "RUNS_BUCKET", "ENVIRONMENT", "DEPLOYED"):
+    for key in ("AWS_PROFILE_NAME", "AWS_PROFILE", "RUNS_BUCKET", "ENVIRONMENT", "DEPLOYED"):
         monkeypatch.delenv(key, raising=False)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
@@ -127,10 +127,18 @@ def _reload_runtime(monkeypatch, **env):
     return importlib.reload(rt)
 
 
-def test_profile_is_none_when_unset(monkeypatch):
-    """In a container there is no named profile — boto3 must use the role."""
-    rt = _reload_runtime(monkeypatch)
+def test_container_uses_instance_role_not_profile(monkeypatch):
+    """When DEPLOYED, no named profile — boto3 must use the instance role."""
+    rt = _reload_runtime(monkeypatch, DEPLOYED="1")
     assert rt.AWS_PROFILE is None
+    assert rt.is_deployed() is True
+
+
+def test_local_dev_defaults_to_project_profile(monkeypatch):
+    """On a laptop the SSO profile must engage without any env setup —
+    this regressed once and silently broke every local preset run."""
+    rt = _reload_runtime(monkeypatch)
+    assert rt.AWS_PROFILE == "intelligence-dev"
     assert rt.is_deployed() is False
 
 

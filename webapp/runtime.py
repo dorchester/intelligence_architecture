@@ -23,10 +23,15 @@ from guardrails.engine import GuardrailEngine  # noqa: E402
 # model Claude Code uses for engineering).
 DEFAULT_MODEL = os.environ.get("ENGINE_MODEL_ID", "us.anthropic.claude-sonnet-4-6")
 
-# On a laptop, credentials come from a named SSO profile. In a container they
-# come from the App Runner instance role, and there is no profile at all —
-# boto3 must be allowed to fall through to the default chain.
-AWS_PROFILE = os.environ.get("AWS_PROFILE_NAME") or None
+# On a laptop, credentials come from a named SSO profile — defaulting to the
+# project profile so local development works out of the box. In a container
+# (DEPLOYED set) there is no profile at all and boto3 must fall through to
+# the instance role.
+AWS_PROFILE = (
+    os.environ.get("AWS_PROFILE_NAME")
+    or os.environ.get("AWS_PROFILE")
+    or (None if os.environ.get("DEPLOYED") else "intelligence-dev")
+)
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
 STORAGE_STACK = f"intelligence-engine-{ENVIRONMENT}-storage"
@@ -128,5 +133,25 @@ def list_preset_companies() -> list[dict]:
 
 
 def active_run_count() -> int:
-    terminal = ("completed", "rejected", "error", "blocked")
+    terminal = ("completed", "rejected", "error", "blocked", "interrupted")
     return sum(1 for r in runs.values() if r["stage"] not in terminal)
+
+
+_run_store = None
+_run_store_checked = False
+
+
+def get_run_store():
+    """Durable run persistence, or None when DynamoDB is unreachable.
+
+    Checked once per process: local dev without credentials degrades to
+    in-memory runs, silently and completely.
+    """
+    global _run_store, _run_store_checked
+    if not _run_store_checked:
+        _run_store_checked = True
+        from webapp.run_store import RunStore
+
+        store = RunStore()
+        _run_store = store if store.available() else None
+    return _run_store
