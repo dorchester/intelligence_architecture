@@ -46,11 +46,24 @@ retrofitted onto it:
 | `waitForTaskToken` | A polling loop | A 7-day wait costs nothing to hold |
 | Auto-stopping workbench | A persistent dev box | Forgetting it costs the volume only |
 
-Free tier covers most of it and pay-per-use covers the rest. **One component
-carries a standing cost: App Runner, roughly $5–10/month** for provisioned
+Everything above is free-tier eligible or pay-per-use except one component:
+**App Runner carries a standing cost of roughly $5–10/month** for provisioned
 container memory, billed whether anyone signs in or not. Deleting that one
 stack removes it without touching data — see
 [Hosted on AWS](#hosted-on-aws).
+
+To be exact about the evidence: the figures here are **published AWS rates and
+architectural choices, not a reading off this account's bill.** Cost Explorer
+is not enabled on the sandbox and turning it on is a billing-configuration
+change this project does not make on its own. Verify with your own numbers:
+
+```bash
+python scripts/bedrock_usage.py --profile intelligence-dev   # tokens + inference cost
+```
+
+What *is* measured is the shape that drives the bill — stages that exit in
+seconds, waits that hold no compute, an instance that stops itself, and no
+resource anywhere that bills for being idle.
 
 The discipline is the point. An architecture that only works with a NAT
 gateway and a provisioned cluster cannot be evaluated by one engineer on a
@@ -293,6 +306,7 @@ scripts/
   data_generation/  company archetypes + generator
   bedrock_usage.py  CloudWatch tokens + Cost Explorer
   export_samples.py refresh docs/samples from S3
+  qa_sweep.py       read-only health check over every deployed stack
 docs/
   architecture-report.html   full visual walkthrough
   samples/                   real output, no AWS needed
