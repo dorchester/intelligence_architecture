@@ -31,6 +31,14 @@ from _aws import config, session
 MAX_CONCURRENCY = 6
 MAX_ATTEMPTS = 5
 
+# A cacheable prefix shorter than the model's minimum is accepted by the API
+# and then silently ignored - no error, no warning, and usage simply reports
+# zero cache activity. That is the worst failure shape available: the code
+# looks correct, the cost saving never arrives, and nothing points at why.
+# Haiku requires 2048 tokens; Sonnet 1024. Assume the stricter bound.
+MIN_CACHEABLE_TOKENS = 2048
+_warned_short_prefix = set()
+
 _sem = threading.Semaphore(MAX_CONCURRENCY)
 _client = None
 _lock = threading.Lock()
@@ -72,6 +80,15 @@ def invoke(system_prefix: str, user_text: str, *, model_key: str = "model_profil
     """
     system = [{"type": "text", "text": system_prefix}]
     if cache_prefix:
+        approx_tokens = len(system_prefix) // 4
+        if approx_tokens < MIN_CACHEABLE_TOKENS:
+            key = system_prefix[:60]
+            if key not in _warned_short_prefix:
+                _warned_short_prefix.add(key)
+                print(f"WARNING: cacheable prefix is ~{approx_tokens:,} tokens, "
+                      f"below the {MIN_CACHEABLE_TOKENS:,}-token minimum. "
+                      f"cache_control will be ignored and every call billed in "
+                      f"full. Lengthen the shared prefix or stop marking it.")
         system[0]["cache_control"] = {"type": "ephemeral"}
 
     payload = {

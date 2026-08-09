@@ -146,6 +146,88 @@ and buy for roles standing up something the company does not yet do.
 "Health Economics Lead" with HEOR and modelling skills -> Commercial /
   scarce / buy.
 
+=== FURTHER WORKED EXAMPLES ===
+Consistency across batches is the whole point of this list. When a title
+resembles one below, classify it the same way.
+
+"Associate Director, Pharmacovigilance" with signal detection and case
+  processing skills -> Clinical / scarce / buy. PV leadership is a small,
+  contested pool and carries personal regulatory accountability.
+"Manufacturing Technician II" with aseptic and batch record skills ->
+  Manufacturing / common / build. Site-specific procedure knowledge dominates.
+"Patent Counsel" with prosecution and freedom-to-operate skills -> Corporate
+  Functions / scarce / buy. Qualified pharma IP attorneys are few and
+  portable between employers.
+"Sales Representative, Specialty" with territory and account skills ->
+  Commercial / common / build.
+"Biostatistician" with SAS, mixed models and submissions skills -> Clinical /
+  specialised / buy.
+"Head of Talent Acquisition" with recruiting and employer brand skills ->
+  Corporate Functions / specialised / build.
+"Validation Engineer" with CSV, IQ/OQ/PQ and tech transfer skills ->
+  Manufacturing / specialised / build.
+"Cloud Platform Engineer" with Kubernetes, Terraform and observability skills
+  -> Technology / specialised / buy.
+"Medical Science Liaison" with KOL engagement and therapeutic area skills ->
+  Clinical / specialised / buy. Relationships travel with the person.
+"Financial Analyst, FP&A" with forecasting and variance skills -> Corporate
+  Functions / common / build.
+"Director, CMC Regulatory Affairs (Biologics)" -> Regulatory / scarce / buy.
+  The intersection of biologics and CMC filings is the scarcest regulatory
+  skill in the sector.
+"Warehouse Supervisor" with GDP and inventory skills -> Manufacturing /
+  common / build.
+"Principal Machine Learning Scientist" with molecular property prediction
+  skills -> Technology / scarce / buy.
+"Clinical Data Manager" with EDC, CDISC and query management skills ->
+  Clinical / specialised / build.
+"Brand Manager" with launch planning and omnichannel skills -> Commercial /
+  specialised / buy.
+"Executive Assistant" -> Corporate Functions / common / build.
+"Qualified Person (QP)" with batch release skills -> Regulatory / scarce /
+  buy. Statutory role, tiny national pool.
+
+=== WHY THESE DIMENSIONS ===
+Read this before classifying; it resolves most borderline cases on its own.
+
+capability_area exists to answer "which part of the operating model does this
+person belong to". It is about the work, not the reporting line. A finance
+business partner embedded in a manufacturing site is Corporate Functions,
+because the work is finance. A process engineer reporting into a corporate
+technical function is Manufacturing, because the work is process.
+
+scarcity exists to answer "how long would replacing this take, and how
+contested is the hire". It is a statement about the external market, never
+about performance, never about seniority, and never about how important the
+role feels internally. A chief of staff is important and not scarce. A single
+qualified person is unremarkable in the hierarchy and extremely scarce.
+
+build_or_buy exists to answer "where should the organisation put its effort
+if it needs more of this". Build means internal development is the faster and
+cheaper route because company-specific knowledge dominates. Buy means the
+market can supply it faster than internal development, usually because the
+skill transfers cleanly between employers.
+
+The three interact. Scarce and buy together signal an acquisition problem
+that money alone may not solve, and those roles carry the highest
+single-point-of-failure risk. Scarce and build together signal a succession
+problem: the capability exists internally and cannot be replaced quickly from
+outside, so losing the holder is expensive. Common and buy together is the
+lowest-risk combination and rarely needs comment in an analysis.
+
+Apply the taxonomy mechanically. Do not editorialise, do not hedge, and do
+not add fields. A downstream stage counts these classifications and any
+deviation from the six areas or three scarcity levels corrupts the totals.
+
+=== EDGE HANDLING ===
+If a title is ambiguous or generic ("Analyst", "Manager", "Specialist" with
+no qualifier), use the department field to decide capability_area, default
+scarcity to common, and default build_or_buy to build.
+If skills contradict the title, trust the skills.
+If a profile appears to sit across two areas, choose the one its skills
+support most, never a blend.
+Never invent a category outside the six listed. Never leave a field blank.
+
 === OUTPUT ===
 Reply with JSON only, a list of objects, one per profile, in the order given:
   {"i": <index>, "capability_area": "...", "scarcity": "...", "build_or_buy": "..."}
