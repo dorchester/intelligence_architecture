@@ -151,9 +151,10 @@
         </div>
     </div>
 
-    <!-- View toggle -->
-    <div style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
-        <a href="/run/{{ run.run_id }}/engineer" style="font-size:0.72rem; color:var(--text-muted); text-decoration:none; padding:0.35rem 0.75rem; border:1px solid var(--border); border-radius:6px; transition:all 0.15s;" onmouseover="this.style.color='var(--cyan)';this.style.borderColor='var(--cyan)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border)'">Engineer View</a>
+    <!-- Nav -->
+    <div style="display:flex; justify-content:flex-end; margin-bottom:1rem; gap:0.5rem;">
+        <a href="/engineer/run/{{ run.run_id }}" style="font-size:0.72rem; color:var(--text-muted); text-decoration:none; padding:0.35rem 0.75rem; border:1px solid var(--border); border-radius:6px;">Inspect</a>
+        <a href="/engineer" style="font-size:0.72rem; color:var(--text-muted); text-decoration:none; padding:0.35rem 0.75rem; border:1px solid var(--border); border-radius:6px;">Engineer Dashboard</a>
     </div>
 
     <!-- Progress segments (5 checkpoints) -->

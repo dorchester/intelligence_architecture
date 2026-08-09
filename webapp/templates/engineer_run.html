@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inspect {{ run.run_id[:8] }} — Engineer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0c10; --surface: #12151c; --card: #161921; --border: #262d3d;
+            --text: #f1f3f5; --text-secondary: #a1a9bc; --text-muted: #6b7280;
+            --blue: #3b82f6; --green: #10b981; --purple: #8b5cf6; --orange: #f59e0b; --cyan: #06b6d4; --red: #ef4444;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+        .shell { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+        .back-link { display: inline-block; color: var(--text-muted); text-decoration: none; font-size: 0.8rem; font-weight: 500; margin-bottom: 1.5rem; }
+        .back-link:hover { color: var(--text); }
+        h1 { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.25rem; }
+        .subtitle { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 2rem; }
+        .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.25rem; }
+        .panel h3 { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.75rem; }
+        .kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.6rem; }
+        .kv-item {}
+        .kv-label { font-size: 0.68rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .kv-value { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--text); margin-top: 0.1rem; word-break: break-all; }
+        .kv-value.cyan { color: var(--cyan); }
+        .kv-value.green { color: var(--green); }
+        .kv-value.orange { color: var(--orange); }
+
+        .artifact-list { list-style: none; }
+        .artifact-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.45rem 0; border-bottom: 1px solid rgba(38,45,61,0.4); font-size: 0.78rem; }
+        .artifact-item:last-child { border-bottom: none; }
+        .artifact-badge { font-size: 0.63rem; font-weight: 700; padding: 0.12rem 0.4rem; border-radius: 3px; text-transform: uppercase; }
+        .artifact-badge.input { background: rgba(59,130,246,0.1); color: var(--blue); }
+        .artifact-badge.working { background: rgba(245,158,11,0.1); color: var(--orange); }
+        .artifact-badge.output { background: rgba(16,185,129,0.1); color: var(--green); }
+        .artifact-path { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-secondary); }
+
+        .cp-item { padding: 0.6rem 0; border-bottom: 1px solid rgba(38,45,61,0.4); }
+        .cp-item:last-child { border-bottom: none; }
+        .cp-head { display: flex; align-items: center; gap: 0.6rem; }
+        .cp-name { font-size: 0.82rem; font-weight: 600; }
+        .cp-badge { font-size: 0.63rem; font-weight: 700; padding: 0.12rem 0.4rem; border-radius: 3px; text-transform: uppercase; }
+        .cp-badge.approved { background: rgba(16,185,129,0.1); color: var(--green); }
+        .cp-badge.rejected { background: rgba(239,68,68,0.1); color: var(--red); }
+        .cp-badge.pending { background: rgba(245,158,11,0.1); color: var(--orange); }
+        .cp-feedback { font-size: 0.78rem; color: var(--purple); font-style: italic; margin-top: 0.2rem; }
+        .cp-time { font-size: 0.7rem; color: var(--text-muted); margin-top: 0.1rem; }
+
+        .log-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; max-height: 400px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; line-height: 1.8; }
+        .log-box .l { color: var(--text-secondary); }
+        .log-box .l.fb { color: var(--purple); }
+        .log-box .l.ok { color: var(--green); }
+        .log-box .l.err { color: var(--red); }
+
+        .research-block { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; font-size: 0.78rem; color: var(--text-secondary); max-height: 300px; overflow-y: auto; white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <a href="/engineer" class="back-link">&larr; Engineer Dashboard</a>
+
+    <h1>{{ run.company_name }}</h1>
+    <p class="subtitle">Run <code style="color:var(--cyan);">{{ run.run_id }}</code></p>
+
+    <!-- Run metadata -->
+    <div class="panel">
+        <h3>Run Configuration</h3>
+        <div class="kv-grid">
+            <div class="kv-item"><div class="kv-label">Run ID</div><div class="kv-value cyan">{{ run.run_id }}</div></div>
+            <div class="kv-item"><div class="kv-label">Company</div><div class="kv-value">{{ run.company_name }}</div></div>
+            <div class="kv-item"><div class="kv-label">Stage</div><div class="kv-value {% if run.stage == 'completed' %}green{% elif run.stage == 'rejected' %}{% else %}orange{% endif %}">{{ run.stage }}</div></div>
+            <div class="kv-item"><div class="kv-label">Model</div><div class="kv-value cyan">{{ run.model_used or 'pending' }}</div></div>
+            <div class="kv-item"><div class="kv-label">Created</div><div class="kv-value">{{ run.created_at }}</div></div>
+            <div class="kv-item"><div class="kv-label">Context</div><div class="kv-value">{{ run.engagement_context or '—' }}</div></div>
+        </div>
+    </div>
+
+    <!-- Research data -->
+    {% if run.research %}
+    <div class="panel">
+        <h3>Research Output (Raw JSON)</h3>
+        <div class="research-block">{{ run.research | tojson(indent=2) }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Checkpoints -->
+    <div class="panel">
+        <h3>Checkpoints ({{ run.checkpoints | length }} resolved{% if run.current_checkpoint %}, 1 pending{% endif %})</h3>
+        {% for cp in run.checkpoints %}
+        <div class="cp-item">
+            <div class="cp-head">
+                <span class="cp-name">{{ cp.title }}</span>
+                <span class="cp-badge {{ cp.status }}">{{ cp.status }}</span>
+            </div>
+            {% if cp.feedback %}<div class="cp-feedback">"{{ cp.feedback }}"</div>{% endif %}
+            {% if cp.resolved_at %}<div class="cp-time">{{ cp.resolved_at }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        {% if run.current_checkpoint %}
+        <div class="cp-item">
+            <div class="cp-head">
+                <span class="cp-name">{{ run.current_checkpoint.title }}</span>
+                <span class="cp-badge pending">pending</span>
+            </div>
+            <div class="cp-time">since {{ run.current_checkpoint.requested_at }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Artifacts -->
+    <div class="panel">
+        <h3>Artifacts ({{ run.artifacts | length }})</h3>
+        {% if run.artifacts %}
+        <ul class="artifact-list">
+            {% for path in run.artifacts %}
+            {% set parts = path.replace('\\', '/').split('/') %}
+            {% set cat = parts[-2] if parts | length > 1 else 'unknown' %}
+            <li class="artifact-item">
+                <span class="artifact-badge {{ cat }}">{{ cat }}</span>
+                <span class="artifact-path">{{ parts[-1] }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p style="font-size:0.8rem; color:var(--text-muted);">No artifacts yet</p>
+        {% endif %}
+    </div>
+
+    <!-- Full log -->
+    <div class="panel">
+        <h3>Execution Log ({{ run.log | length }} entries)</h3>
+        <div class="log-box">
+            {% for entry in run.log %}
+            <div class="l{% if 'feedback' in entry.lower() or 'direction' in entry.lower() %} fb{% elif 'complete' in entry.lower() or 'generated' in entry.lower() or 'saved' in entry.lower() %} ok{% elif 'error' in entry.lower() %} err{% endif %}">{{ entry }}</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% if run.stage not in ['completed', 'rejected'] %}
+<script>setTimeout(() => location.reload(), 4000);</script>
+{% endif %}
+</body>
+</html>

@@ -82,12 +82,34 @@ def run_status(run_id: str):
     return render_template("run.html", run=run)
 
 
-@app.route("/run/<run_id>/engineer")
-def engineer_view(run_id: str):
+@app.route("/engineer")
+def engineer_dashboard():
+    """Top-level engineer dashboard showing system state, all runs, infrastructure."""
+    runs_list = sorted(runs.values(), key=lambda r: r["created_at"], reverse=True)
+    active_runs = sum(1 for r in runs.values() if r["stage"] not in ["completed", "rejected", "waiting_for_approval", "initialized"])
+    total_llm_calls = sum(len([e for e in r.get("log", []) if "Bedrock" in e or "generated" in e.lower()]) for r in runs.values())
+    bedrock_status = "connected"
+    try:
+        get_bedrock_model()
+    except Exception:
+        bedrock_status = "error"
+    return render_template("engineer.html",
+        runs=runs.values(),
+        runs_list=runs_list,
+        active_runs=active_runs,
+        total_llm_calls=total_llm_calls,
+        runs_dir=str(RUNS_DIR),
+        bedrock_status=bedrock_status,
+    )
+
+
+@app.route("/engineer/run/<run_id>")
+def engineer_inspect(run_id: str):
+    """Engineer detail view for a single run."""
     run = runs.get(run_id)
     if not run:
         return "Run not found", 404
-    return render_template("engineer.html", run=run)
+    return render_template("engineer_run.html", run=run)
 
 
 @app.route("/run/<run_id>/approve", methods=["POST"])
