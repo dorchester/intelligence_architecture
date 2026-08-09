@@ -7,6 +7,7 @@ Keeping this separate lets the two consoles live in different modules
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -14,16 +15,39 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-RUNS_DIR = BASE_DIR / "runs"
+RUNS_DIR = Path(os.environ.get("RUNS_DIR", BASE_DIR / "runs"))
 
 from guardrails.engine import GuardrailEngine  # noqa: E402
 
 # Default runtime model for the Intelligence Engine (distinct from the
 # model Claude Code uses for engineering).
-DEFAULT_MODEL = "us.anthropic.claude-sonnet-4-6"
-AWS_PROFILE = "intelligence-dev"
-AWS_REGION = "us-east-1"
-STORAGE_STACK = "intelligence-engine-dev-storage"
+DEFAULT_MODEL = os.environ.get("ENGINE_MODEL_ID", "us.anthropic.claude-sonnet-4-6")
+
+# On a laptop, credentials come from a named SSO profile. In a container they
+# come from the App Runner instance role, and there is no profile at all —
+# boto3 must be allowed to fall through to the default chain.
+AWS_PROFILE = os.environ.get("AWS_PROFILE_NAME") or None
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
+STORAGE_STACK = f"intelligence-engine-{ENVIRONMENT}-storage"
+
+# When deployed, the bucket is injected directly so the task role does not
+# need cloudformation:DescribeStacks just to find its own bucket.
+RUNS_BUCKET = os.environ.get("RUNS_BUCKET") or None
+
+
+def _session(**kwargs):
+    """boto3 Session honouring the profile only when one is configured."""
+    import boto3
+
+    if AWS_PROFILE:
+        kwargs["profile_name"] = AWS_PROFILE
+    return boto3.Session(region_name=AWS_REGION, **kwargs)
+
+
+def is_deployed() -> bool:
+    """True when running as the deployed App Runner service."""
+    return bool(os.environ.get("DEPLOYED"))
 
 # In-memory run registry. Production would back this with DynamoDB.
 runs: dict[str, dict] = {}
@@ -45,23 +69,28 @@ def dataset_error() -> str | None:
     return _dataset_error
 
 
+def resolve_bucket() -> str:
+    """Bucket name from the environment, falling back to the stack output."""
+    if RUNS_BUCKET:
+        return RUNS_BUCKET
+    cfn = _session().client("cloudformation")
+    resp = cfn.describe_stacks(StackName=STORAGE_STACK)
+    return next(
+        o["OutputValue"]
+        for o in resp["Stacks"][0]["Outputs"]
+        if o["OutputKey"] == "BucketName"
+    )
+
+
 def get_dataset_query():
     """Return a DatasetQuery bound to the project bucket, or None."""
     global _dataset_query, _dataset_error
     if _dataset_query is not None:
         return _dataset_query
     try:
-        import boto3
         from datasets.query import DatasetQuery
 
-        session = boto3.Session(profile_name=AWS_PROFILE, region_name=AWS_REGION)
-        cfn = session.client("cloudformation")
-        resp = cfn.describe_stacks(StackName=STORAGE_STACK)
-        bucket = next(
-            o["OutputValue"]
-            for o in resp["Stacks"][0]["Outputs"]
-            if o["OutputKey"] == "BucketName"
-        )
+        bucket = resolve_bucket()
         limits = guardrails.dataset_limits()
         _dataset_query = DatasetQuery(
             bucket=bucket,

@@ -73,11 +73,47 @@ python scripts/bedrock_usage.py --profile intelligence-dev --hours 24
 6. `provider_data_share` enabled — sandbox only.
 7. Claude Fable 5 unavailable for this account (external AWS limitation).
 
+## Hosting
+
+The console is deployable as an App Runner service behind a Cognito login, in
+one command: `./infrastructure/deploy.sh --with-app`.
+
+| Piece | Where |
+|---|---|
+| Container image | `Dockerfile` — single worker, non-root, port 8080 |
+| Registry | `cloudformation/ecr.yaml` — scan on push, keeps 5 images |
+| Build | `cloudformation/build.yaml` — CodeBuild, so no local Docker is needed |
+| Service + identity | `cloudformation/app.yaml` — App Runner, Cognito, IAM roles |
+
+Three things are worth knowing about this deployment.
+
+**It is pinned to one instance.** `MaxSize: 1` in the autoscaling config is
+load-bearing, not conservatism. Run state and the threads executing each phase
+live in the process, so a second instance would not see a run started by the
+first. Moving run state to DynamoDB is what unlocks scaling, and it remains the
+top item below.
+
+**The callback URL needs two passes.** Cognito needs the App Runner URL, which
+does not exist until the service is created. `deploy.sh` deploys the app stack
+with a placeholder, reads the service URL, and deploys again with the real
+value. Idempotent, and re-running it is harmless.
+
+**It is the only standing cost in the project.** App Runner bills for
+provisioned container memory whether or not anyone is using the service —
+roughly $5–10/month. Deleting the `-app` stack removes that cost and leaves
+storage, datasets, and run state untouched.
+
+The instance role grants `bedrock:InvokeModel` on Claude models, read/write on
+the single project bucket, four actions on the single table, and
+`DescribeUserPoolClient` on its own Cognito client. `tests/test_deployment.py`
+asserts no policy contains a wildcard action and no template contains a literal
+account ID.
+
 ## Next
 
-1. Wire the web app to DynamoDB so runs survive restart
-2. Containerize and deploy to App Runner behind SSO
-3. CI/CD with secret scanning and staged promotion
-4. AgentCore Runtime for session suspend/resume at checkpoints
-5. Least-privilege IAM roles per persona
-6. VPC endpoints for Bedrock, S3, DynamoDB
+1. Wire the web app to DynamoDB so runs survive restart — and unpin the instance count
+2. CI/CD with secret scanning and staged promotion
+3. AgentCore Runtime for session suspend/resume at checkpoints
+4. Least-privilege IAM roles per persona
+5. VPC endpoints for Bedrock, S3, DynamoDB
+6. Custom domain and firm SSO federated into the Cognito pool

@@ -10,7 +10,7 @@ workforce, change). Enter a company → verify it's real → load workforce data
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                          # 46 tests, no AWS
+pytest -q                          # 61 tests, no AWS
 python webapp/app.py               # consultant → :5000, engineer → :5000/engineer
 ENGINEER_CONSOLE=0 python webapp/app.py   # consultant only
 ```
@@ -20,10 +20,19 @@ ENGINEER_CONSOLE=0 python webapp/app.py   # consultant only
 ```bash
 aws sso login --profile intelligence-dev   # expires often; refresh first
 aws sts get-caller-identity --profile intelligence-dev
-./infrastructure/deploy.sh                 # all three stacks
+./infrastructure/deploy.sh                 # base stacks
+./infrastructure/deploy.sh --with-app      # + hosted console (costs ~$5-10/mo)
 ```
 
-Region `us-east-1`. Stacks: `intelligence-engine-dev-{storage,state,observability}`.
+Region `us-east-1`. Stacks:
+`intelligence-engine-dev-{storage,state,observability,ecr,build,app}`.
+
+`--with-app` builds the image (local Docker, or CodeBuild when Docker is
+absent), creates App Runner + Cognito, then re-deploys the app stack a second
+time to bind Cognito's callback to the service URL — that second pass is not a
+bug, the URL does not exist until the service does.
+
+**Only `-app` has a standing cost.** Delete that stack to stop it; data survives.
 
 **Datasets are already generated and in S3** — 20 companies, 10,000 profiles,
 10,000 postings. Regenerate only if needed:
@@ -37,6 +46,8 @@ python scripts/data_generation/generate_all.py --profile intelligence-dev
 webapp/app.py       consultant console + orchestration (4 LLM phases, 5 checkpoints)
 webapp/engineer.py  engineer console — separate Blueprint at /engineer
 webapp/runtime.py   shared state (runs dict, guardrails, AWS accessors)
+webapp/auth.py      Cognito login — inert unless COGNITO_* env vars are set
+Dockerfile          console image; single worker on purpose (in-process runs)
 guardrails/         YAML-configured rule engine, 14 rules
 datasets/query.py   S3 dataset access + ~30 workforce signals
 agent/              Bedrock wrapper, RunContext
@@ -89,12 +100,18 @@ and `webapp/runtime.py:DEFAULT_MODEL`.
   which is partial, showing a false "-67% slowing". Now compares only complete
   quarters (`quarters[1:-1]`).
 - **SSO expires constantly.** If anything AWS fails, check credentials first.
+- **No profile in the container.** `AWS_PROFILE_NAME` is unset when deployed so
+  boto3 falls through to the instance role. Never pass `profile_name` directly —
+  go through `runtime._session()` or accept `profile: str | None`.
+- **App Runner must stay at one instance.** Run state and the phase threads are
+  in-process. `MaxSize: 1` in `app.yaml` is load-bearing, and a test asserts it.
 
 ## Testing
 
 ```bash
 pytest -q                                              # all
 pytest tests/test_guardrails.py -q                     # 29 guardrail tests
+pytest tests/test_deployment.py -q                     # templates, IAM, container
 python scripts/bedrock_usage.py --profile intelligence-dev --hours 24
 ```
 

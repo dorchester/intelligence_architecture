@@ -37,8 +37,10 @@ the model and regenerates that phase. Revision is a loop, not a dead end.
 
 | URL | Who | What they see |
 |---|---|---|
-| `localhost:5000` | **Consultant** | Client list, progress, checkpoints, the briefing. No infrastructure. |
-| `localhost:5000/engineer` | **Engineer** | System state, run traces, guardrail editor, dataset browser, the exact LLM context. |
+| `/` | **Consultant** | Client list, progress, checkpoints, the briefing. No infrastructure. |
+| `/engineer` | **Engineer** | System state, run traces, guardrail editor, dataset browser, the exact LLM context. |
+
+Locally that is `localhost:5000`; deployed it is the App Runner URL behind Cognito.
 
 They are separate Flask blueprints in separate modules. Consultant templates
 contain zero links to the engineer console, and it can be switched off entirely
@@ -50,7 +52,7 @@ with `ENGINEER_CONSOLE=0`.
 
 ```bash
 pip install -e ".[dev]"
-pytest -q                    # 46 tests, no AWS needed
+pytest -q                    # 61 tests, no AWS needed
 python webapp/app.py         # → http://localhost:5000
 ```
 
@@ -61,9 +63,45 @@ name. The 20 preset clients and their workforce datasets require S3.
 
 ```bash
 aws sso login --profile intelligence-dev
-./infrastructure/deploy.sh                                  # all three stacks
+./infrastructure/deploy.sh                                  # base stacks
 python scripts/data_generation/generate_all.py --profile intelligence-dev
 python webapp/app.py
+```
+
+The app runs locally and calls Bedrock, S3, and DynamoDB with your credentials.
+
+### Hosted on AWS
+
+```bash
+./infrastructure/deploy.sh --with-app
+```
+
+One command takes it from nothing to a working HTTPS URL: base stacks, ECR
+repository, container image, App Runner service, and a Cognito user pool. The
+console is then reachable from anywhere, behind a login.
+
+**No Docker required.** If Docker is running locally the image is built there;
+if not, the script falls back to a CloudFormation-managed CodeBuild project that
+builds inside AWS from committed state. Force either with `--build local` or
+`--build remote`.
+
+Cognito allows no self-signup, so create your own login once:
+
+```bash
+aws cognito-idp admin-create-user --profile intelligence-dev \
+  --user-pool-id <UserPoolId from the stack outputs> \
+  --username you@example.com \
+  --user-attributes Name=email,Value=you@example.com Name=email_verified,Value=true
+```
+
+**This is the one thing in the project with a standing monthly cost** — roughly
+**$5–10** for App Runner's provisioned container memory, billed whether or not
+anyone uses it. Everything else is pay-per-use and idles at zero. Tear the
+hosting down without touching your data:
+
+```bash
+aws cloudformation delete-stack --stack-name intelligence-engine-dev-app \
+  --profile intelligence-dev
 ```
 
 ---
@@ -133,6 +171,7 @@ webapp/
   app.py            consultant console + run orchestration
   engineer.py       engineer console (blueprint)
   runtime.py        shared state, avoids circular import
+  auth.py           Cognito login; inert unless deployed
 guardrails/
   engine.py         rule enforcement
   config.yaml       the tuning surface
@@ -141,9 +180,12 @@ datasets/
 agent/              Bedrock wrapper, run context
 storage/            local + S3 backends, one interface
 state/              DynamoDB run lifecycle
+Dockerfile          console image (single worker, non-root)
 infrastructure/
-  deploy.sh         deploy every stack
-  cloudformation/   storage, state, observability, optional logging
+  deploy.sh         deploy every stack, optionally the hosted console
+  build_and_push.sh build the image locally and push to ECR
+  remote_build.sh   build it in AWS instead, via CodeBuild
+  cloudformation/   storage, state, observability, ecr, build, app, logging
 scripts/
   data_generation/  company archetypes + generator
   bedrock_usage.py  CloudWatch tokens + Cost Explorer
@@ -151,7 +193,7 @@ scripts/
 docs/
   architecture-report.html   full visual walkthrough
   samples/                   real output, no AWS needed
-tests/                       46 tests
+tests/                       61 tests
 ```
 
 ---
@@ -165,9 +207,20 @@ All CloudFormation-managed, tagged `Application=intelligence-engine`.
 | `…-dev-storage` | S3 bucket — versioned, AES-256, TLS-only, private | per GB |
 | `…-dev-state` | DynamoDB — on-demand, PITR, client_id GSI | per request |
 | `…-dev-observability` | CloudWatch dashboard — tokens, latency, cache, errors | free |
+| `…-dev-ecr` | ECR repository — scan on push, keeps 5 images | per GB |
+| `…-dev-build` | CodeBuild project — builds the image in AWS | per build (~2¢) |
+| `…-dev-app` | App Runner service + Cognito user pool | **~$5–10/mo** |
+
+The first four idle at zero. `…-dev-app` is the only standing cost, and deleting
+that one stack removes it without touching data or datasets.
 
 Runtime uses Bedrock on-demand: Claude Sonnet 4.6 for the engine, Haiku 4.5 for
 entity verification.
+
+The App Runner instance role is scoped deliberately: `bedrock:InvokeModel` on
+Claude models only, read/write on the one bucket, four actions on the one table,
+and `DescribeUserPoolClient` on its own Cognito client. No wildcard actions —
+there is a test asserting it.
 
 No account IDs appear anywhere in this repository.
 
@@ -191,7 +244,10 @@ Stated plainly:
 
 - **Run state is in-memory.** The DynamoDB table exists and the CLI orchestrator
   uses it, but the web app keeps runs in a process dictionary. Restarting loses
-  history.
+  history. This is also why the App Runner service is pinned to a single
+  instance — a second instance would not see runs started by the first. Moving
+  run state to DynamoDB is the prerequisite for scaling, and it is the next
+  substantial piece of work.
 - **Research is model knowledge, not live retrieval.** Facts come from training
   data and are bounded by the cutoff. Checkpoint 1 exists precisely so a
   consultant validates them.

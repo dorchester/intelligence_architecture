@@ -243,6 +243,7 @@ footer p{font-size:.76rem;color:var(--text-3);margin-bottom:.25rem}
   <a href="#separation">Separation of Concerns</a>
   <a href="#components">Components</a>
   <a href="#aws">AWS Resources</a>
+  <a href="#deployment">Hosted Deployment</a>
   <a href="#running">Running It</a>
   <a href="#corporate">Corporate Path</a>
   <a href="#limits">Known Limits</a>
@@ -938,6 +939,24 @@ footer p{font-size:.76rem;color:var(--text-3);margin-bottom:.25rem}
         <td>Prepared but <strong>disabled</strong> — it captures full prompts and responses</td>
       </tr>
       <tr>
+        <td><code>…-dev-ecr</code></td>
+        <td><strong>ECR repository</strong><br>console image</td>
+        <td>Per GB</td>
+        <td>Scan on push, AES-256, lifecycle policy keeps the 5 most recent images</td>
+      </tr>
+      <tr>
+        <td><code>…-dev-build</code></td>
+        <td><strong>CodeBuild project</strong><br>builds the image in AWS</td>
+        <td>Per build (~2¢)</td>
+        <td>Removes the local Docker requirement entirely; builds from committed state</td>
+      </tr>
+      <tr>
+        <td><code>…-dev-app</code></td>
+        <td><strong>App Runner + Cognito</strong><br>hosted console</td>
+        <td><strong>~$5–10/month standing</strong></td>
+        <td>Pinned to one instance, scoped instance role, HTTPS terminated upstream, login required</td>
+      </tr>
+      <tr>
         <td>runtime</td>
         <td><strong>Amazon Bedrock</strong></td>
         <td>Per token</td>
@@ -947,13 +966,74 @@ footer p{font-size:.76rem;color:var(--text-3);margin-bottom:.25rem}
   </table>
   </div>
 
-  <p>All resources tagged <code>Application=intelligence-engine</code>, <code>Environment=dev</code>, <code>ManagedBy=cloudformation</code>.</p>
+  <p>All resources tagged <code>Application=intelligence-engine</code>, <code>Environment=dev</code>, <code>ManagedBy=cloudformation</code>. Every stack except <code>…-dev-app</code> idles at zero cost.</p>
+</section>
+
+<!-- ============ DEPLOYMENT ============ -->
+<section id="deployment">
+  <div class="sec-head">
+    <div class="sec-num">11</div>
+    <h2>Hosted Deployment</h2>
+    <p>One command from an empty account to an HTTPS URL behind a login.</p>
+  </div>
+
+<pre><code>./infrastructure/deploy.sh --with-app</code></pre>
+
+  <p>That runs five phases: the three base stacks, then the registry and build
+  project, then the image, then App Runner and Cognito, then a second pass that
+  binds Cognito's callback to the service URL.</p>
+
+  <div class="tri">
+    <div class="tri-c">
+      <h4>Why one instance</h4>
+      <ul>
+        <li>Run state lives in the process</li>
+        <li>Phase execution is a background thread</li>
+        <li>A second instance would not see run one</li>
+        <li><code>MaxSize: 1</code> is load-bearing</li>
+        <li>A test asserts it stays that way</li>
+        <li>DynamoDB-backed state is what lifts it</li>
+      </ul>
+    </div>
+    <div class="tri-c">
+      <h4>Why two deploy passes</h4>
+      <ul>
+        <li>Cognito needs the callback URL</li>
+        <li>The URL is the App Runner service URL</li>
+        <li>Which does not exist until it is created</li>
+        <li>Pass one uses a placeholder</li>
+        <li>Pass two writes the real value</li>
+        <li>Idempotent — re-running is harmless</li>
+      </ul>
+    </div>
+    <div class="tri-c">
+      <h4>What the container may do</h4>
+      <ul>
+        <li><code>bedrock:InvokeModel</code> on Claude only</li>
+        <li>Read/write on the one project bucket</li>
+        <li>Four actions on the one table</li>
+        <li>Describe its own Cognito client</li>
+        <li>Nothing else — no wildcard actions</li>
+        <li>Runs as a non-root user</li>
+      </ul>
+    </div>
+  </div>
+
+  <p><strong>No Docker needed.</strong> If the Docker daemon is running locally
+  the image is built there; if it is not, the deploy falls back to the CodeBuild
+  project, which builds inside AWS from <code>git archive HEAD</code>. The
+  repository stays the source of truth either way — every image corresponds to a
+  commit you can check out.</p>
+
+  <p><strong>Cost is reversible.</strong> App Runner is the only resource here
+  that bills while idle. Deleting the <code>…-dev-app</code> stack stops that
+  charge and leaves storage, datasets, and run state untouched.</p>
 </section>
 
 <!-- ============ RUNNING ============ -->
 <section id="running">
   <div class="sec-head">
-    <div class="sec-num">11</div>
+    <div class="sec-num">12</div>
     <h2>Running It</h2>
   </div>
 
@@ -966,18 +1046,30 @@ pytest -q
 <span class="cmt"># refresh credentials</span>
 aws sso login --profile intelligence-dev
 
-<span class="cmt"># deploy infrastructure</span>
-aws cloudformation deploy --profile intelligence-dev --region us-east-1 \
-  --template-file infrastructure/cloudformation/storage.yaml \
-  --stack-name intelligence-engine-dev-storage --parameter-overrides Environment=dev
+<span class="cmt"># deploy infrastructure — every stack, one command</span>
+./infrastructure/deploy.sh
+./infrastructure/deploy.sh --dry-run     <span class="cmt"># see the commands first</span>
 
 <span class="cmt"># generate all twenty datasets and upload to S3</span>
 python scripts/data_generation/generate_all.py --profile intelligence-dev
 
-<span class="cmt"># run the app</span>
+<span class="cmt"># run the app locally, against AWS</span>
 python webapp/app.py
 <span class="cmt">#   consultant → http://localhost:5000</span>
 <span class="cmt">#   engineer   → http://localhost:5000/engineer</span>
+
+<span class="cmt"># or host it — App Runner behind a Cognito login</span>
+./infrastructure/deploy.sh --with-app
+./infrastructure/deploy.sh --with-app --build remote   <span class="cmt"># force CodeBuild</span>
+
+<span class="cmt"># create your login (self-signup is disabled)</span>
+aws cognito-idp admin-create-user --profile intelligence-dev \
+  --user-pool-id <span class="str">&lt;UserPoolId&gt;</span> --username you@example.com \
+  --user-attributes Name=email,Value=you@example.com Name=email_verified,Value=true
+
+<span class="cmt"># stop the only standing cost; data is untouched</span>
+aws cloudformation delete-stack --profile intelligence-dev \
+  --stack-name intelligence-engine-dev-app
 
 <span class="cmt"># run consultant console only</span>
 ENGINEER_CONSOLE=0 python webapp/app.py
@@ -990,7 +1082,7 @@ python scripts/bedrock_usage.py --profile intelligence-dev --cost --month-to-dat
 <!-- ============ CORPORATE ============ -->
 <section id="corporate">
   <div class="sec-head">
-    <div class="sec-num">12</div>
+    <div class="sec-num">13</div>
     <h2>Corporate Deployment Path</h2>
     <p>How this maps into an environment where DevOps owns infrastructure and console access is restricted.</p>
   </div>
@@ -1022,7 +1114,7 @@ python scripts/bedrock_usage.py --profile intelligence-dev --cost --month-to-dat
 <!-- ============ LIMITS ============ -->
 <section id="limits">
   <div class="sec-head">
-    <div class="sec-num">13</div>
+    <div class="sec-num">14</div>
     <h2>Known Limits</h2>
     <p>Stated plainly, because a reference architecture that hides its gaps is not useful.</p>
   </div>
@@ -1030,7 +1122,7 @@ python scripts/bedrock_usage.py --profile intelligence-dev --cost --month-to-dat
   <div class="cards">
     <div class="card">
       <div class="card-h"><div class="card-t">Run state is in-memory</div></div>
-      <div class="card-d">The DynamoDB table and state manager exist and are exercised by the CLI orchestrator, but the web app keeps runs in a process dictionary. Restarting loses history. Wiring the web app to DynamoDB is the next structural step.</div>
+      <div class="card-d">The DynamoDB table and state manager exist and are exercised by the CLI orchestrator, but the web app keeps runs in a process dictionary. Restarting loses history, and it is why the hosted service is pinned to a single instance. Wiring the web app to DynamoDB is the next structural step and the prerequisite for scaling.</div>
     </div>
     <div class="card">
       <div class="card-h"><div class="card-t">Research is model knowledge, not live retrieval</div></div>
@@ -1045,8 +1137,8 @@ python scripts/bedrock_usage.py --profile intelligence-dev --cost --month-to-dat
       <div class="card-d">Acceptable for a personal sandbox with synthetic data. It must be reviewed before any deployment touching confidential client information.</div>
     </div>
     <div class="card">
-      <div class="card-h"><div class="card-t">No authentication</div></div>
-      <div class="card-d">The web app is unauthenticated and intended for local use. Corporate deployment requires SSO in front of both consoles.</div>
+      <div class="card-h"><div class="card-t">Authentication is one Cognito pool</div></div>
+      <div class="card-d">The hosted console requires a Cognito login, but both consoles sit behind the <em>same</em> pool — any user who can reach the consultant view can reach the engineer view. Separating them means a second service with <code>ENGINEER_CONSOLE=0</code> and its own pool, or group claims enforced at the blueprint. Locally there is no auth at all.</div>
     </div>
     <div class="card">
       <div class="card-h"><div class="card-t">No CI/CD</div></div>
@@ -1057,7 +1149,7 @@ python scripts/bedrock_usage.py --profile intelligence-dev --cost --month-to-dat
 
 <footer>
   <p>Intelligence Engine — Architecture &amp; Implementation Reference</p>
-  <p>Python 3.12 · Flask · Amazon Bedrock · S3 · DynamoDB · CloudFormation · CloudWatch</p>
+  <p>Python 3.12 · Flask · Amazon Bedrock · S3 · DynamoDB · App Runner · Cognito · ECR · CodeBuild · CloudFormation · CloudWatch</p>
   <p>Synthetic data only. No real client information appears in this repository.</p>
 </footer>
 

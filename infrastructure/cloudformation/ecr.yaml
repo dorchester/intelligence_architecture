@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - container registry for the console image
+
+# Deployed before the application stack, because App Runner cannot be created
+# until an image exists to point it at.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+Resources:
+  ConsoleRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub intelligence-engine-${Environment}-console
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      ImageTagMutability: MUTABLE
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      LifecyclePolicy:
+        # Images are cheap but not free, and old ones are never rolled back to.
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Expire untagged images after 1 day",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 1
+                },
+                "action": { "type": "expire" }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Keep only the 5 most recent tagged images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": { "type": "expire" }
+              }
+            ]
+          }
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+  RepositoryUri:
+    Description: Push target for the console image
+    Value: !GetAtt ConsoleRepository.RepositoryUri
+    Export:
+      Name: !Sub intelligence-engine-${Environment}-ecr-uri
+  RepositoryName:
+    Value: !Ref ConsoleRepository

@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - remote container build (CodeBuild)
+
+# Builds the console image inside AWS so no Docker install is required on the
+# operator's machine. The source arrives as a zip in the project bucket; the
+# built image lands in ECR.
+#
+# Cost: pay-per-build only. A build takes ~3 minutes on the smallest Linux
+# instance, which is a couple of cents. Nothing runs between builds.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+  SourceKey:
+    Type: String
+    Default: build/source.zip
+    Description: Key in the project bucket holding the zipped repository
+
+Resources:
+
+  BuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-codebuild
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/intelligence-engine-${Environment}*
+        - PolicyName: source-read
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  Fn::Sub:
+                    - '${BucketArn}/build/*'
+                    - BucketArn:
+                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+        - PolicyName: ecr-push
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/intelligence-engine-${Environment}-console
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  ConsoleBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub intelligence-engine-${Environment}-console-build
+      ServiceRole: !GetAtt BuildRole.Arn
+      TimeoutInMinutes: 20
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Source:
+        Type: S3
+        Location:
+          Fn::Sub:
+            - '${Bucket}/${SourceKey}'
+            - Bucket:
+                Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-name
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - echo Logging in to ECR
+                - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REGISTRY
+            build:
+              commands:
+                - echo Building $REPO_URI:$IMAGE_TAG
+                - docker build --platform linux/amd64 -t $REPO_URI:$IMAGE_TAG .
+            post_build:
+              commands:
+                - docker push $REPO_URI:$IMAGE_TAG
+                - echo Pushed $REPO_URI:$IMAGE_TAG
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        # Required to run the Docker daemon inside the build container.
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: REGISTRY
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com
+          - Name: REPO_URI
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/intelligence-engine-${Environment}-console
+          - Name: IMAGE_TAG
+            Value: latest
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+  ProjectName:
+    Value: !Ref ConsoleBuild
+  RepositoryUri:
+    Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/intelligence-engine-${Environment}-console

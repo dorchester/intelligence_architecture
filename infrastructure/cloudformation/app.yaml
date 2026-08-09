@@ -1,0 +1,293 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - hosted console (App Runner) behind Cognito
+
+# Depends on the storage, state, and ecr stacks (via exports) and on an image
+# already existing in the repository.
+#
+# Cost note: App Runner bills for provisioned container memory whether or not
+# anyone is using the service. This is the only resource in the project with a
+# standing monthly cost. Everything else is pay-per-use.
+#
+# The callback URL is a chicken-and-egg: Cognito needs the service URL, which
+# does not exist until the service is created. deploy.sh handles this by
+# deploying once with the placeholder, reading the service URL, and deploying
+# again with CallbackURL set. Idempotent either way.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+  ImageUri:
+    Type: String
+    Description: Full ECR image URI including tag
+
+  CallbackURL:
+    Type: String
+    Default: 'https://localhost/auth/callback'
+    Description: OAuth2 redirect URI - set to the App Runner URL on the second pass
+
+  LogoutURL:
+    Type: String
+    Default: 'https://localhost'
+
+  EngineModelId:
+    Type: String
+    Default: us.anthropic.claude-sonnet-4-6
+    Description: Runtime model. Config, never hardcoded in analytical code.
+
+  EnableEngineerConsole:
+    Type: String
+    Default: '1'
+    AllowedValues: ['0', '1']
+    Description: Mount the engineer blueprint. Set 0 to ship consultant-only.
+
+  Cpu:
+    Type: String
+    Default: '1024'
+    AllowedValues: ['256', '512', '1024', '2048', '4096']
+
+  Memory:
+    Type: String
+    Default: '2048'
+    AllowedValues: ['512', '1024', '2048', '3072', '4096']
+
+Resources:
+
+  # ---------- Identity ----------
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub intelligence-engine-${Environment}-users
+      # No self-signup. Users are created deliberately by an administrator.
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      MfaConfiguration: 'OFF'
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      UserPoolTags:
+        Application: intelligence-engine
+        Environment: !Ref Environment
+        ManagedBy: cloudformation
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub intelligence-engine-${Environment}-console
+      UserPoolId: !Ref UserPool
+      # Confidential client: the app runs server-side and reads its own secret
+      # from Cognito at boot, so the secret never enters the repo or a stack
+      # output.
+      GenerateSecret: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes: [openid, email, profile]
+      CallbackURLs: [!Ref CallbackURL]
+      LogoutURLs: [!Ref LogoutURL]
+      SupportedIdentityProviders: [COGNITO]
+      ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 1
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      # Account ID keeps the prefix globally unique without appearing in the
+      # repository - it is resolved at deploy time.
+      Domain: !Sub intelligence-engine-${Environment}-${AWS::AccountId}
+      UserPoolId: !Ref UserPool
+
+  # ---------- Permissions ----------
+
+  # Lets App Runner pull the image. AWS-managed policy, ECR access only.
+  AppRunnerAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-apprunner-access
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: build.apprunner.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  # What the running container may do. Deliberately narrow: one bucket, one
+  # table, Claude models only, and read-only on its own Cognito client.
+  AppRunnerInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-apprunner-instance
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: tasks.apprunner.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: bedrock-invoke
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  # Cross-region inference profiles, and the foundation models
+                  # they route to in the peer regions.
+                  - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/us.anthropic.*
+                  - arn:aws:bedrock:*::foundation-model/anthropic.*
+        - PolicyName: dataset-and-artifact-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource:
+                  Fn::Sub:
+                    - '${BucketArn}/*'
+                    - BucketArn:
+                        Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+              - Effect: Allow
+                Action: [s3:ListBucket]
+                Resource:
+                  Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-arn
+        - PolicyName: run-state-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                Resource:
+                  - Fn::ImportValue: !Sub intelligence-engine-${Environment}-table-arn
+                  - Fn::Sub:
+                      - '${TableArn}/index/*'
+                      - TableArn:
+                          Fn::ImportValue: !Sub intelligence-engine-${Environment}-table-arn
+        - PolicyName: read-own-oauth-client
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: cognito-idp:DescribeUserPoolClient
+                Resource: !GetAtt UserPool.Arn
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  # ---------- Service ----------
+
+  AutoScalingConfig:
+    Type: AWS::AppRunner::AutoScalingConfiguration
+    Properties:
+      AutoScalingConfigurationName: !Sub ie-${Environment}-single
+      # Pinned to one instance on purpose. Run state and the threads executing
+      # each phase live in the process, so a second instance would not see a
+      # run started by the first. Raising MaxSize requires moving run state to
+      # DynamoDB first.
+      MinSize: 1
+      MaxSize: 1
+      MaxConcurrency: 20
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+
+  ConsoleService:
+    Type: AWS::AppRunner::Service
+    Properties:
+      ServiceName: !Sub intelligence-engine-${Environment}-console
+      AutoScalingConfigurationArn: !GetAtt AutoScalingConfig.AutoScalingConfigurationArn
+      InstanceConfiguration:
+        Cpu: !Ref Cpu
+        Memory: !Ref Memory
+        InstanceRoleArn: !GetAtt AppRunnerInstanceRole.Arn
+      HealthCheckConfiguration:
+        Protocol: HTTP
+        Path: /healthz
+        Interval: 20
+        Timeout: 5
+        HealthyThreshold: 1
+        UnhealthyThreshold: 5
+      NetworkConfiguration:
+        # Public egress. No VPC connector, and therefore no NAT gateway.
+        EgressConfiguration:
+          EgressType: DEFAULT
+      SourceConfiguration:
+        AutoDeploymentsEnabled: false
+        AuthenticationConfiguration:
+          AccessRoleArn: !GetAtt AppRunnerAccessRole.Arn
+        ImageRepository:
+          ImageIdentifier: !Ref ImageUri
+          ImageRepositoryType: ECR
+          ImageConfiguration:
+            Port: '8080'
+            RuntimeEnvironmentVariables:
+              - Name: ENVIRONMENT
+                Value: !Ref Environment
+              - Name: DEPLOYED
+                Value: '1'
+              - Name: ENGINE_MODEL_ID
+                Value: !Ref EngineModelId
+              - Name: ENGINEER_CONSOLE
+                Value: !Ref EnableEngineerConsole
+              - Name: RUNS_BUCKET
+                Value:
+                  Fn::ImportValue: !Sub intelligence-engine-${Environment}-bucket-name
+              - Name: RUN_STATE_TABLE
+                Value:
+                  Fn::ImportValue: !Sub intelligence-engine-${Environment}-table-name
+              - Name: COGNITO_USER_POOL_ID
+                Value: !Ref UserPool
+              - Name: COGNITO_CLIENT_ID
+                Value: !Ref UserPoolClient
+              - Name: COGNITO_DOMAIN
+                Value: !Sub ${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com
+              - Name: COGNITO_REDIRECT_URI
+                Value: !Ref CallbackURL
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+Outputs:
+  ServiceUrl:
+    Description: Console URL (https, TLS terminated by App Runner)
+    Value: !Sub https://${ConsoleService.ServiceUrl}
+  CallbackUrlToSet:
+    Description: Pass this back as CallbackURL on the second deploy pass
+    Value: !Sub https://${ConsoleService.ServiceUrl}/auth/callback
+  LogoutUrlToSet:
+    Value: !Sub https://${ConsoleService.ServiceUrl}
+  UserPoolId:
+    Value: !Ref UserPool
+  LoginDomain:
+    Value: !Sub ${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com

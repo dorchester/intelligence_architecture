@@ -63,8 +63,10 @@ def dashboard():
         runs_dir=str(runtime.RUNS_DIR),
         bedrock_status=bedrock_status,
         model_id=runtime.DEFAULT_MODEL,
-        aws_profile=runtime.AWS_PROFILE,
+        aws_profile=runtime.AWS_PROFILE or ("instance role" if runtime.is_deployed()
+                                            else "default credential chain"),
         aws_region=runtime.AWS_REGION,
+        deployed=runtime.is_deployed(),
         bucket=getattr(dq, "bucket", None),
     )
 

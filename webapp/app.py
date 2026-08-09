@@ -37,6 +37,11 @@ from webapp.runtime import (
 
 app = Flask(__name__)
 
+# Signs the session cookie. Generated per process rather than stored: a
+# container recycle invalidates sessions, which is consistent with run state,
+# which is also in-process. Avoids managing a secret for no added safety.
+app.secret_key = os.environ.get("FLASK_SECRET_KEY") or os.urandom(32)
+
 # The engineer console is mounted only when enabled. In a corporate
 # deployment it would run as a separate service behind different auth.
 ENABLE_ENGINEER_CONSOLE = os.environ.get("ENGINEER_CONSOLE", "1") != "0"
@@ -44,6 +49,18 @@ if ENABLE_ENGINEER_CONSOLE:
     from webapp.engineer import engineer_bp
 
     app.register_blueprint(engineer_bp)
+
+# Cognito login. Inert unless the Cognito environment variables are set, so
+# local development is unaffected.
+from webapp.auth import init_auth  # noqa: E402
+
+init_auth(app)
+
+
+@app.route("/healthz")
+def healthz():
+    """App Runner health check. Must not touch AWS or require a session."""
+    return jsonify({"status": "ok", "active_runs": runtime.active_run_count()})
 
 
 # ============ CONSULTANT ROUTES ============
