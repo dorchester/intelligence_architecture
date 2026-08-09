@@ -201,3 +201,23 @@ def test_healthz_responds():
         resp = client.get("/healthz")
         assert resp.status_code == 200
         assert resp.get_json()["status"] == "ok"
+
+
+def test_guardrail_edits_are_disabled_when_deployed(monkeypatch):
+    """Enforcement config must not be editable from a browser in production.
+
+    Hot reloading is a good local affordance. Deployed, it changes what the
+    system blocks with no diff, no review and no author - which contradicts
+    the rule every other change in this project follows.
+    """
+    monkeypatch.setenv("DEPLOYED", "1")
+    import webapp.engineer as engineer
+
+    importlib.reload(engineer)
+    assert engineer.EDITS_ALLOWED is False, (
+        "guardrail editing must be read-only when DEPLOYED=1"
+    )
+
+    monkeypatch.delenv("DEPLOYED", raising=False)
+    importlib.reload(engineer)
+    assert engineer.EDITS_ALLOWED is True, "local development keeps the editor"

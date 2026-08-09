@@ -110,17 +110,32 @@
 
     <div class="section">
         <div class="section-head">
-            <h2>Edit Configuration</h2>
-            <span class="badge">changes apply to new runs immediately</span>
+            <h2>{% if edits_allowed %}Edit Configuration{% else %}Configuration{% endif %}</h2>
+            <span class="badge">
+                {%- if edits_allowed %}changes apply to new runs immediately
+                {%- else %}read-only on deployed instances{% endif -%}
+            </span>
         </div>
+        {% if not edits_allowed %}
+        <div class="notice warn">
+            <strong>Editing is disabled here.</strong><br>
+            These rules decide what the system blocks. Changing them from a browser
+            would leave no diff, no review and no author, which is exactly what the
+            rest of this architecture refuses to allow. Edit
+            <code>guardrails/config.yaml</code> in the repository and redeploy.
+        </div>
+        {% endif %}
         <form action="{{ url_for('engineer.guardrails_save') }}" method="POST">
-            <textarea name="raw_config" class="editor" spellcheck="false">{{ raw_config }}</textarea>
+            <textarea name="raw_config" class="editor" spellcheck="false"
+                      {% if not edits_allowed %}readonly{% endif %}>{{ raw_config }}</textarea>
+            {% if edits_allowed %}
             <div style="margin-top:0.8rem;">
                 <button type="submit" class="btn btn-primary">Save &amp; Reload</button>
                 <span style="font-size:0.75rem;color:var(--text-muted);margin-left:0.8rem;">
                     YAML is validated before writing. Invalid syntax is rejected.
                 </span>
             </div>
+            {% endif %}
         </form>
     </div>
 {% endblock %}

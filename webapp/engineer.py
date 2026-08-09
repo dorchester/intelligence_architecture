@@ -15,6 +15,8 @@ route behind different auth (see docs/corporate-deployment-architecture.md).
 
 from __future__ import annotations
 
+import os
+
 from flask import Blueprint, redirect, render_template, request, url_for
 
 from webapp import runtime
@@ -108,13 +110,31 @@ def guardrails_page():
         events=events[:50],
         saved=request.args.get("saved"),
         error=request.args.get("error"),
+        edits_allowed=EDITS_ALLOWED,
     )
+
+
+# Hot-reloading enforcement config from a browser is a good local affordance
+# and a governance hole anywhere else: it changes what the system blocks, with
+# no review, no diff and no audit trail, in an environment where the rest of
+# the architecture insists that permanent change flows through version control.
+# Deployed instances therefore serve the editor read-only - the rules stay
+# visible and inspectable, but changing them means a commit.
+EDITS_ALLOWED = os.environ.get("DEPLOYED") != "1"
 
 
 @engineer_bp.route("/guardrails/save", methods=["POST"])
 def guardrails_save():
     """Validate and persist edited guardrail YAML."""
     import yaml
+
+    if not EDITS_ALLOWED:
+        return redirect(url_for(
+            "engineer.guardrails_page",
+            error="Guardrail edits are disabled on deployed instances. "
+                  "Change guardrails/config.yaml in the repository and redeploy, "
+                  "so the change carries a diff, a review and an author.",
+        ))
 
     raw = request.form.get("raw_config", "")
     try:
