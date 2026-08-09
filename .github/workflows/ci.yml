@@ -1,0 +1,44 @@
+# CI for a public repository that must never carry a credential.
+#
+# Two independent jobs:
+#   test    - the full suite (70 tests, no AWS required by design)
+#   secrets - gitleaks over the complete history, every push
+#
+# Deliberately no AWS credentials anywhere in CI. Anything needing the real
+# account (golden replay, deployed smoke tests) runs in-account via the
+# CodeBuild projects - see infrastructure/cloudformation/workflow.yaml.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Tests
+        run: pytest -q
+      - name: CloudFormation templates parse and carry no account ids
+        run: pytest tests/test_deployment.py -q
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # scan the whole history, not just the diff
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
