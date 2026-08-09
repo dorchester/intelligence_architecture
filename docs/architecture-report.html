@@ -957,6 +957,36 @@ footer p{font-size:.76rem;color:var(--text-3);margin-bottom:.25rem}
         <td>Pinned to one instance, scoped instance role, HTTPS terminated upstream, login required</td>
       </tr>
       <tr>
+        <td><code>…-dev-workbench</code></td>
+        <td><strong>Engineer workbench</strong><br>EC2 via SSM, no SSH</td>
+        <td>~$0.02/hr running; auto-stops idle</td>
+        <td>Zero inbound rules, IMDSv2, encrypted EBS, CloudTrail-audited sessions; Claude Code + Terraform + Databricks CLI preinstalled</td>
+      </tr>
+      <tr>
+        <td><code>…-dev-dataplane</code></td>
+        <td><strong>Partitioned data plane</strong><br>5 domains, 5 walls</td>
+        <td>Per GB / per query</td>
+        <td>landing / lakehouse / artifacts / site / sensitive vault (own KMS key, zero grants until privacy signoff); enumerated row-level read policies; upload audit trail; Athena workgroup with 10 GB scan cutoff</td>
+      </tr>
+      <tr>
+        <td><code>…-dev-author-seat</code></td>
+        <td><strong>Author identity</strong><br>third persona</td>
+        <td>Free</td>
+        <td>Artifact read + Bedrock invoke + SSM sessions; no deploys — authors change the system by pull request</td>
+      </tr>
+      <tr>
+        <td><code>…-dev-llm-controls</code></td>
+        <td><strong>LLM usage controls</strong></td>
+        <td>Free</td>
+        <td>Per-client application inference profiles for attribution; monthly spend alerts at 80% actual / 100% forecast</td>
+      </tr>
+      <tr>
+        <td><code>…-dev-databricks-access</code></td>
+        <td><strong>Databricks bridge</strong></td>
+        <td>Free</td>
+        <td>Read-only Unity Catalog IAM role over datasets (placeholder external ID until the credential exists); OAuth secrets in SSM SecureString</td>
+      </tr>
+      <tr>
         <td>runtime</td>
         <td><strong>Amazon Bedrock</strong></td>
         <td>Per token</td>

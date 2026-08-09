@@ -24,8 +24,15 @@ aws sts get-caller-identity --profile intelligence-dev
 ./infrastructure/deploy.sh --with-app      # + hosted console (costs ~$5-10/mo)
 ```
 
-Region `us-east-1`. Stacks:
-`intelligence-engine-dev-{storage,state,observability,ecr,build,app}`.
+Region `us-east-1`. Stacks: `intelligence-engine-dev-{storage,state,
+observability,ecr,build,app,workbench,dataplane,author-seat,llm-controls,
+databricks-access}`.
+
+Workbench: `aws ssm start-session --target <InstanceId from workbench stack>`.
+Databricks account-level IaC is Terraform in `infrastructure/databricks/`,
+run from the workbench via `apply.sh` (credentials come from SSM, never files).
+See `docs/predictive-workflow-readiness.md` for the gap map and open
+decision gates.
 
 `--with-app` builds the image (local Docker, or CodeBuild when Docker is
 absent), creates App Runner + Cognito, then re-deploys the app stack a second
@@ -100,6 +107,16 @@ and `webapp/runtime.py:DEFAULT_MODEL`.
   which is partial, showing a false "-67% slowing". Now compares only complete
   quarters (`quarters[1:-1]`).
 - **SSO expires constantly.** If anything AWS fails, check credentials first.
+- **CloudFormation rejects YAML anchors** (`&x`/`*x`) even though local YAML
+  parsers accept them — templates must expand everything.
+- **CFN "EarlyValidation" hook failures carry no detail.** Call the service
+  API directly with the same properties to get the real error (that is how
+  the Bedrock description-regex rejection was found).
+- **Bedrock name/description fields** reject consecutive separators
+  (pattern `([0-9a-zA-Z:.][ _-]?)+`) — no " - ".
+- **IAM self-trust needs two passes**: a role cannot name itself as a
+  principal while being created. `databricks-access.yaml` gates it behind
+  `EnableSelfAssume=true` on the second deploy.
 - **No profile in the container.** `AWS_PROFILE_NAME` is unset when deployed so
   boto3 falls through to the instance role. Never pass `profile_name` directly —
   go through `runtime._session()` or accept `profile: str | None`.

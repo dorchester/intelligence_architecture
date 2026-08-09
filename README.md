@@ -235,6 +235,10 @@ All CloudFormation-managed, tagged `Application=intelligence-engine`.
 | `…-dev-build` | CodeBuild project — builds the image in AWS | per build (~2¢) |
 | `…-dev-app` | App Runner service + Cognito user pool | **~$5–10/mo** |
 | `…-dev-workbench` | Engineer EC2 reached via SSM, auto-stops when idle | ~$0.02/hr running, ~$0.80/mo stopped |
+| `…-dev-dataplane` | Partitioned data domains — landing, lakehouse, artifacts, site, sensitive vault (KMS) — plus Athena workgroup and upload audit trail | per GB / per query |
+| `…-dev-author-seat` | IAM identity for the authoring persona — artifact read, Bedrock, no deploys | free |
+| `…-dev-llm-controls` | Per-client Bedrock attribution profiles + monthly spend alerts | free |
+| `…-dev-databricks-access` | Read-only Unity Catalog role over datasets + credential parameters | free |
 
 The first four idle at zero. `…-dev-app` is the only standing cost, and deleting
 that one stack removes it without touching data or datasets.
@@ -255,6 +259,7 @@ No account IDs appear anywhere in this repository.
 
 - [`docs/architecture-report.html`](docs/architecture-report.html) — full visual walkthrough
 - [`docs/samples/`](docs/samples/) — real system output, readable without AWS
+- [`docs/predictive-workflow-readiness.md`](docs/predictive-workflow-readiness.md) — how this substrate maps to an episodic report-generation workflow, and what remains
 - [`docs/corporate-deployment-architecture.md`](docs/corporate-deployment-architecture.md) — target model for a firm where DevOps owns infrastructure
 - [`docs/bedrock-usage-monitoring.md`](docs/bedrock-usage-monitoring.md) — token and cost monitoring
 - [`docs/decisions.md`](docs/decisions.md) — architectural decision log

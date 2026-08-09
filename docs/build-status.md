@@ -109,6 +109,23 @@ the single project bucket, four actions on the single table, and
 asserts no policy contains a wildcard action and no template contains a literal
 account ID.
 
+## Predictive workflow substrate
+
+The engine's next consumer is an episodic report-generation workflow in a
+separate private repository. `docs/predictive-workflow-readiness.md` maps its
+functional requirements onto this account; the short version:
+
+- **Deployed**: partitioned data plane with hard IAM walls and an empty
+  sensitive vault; author-seat identity; per-client Bedrock attribution +
+  spend alerts; Athena diagnostic SQL; audited upload trail; Databricks
+  bridge (AWS side) and serverless-workspace Terraform.
+- **Verified**: Haiku 4.5 applied quota is 50 req/min (vs 10,000 default) —
+  increase needed before high-volume builds.
+- **Next build**: durable days-long approvals (state exists; the wait is
+  still in-process).
+- **Open gates**: orchestration substrate, privacy signoff for the vault,
+  vendor licence reviews, invocation logging.
+
 ## Next
 
 1. Wire the web app to DynamoDB so runs survive restart — and unpin the instance count
