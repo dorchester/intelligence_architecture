@@ -32,21 +32,125 @@ from _aws import config, emit_metric, put_json, read_parquet
 
 BATCH_SIZE = 50
 
-# Identical for every batch, so it is worth caching. Everything that varies
-# goes in the user turn.
+# Identical for every batch, so it is marked cacheable. Note the length: a
+# cacheable prefix has to clear a minimum token count or the directive is
+# silently ignored and every call is billed in full. A one-paragraph
+# instruction never caches, which is why caching so often looks wired up and
+# does nothing. A real taxonomy - definitions, boundaries, worked examples -
+# clears the bar on its own merits, and is what a production extractor needs
+# anyway to classify consistently across batches.
 EXTRACT_SYSTEM = """You classify workforce profiles for an organisational
-analysis. For each profile you are given, decide:
+capability analysis of a pharmaceutical company. Apply the taxonomy below
+exactly. Consistency across batches matters more than nuance in any single
+case: the same title must always receive the same classification.
 
-  capability_area : one of [Commercial, Clinical, Regulatory, Manufacturing,
-                            Technology, Corporate Functions]
-  scarcity        : one of [common, specialised, scarce]
-  build_or_buy    : one of [build, buy] - whether this capability is more
-                    realistically developed internally or hired in
+=== DIMENSION 1: capability_area ===
+Assign exactly one.
 
-Reply with JSON only, as a list of objects, one per profile, in the order
-given, each of the form:
+Commercial
+  Revenue-generating and market-facing work: field sales, key accounts,
+  market access, pricing, payer strategy, brand and product marketing,
+  commercial analytics, launch planning, patient services commercial.
+  Boundary: analytics sits here when it serves brand or payer decisions, and
+  under Technology when it is platform or infrastructure work.
+
+Clinical
+  Study design and execution, biostatistics, clinical operations, medical
+  affairs, medical science liaison, pharmacovigilance, clinical data
+  management, epidemiology, real-world evidence, translational research.
+  Boundary: safety reporting is Clinical; safety *submissions* are Regulatory.
+
+Regulatory
+  Submissions and health-authority interaction, labelling, CMC regulatory,
+  regulatory intelligence, GxP quality assurance, compliance, audit, GCP and
+  GMP oversight, inspection readiness.
+  Boundary: quality work that governs a production line is Manufacturing;
+  quality work that governs a filing is Regulatory.
+
+Manufacturing
+  Process development and scale-up, drug substance and drug product, fill and
+  finish, biologics and cell culture, validation and tech transfer, supply
+  chain, logistics, procurement, site engineering, maintenance.
+  Boundary: analytical development that supports a process is Manufacturing;
+  bioanalysis supporting a study is Clinical.
+
+Technology
+  Software engineering, data engineering and platforms, cloud and
+  infrastructure, cybersecurity, enterprise applications, laboratory
+  informatics, computational chemistry and biology, machine learning.
+  Boundary: a data scientist embedded in commercial analytics is Commercial;
+  one building shared pipelines is Technology.
+
+Corporate Functions
+  Finance, accounting, tax, treasury, legal, intellectual property, human
+  resources, talent acquisition, communications, corporate strategy,
+  facilities, administration, executive leadership without a stated function.
+
+=== DIMENSION 2: scarcity ===
+Judge the external labour market, not the person's seniority.
+
+common
+  Widely available; a competent hire can be sourced in weeks from many
+  industries. Most administrative, generalist finance, generalist HR,
+  standard IT support, entry commercial roles.
+
+specialised
+  Requires sector-specific training or credentials, but a viable pool exists
+  within pharma and adjacent industries. Most clinical operations, regulatory
+  affairs, quality, process engineering, brand marketing, mid-level data.
+
+scarce
+  Small national pool, long lead time, frequently contested between
+  employers. Biologics process development, cell and gene therapy, regulatory
+  CMC for biologics, pharmacovigilance leadership, health economics,
+  ML applied to molecular data, qualified persons, inspection-facing quality
+  leadership.
+
+Do not mark something scarce merely because the title is senior. Seniority is
+captured separately; scarcity is about replaceability.
+
+=== DIMENSION 3: build_or_buy ===
+Whether the organisation more realistically develops this capability
+internally or hires it in.
+
+build
+  Institutional knowledge dominates: the work depends on knowing this
+  company's products, processes, systems, history or relationships. Internal
+  progression is normally faster and cheaper than external hiring.
+
+buy
+  The capability is portable and the external market can supply it faster
+  than internal development. Typical where a step change in scale or a new
+  modality is involved, or where the skill is generic across employers.
+
+Where both are defensible, prefer build for roles deep in an existing process
+and buy for roles standing up something the company does not yet do.
+
+=== WORKED EXAMPLES ===
+"Principal Scientist, Upstream Process Development" with cell culture and
+  bioreactor skills -> Manufacturing / scarce / buy. Biologics process
+  development is contested and rarely grown quickly in-house.
+"Regulatory Affairs Manager" with submissions and labelling skills ->
+  Regulatory / specialised / build. Filing history and product knowledge are
+  company-specific.
+"HR Coordinator" with HRIS and employee relations skills -> Corporate
+  Functions / common / build.
+"Director, Market Access" with payer strategy and pricing skills ->
+  Commercial / specialised / buy. Payer relationships are portable.
+"Senior Data Engineer" with pipeline and cloud skills -> Technology /
+  specialised / buy.
+"Clinical Trial Manager" with GCP and site management skills -> Clinical /
+  specialised / build.
+"Quality Assurance Specialist, GMP" auditing a production line ->
+  Manufacturing / specialised / build.
+"Health Economics Lead" with HEOR and modelling skills -> Commercial /
+  scarce / buy.
+
+=== OUTPUT ===
+Reply with JSON only, a list of objects, one per profile, in the order given:
   {"i": <index>, "capability_area": "...", "scarcity": "...", "build_or_buy": "..."}
-No prose. No code fences."""
+Every profile you were given must appear exactly once. No prose, no code
+fences, no commentary."""
 
 SYNTHESIS_SYSTEM = """You are summarising an organisational capability
 profile from already-classified counts. Be specific and quantitative. Never
