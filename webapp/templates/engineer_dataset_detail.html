@@ -1,0 +1,123 @@
+{% extends "_base_engineer.html" %}
+{% set active_nav = 'datasets' %}
+{% block title %}{{ summary.company_name }} Dataset{% endblock %}
+{% block heading %}{{ summary.company_name }}{% endblock %}
+
+{% block extra_css %}
+        .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 0.6rem; }
+        .kv-item .k { font-size: 0.65rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .kv-item .v { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; margin-top: 0.1rem; }
+        .v.cyan { color: var(--cyan); } .v.green { color: var(--green); } .v.orange { color: var(--orange); }
+        pre.ctx {
+            background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+            padding: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+            line-height: 1.7; overflow-x: auto; max-height: 520px; overflow-y: auto;
+            color: var(--text-secondary); white-space: pre-wrap;
+        }
+        pre.json {
+            background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+            padding: 0.9rem; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
+            line-height: 1.6; overflow-x: auto; max-height: 320px; overflow-y: auto;
+            color: var(--text-secondary);
+        }
+        .bar-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem; font-size: 0.76rem; }
+        .bar-label { width: 190px; color: var(--text-secondary); flex-shrink: 0; }
+        .bar-track { flex: 1; height: 16px; background: var(--surface); border-radius: 3px; overflow: hidden; }
+        .bar-fill { height: 100%; background: linear-gradient(90deg, var(--blue), var(--purple)); }
+        .bar-val { width: 60px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted); }
+{% endblock %}
+
+{% block content %}
+    <a href="/engineer/datasets" class="link" style="font-size:0.8rem;display:inline-block;margin-bottom:1.5rem;">&larr; All datasets</a>
+
+    <div class="section">
+        <div class="section-head"><h2>Overview</h2></div>
+        <div class="panel">
+            <div class="kv">
+                <div class="kv-item"><div class="k">Company ID</div><div class="v cyan">{{ summary.company_id }}</div></div>
+                <div class="kv-item"><div class="k">Industry</div><div class="v">{{ summary.industry }}</div></div>
+                <div class="kv-item"><div class="k">Headcount</div><div class="v">{{ '{:,}'.format(summary.headcount) }}</div></div>
+                <div class="kv-item"><div class="k">Profiles</div><div class="v green">{{ '{:,}'.format(summary.profiles_analyzed) }}</div></div>
+                <div class="kv-item"><div class="k">Postings</div><div class="v green">{{ '{:,}'.format(summary.postings_analyzed) }}</div></div>
+                <div class="kv-item"><div class="k">Avg Tenure</div><div class="v">{{ summary.avg_tenure_years }}y</div></div>
+                <div class="kv-item"><div class="k">Flight Risk</div><div class="v orange">{{ summary.flight_risk_pct }}%</div></div>
+                <div class="kv-item"><div class="k">Active Roles</div><div class="v">{{ summary.active_postings }}</div></div>
+                <div class="kv-item"><div class="k">Avg Days to Fill</div><div class="v">{{ summary.avg_days_to_fill }}</div></div>
+                <div class="kv-item"><div class="k">Remote %</div><div class="v">{{ summary.remote_pct }}%</div></div>
+                <div class="kv-item"><div class="k">Hiring Trend</div><div class="v">{{ summary.hiring_velocity_trend }}</div></div>
+                <div class="kv-item"><div class="k">External Hire Ratio</div><div class="v">{{ '{:.0%}'.format(summary.external_hire_ratio) }}</div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-head"><h2>Department Distribution</h2></div>
+        <div class="panel">
+            {% set max_dept = summary.department_distribution.values() | max %}
+            {% for dept, count in summary.department_distribution.items() | sort(attribute='1', reverse=true) %}
+            <div class="bar-row">
+                <div class="bar-label">{{ dept }}</div>
+                <div class="bar-track"><div class="bar-fill" style="width: {{ (count / max_dept * 100) | round }}%;"></div></div>
+                <div class="bar-val">{{ count }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-head"><h2>Hiring by Function</h2></div>
+        <div class="panel">
+            {% if summary.postings_by_department %}
+            {% set max_post = summary.postings_by_department.values() | max %}
+            {% for dept, count in summary.postings_by_department.items() | sort(attribute='1', reverse=true) %}
+            <div class="bar-row">
+                <div class="bar-label">{{ dept }}</div>
+                <div class="bar-track"><div class="bar-fill" style="width: {{ (count / max_post * 100) | round }}%;"></div></div>
+                <div class="bar-val">{{ count }}</div>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+
+    {% if summary.hardest_to_fill %}
+    <div class="section">
+        <div class="section-head"><h2>Hardest Roles to Fill</h2></div>
+        <div class="panel">
+            <table>
+                <thead><tr><th>Title</th><th>Department</th><th>Avg Days</th><th>Postings</th></tr></thead>
+                <tbody>
+                {% for r in summary.hardest_to_fill %}
+                    <tr>
+                        <td>{{ r.title }}</td><td>{{ r.department }}</td>
+                        <td><code>{{ r.avg_days_to_fill }}</code></td><td>{{ r.count }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="section">
+        <div class="section-head">
+            <h2>Agent Context</h2>
+            <span class="badge">exactly what the LLM receives</span>
+        </div>
+        <pre class="ctx">{{ agent_context }}</pre>
+    </div>
+
+    <div class="section">
+        <div class="section-head"><h2>Sample Profile</h2></div>
+        {% if sample_profiles %}
+        <pre class="json">{{ sample_profiles[0] | tojson(indent=2) }}</pre>
+        {% endif %}
+    </div>
+
+    <div class="section">
+        <div class="section-head"><h2>Sample Posting</h2></div>
+        {% if sample_postings %}
+        <pre class="json">{{ sample_postings[0] | tojson(indent=2) }}</pre>
+        {% endif %}
+    </div>
+{% endblock %}

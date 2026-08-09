@@ -1,0 +1,79 @@
+{% extends "_base_engineer.html" %}
+{% set active_nav = 'datasets' %}
+{% block title %}Datasets{% endblock %}
+{% block heading %}Workforce Datasets{% endblock %}
+
+{% block extra_css %}
+        .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); gap: 0.75rem; margin-bottom: 2rem; }
+        .stat {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 1.1rem 1.25rem;
+        }
+        .stat-val { font-size: 1.7rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .stat-lbl { font-size: 0.66rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 0.2rem; }
+        .stat:nth-child(1) .stat-val { color: var(--cyan); }
+        .stat:nth-child(2) .stat-val { color: var(--green); }
+        .stat:nth-child(3) .stat-val { color: var(--purple); }
+{% endblock %}
+
+{% block content %}
+    {% if dataset_error %}
+    <div class="notice err">
+        Dataset service unavailable: {{ dataset_error }}<br>
+        <span style="font-size:0.78rem;">Refresh AWS credentials with <code>aws sso login --profile intelligence-dev</code></span>
+    </div>
+    {% endif %}
+
+    {% if companies %}
+    <div class="stat-row">
+        <div class="stat">
+            <div class="stat-val">{{ companies | length }}</div>
+            <div class="stat-lbl">Companies</div>
+        </div>
+        <div class="stat">
+            <div class="stat-val">{{ '{:,}'.format(companies | sum(attribute='profile_count')) }}</div>
+            <div class="stat-lbl">Employee Profiles</div>
+        </div>
+        <div class="stat">
+            <div class="stat-val">{{ '{:,}'.format(companies | sum(attribute='posting_count')) }}</div>
+            <div class="stat-lbl">Job Postings</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="section">
+        <div class="section-head">
+            <h2>Available Datasets</h2>
+            {% if bucket %}<span class="badge">s3://{{ bucket }}/datasets/</span>{% endif %}
+        </div>
+        <div class="panel">
+        {% if companies %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Company</th><th>Industry</th><th>Headcount</th>
+                        <th>Profiles</th><th>Postings</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for c in companies %}
+                    <tr>
+                        <td><strong>{{ c.company_name }}</strong><br><code>{{ c.company_id }}</code></td>
+                        <td>{{ c.industry }}</td>
+                        <td>{{ '{:,}'.format(c.headcount) }}</td>
+                        <td>{{ '{:,}'.format(c.profile_count) }}</td>
+                        <td>{{ '{:,}'.format(c.posting_count) }}</td>
+                        <td><a class="link" href="/engineer/datasets/{{ c.company_id }}">inspect</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p style="font-size:0.85rem;color:var(--text-muted);">
+                No datasets found. Generate them with:<br>
+                <code style="display:block;margin-top:0.5rem;">python scripts/data_generation/generate_all.py --profile intelligence-dev</code>
+            </p>
+        {% endif %}
+        </div>
+    </div>
+{% endblock %}

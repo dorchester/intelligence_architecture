@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Engineer{% endblock %} — Intelligence Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0c10; --surface: #12151c; --card: #161921; --border: #262d3d;
+            --text: #f1f3f5; --text-secondary: #a1a9bc; --text-muted: #6b7280;
+            --blue: #3b82f6; --green: #10b981; --purple: #8b5cf6;
+            --orange: #f59e0b; --cyan: #06b6d4; --red: #ef4444;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif; background: var(--bg);
+            color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased;
+        }
+        .shell { max-width: 1200px; margin: 0 auto; padding: 2rem 2.5rem; }
+        header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;
+        }
+        header h1 { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.02em; }
+        .nav-links { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+        .nav-links a {
+            font-size: 0.76rem; font-weight: 500; color: var(--text-muted);
+            text-decoration: none; padding: 0.4rem 0.8rem; border-radius: 6px;
+            border: 1px solid transparent; transition: all 0.15s;
+        }
+        .nav-links a:hover { color: var(--text); border-color: var(--border); }
+        .nav-links a.active { color: var(--cyan); border-color: var(--cyan); }
+        .section { margin-bottom: 2.5rem; }
+        .section-head {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;
+        }
+        .section-head h2 { font-size: 0.95rem; font-weight: 700; }
+        .badge {
+            font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.6rem;
+            border-radius: 4px; background: var(--surface); color: var(--text-muted);
+        }
+        .panel {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 1.5rem;
+        }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.82rem; }
+        th {
+            text-align: left; padding: 0.6rem 0.8rem; font-size: 0.66rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        td { padding: 0.65rem 0.8rem; border-bottom: 1px solid rgba(38,45,61,0.4); vertical-align: top; }
+        tr:hover td { background: var(--surface); }
+        code {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--cyan);
+        }
+        a.link { color: var(--blue); text-decoration: none; font-weight: 600; }
+        a.link:hover { text-decoration: underline; }
+        .pill {
+            font-size: 0.63rem; font-weight: 700; padding: 0.15rem 0.45rem;
+            border-radius: 4px; text-transform: uppercase; white-space: nowrap;
+        }
+        .pill.block { background: rgba(239,68,68,0.12); color: var(--red); }
+        .pill.warn { background: rgba(245,158,11,0.12); color: var(--orange); }
+        .pill.log { background: rgba(107,114,128,0.15); color: var(--text-muted); }
+        .pill.ok { background: rgba(16,185,129,0.12); color: var(--green); }
+        .notice {
+            padding: 0.8rem 1.1rem; border-radius: 8px; font-size: 0.82rem;
+            margin-bottom: 1.25rem;
+        }
+        .notice.ok { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); color: var(--green); }
+        .notice.err { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: var(--red); }
+        .notice.warn { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); color: var(--orange); }
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+<div class="shell">
+    <header>
+        <h1>{% block heading %}Engineer{% endblock %}</h1>
+        <nav class="nav-links">
+            <a href="/">Consultant</a>
+            <a href="/engineer" {% if active_nav == 'dashboard' %}class="active"{% endif %}>Dashboard</a>
+            <a href="/engineer/guardrails" {% if active_nav == 'guardrails' %}class="active"{% endif %}>Guardrails</a>
+            <a href="/engineer/datasets" {% if active_nav == 'datasets' %}class="active"{% endif %}>Datasets</a>
+            <a href="https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards/dashboard/intelligence-engine-bedrock-usage" target="_blank">CloudWatch &nearr;</a>
+        </nav>
+    </header>
+    {% block content %}{% endblock %}
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

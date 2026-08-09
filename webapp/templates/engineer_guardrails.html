@@ -1,0 +1,126 @@
+{% extends "_base_engineer.html" %}
+{% set active_nav = 'guardrails' %}
+{% block title %}Guardrails{% endblock %}
+{% block heading %}Guardrail Configuration{% endblock %}
+
+{% block extra_css %}
+        .rule-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 0.75rem; }
+        .rule-card {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 1rem 1.15rem;
+        }
+        .rule-card.disabled { opacity: 0.45; }
+        .rule-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.4rem; }
+        .rule-name { font-size: 0.82rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        .rule-desc { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.5; }
+        .rule-params { margin-top: 0.6rem; font-size: 0.7rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+        .rule-params span { display: inline-block; margin-right: 0.75rem; }
+        .editor {
+            width: 100%; min-height: 480px; background: var(--surface);
+            border: 1px solid var(--border); border-radius: 8px; padding: 1rem;
+            color: var(--text); font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem; line-height: 1.6; resize: vertical;
+        }
+        .editor:focus { outline: none; border-color: var(--blue); }
+        .btn {
+            border: none; border-radius: 7px; padding: 0.55rem 1.3rem;
+            font-size: 0.8rem; font-weight: 600; cursor: pointer;
+            font-family: inherit; transition: all 0.15s;
+        }
+        .btn-primary { background: var(--blue); color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .group-title {
+            font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.07em; color: var(--text-muted);
+            margin: 1.25rem 0 0.6rem;
+        }
+{% endblock %}
+
+{% block content %}
+    {% if saved %}<div class="notice ok">Configuration saved and reloaded. New runs will use these rules.</div>{% endif %}
+    {% if error %}<div class="notice err">{{ error }}</div>{% endif %}
+
+    <div class="section">
+        <div class="section-head">
+            <h2>Active Rules</h2>
+            <span class="badge">{{ config_path }}</span>
+        </div>
+
+        {% for group_name, group in config.items() %}
+            {% if group is mapping %}
+            <div class="group-title">{{ group_name.replace('_', ' ') }}</div>
+            <div class="rule-grid">
+                {% for rule_name, rule in group.items() %}
+                {% if rule is mapping %}
+                <div class="rule-card {% if not rule.enabled %}disabled{% endif %}">
+                    <div class="rule-head">
+                        <span class="rule-name">{{ rule_name }}</span>
+                        {% if rule.enabled %}
+                            <span class="pill {{ rule.severity | default('log') }}">{{ rule.severity | default('log') }}</span>
+                        {% else %}
+                            <span class="pill log">off</span>
+                        {% endif %}
+                    </div>
+                    <div class="rule-desc">{{ rule.description | default('—') }}</div>
+                    <div class="rule-params">
+                        {% for k, v in rule.items() %}
+                            {% if k not in ('enabled', 'severity', 'description', 'patterns', 'blocklist', 'scan_fields', 'required_fields') %}
+                                <span>{{ k }}={{ v }}</span>
+                            {% endif %}
+                        {% endfor %}
+                        {% if rule.patterns %}<span>patterns={{ rule.patterns | length }}</span>{% endif %}
+                        {% if rule.blocklist %}<span>blocklist={{ rule.blocklist | length }}</span>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <div class="section">
+        <div class="section-head">
+            <h2>Recent Guardrail Events</h2>
+            <span class="badge">{{ events | length }} shown</span>
+        </div>
+        <div class="panel">
+        {% if events %}
+            <table>
+                <thead>
+                    <tr><th>Severity</th><th>Check</th><th>Message</th><th>Company</th><th>Run</th></tr>
+                </thead>
+                <tbody>
+                {% for e in events %}
+                    <tr>
+                        <td><span class="pill {{ e.severity }}">{{ e.severity }}</span></td>
+                        <td><code>{{ e.check }}</code></td>
+                        <td>{{ e.message }}{% if e.detail %}<br><span style="color:var(--text-muted);font-size:0.75rem;">{{ e.detail }}</span>{% endif %}</td>
+                        <td>{{ e.company }}</td>
+                        <td><a class="link" href="/engineer/run/{{ e.run_id }}"><code>{{ e.run_id[:8] }}</code></a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p style="font-size:0.85rem;color:var(--text-muted);">No guardrail events recorded yet.</p>
+        {% endif %}
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-head">
+            <h2>Edit Configuration</h2>
+            <span class="badge">changes apply to new runs immediately</span>
+        </div>
+        <form action="/engineer/guardrails/save" method="POST">
+            <textarea name="raw_config" class="editor" spellcheck="false">{{ raw_config }}</textarea>
+            <div style="margin-top:0.8rem;">
+                <button type="submit" class="btn btn-primary">Save &amp; Reload</button>
+                <span style="font-size:0.75rem;color:var(--text-muted);margin-left:0.8rem;">
+                    YAML is validated before writing. Invalid syntax is rejected.
+                </span>
+            </div>
+        </form>
+    </div>
+{% endblock %}

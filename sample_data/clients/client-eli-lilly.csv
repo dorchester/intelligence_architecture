@@ -1,0 +1,215 @@
+employee_id,name,department,title,age,tenure_years,turnover_risk
+E0001,Remy Fischer,Research & Development,Research Associate,26,0.5,Medium
+E0002,Skyler Williams,Research & Development,Senior Scientist,33,10.5,Medium
+E0003,Marley Rivera,Research & Development,Senior Scientist,54,7.7,Medium
+E0004,Rowan Brown,Research & Development,Scientist,56,10.9,Low
+E0005,Wren Martinez,Research & Development,Director of Research,28,5.3,Low
+E0006,Taylor Anderson,Research & Development,Principal Scientist,23,0.9,Medium
+E0007,Morgan Campbell,Research & Development,Scientist,45,9.4,Low
+E0008,Marley Kim,Research & Development,Principal Scientist,31,0.6,High
+E0009,Ellis Torres,Research & Development,Research Associate,61,0.9,Medium
+E0010,Remy Clarke,Research & Development,Director of Research,51,6.1,Low
+E0011,Avery Santos,Research & Development,Research Associate,61,16.0,Low
+E0012,Jamie Yamamoto,Research & Development,Scientist,51,7.1,High
+E0013,Jamie Jackson,Research & Development,Principal Scientist,50,16.8,High
+E0014,Lennon Yamamoto,Research & Development,Senior Scientist,55,9.7,Low
+E0015,Wren Burke,Research & Development,Research Associate,28,7.0,Medium
+E0016,Wren Wilson,Research & Development,Director of Research,35,2.9,High
+E0017,Wren Kim,Research & Development,Director of Research,60,19.1,High
+E0018,Shiloh Nguyen,Research & Development,Research Associate,26,3.4,High
+E0019,Aspen Zhang,Research & Development,Senior Scientist,22,0.5,Medium
+E0020,Riley Rivera,Research & Development,Scientist,30,0.7,High
+E0021,Kai Santos,Research & Development,Senior Scientist,22,0.5,High
+E0022,Remy Patel,Research & Development,Director of Research,54,16.9,Low
+E0023,Sage Okafor,Research & Development,Research Associate,44,13.1,Low
+E0024,Harper Chen,Research & Development,Scientist,32,10.5,Low
+E0025,Tatum Park,Research & Development,Principal Scientist,49,8.9,Low
+E0026,Sage Anderson,Research & Development,Director of Research,32,7.1,Low
+E0027,Remy Chen,Research & Development,Research Associate,25,2.3,Low
+E0028,Kai Nguyen,Research & Development,Senior Scientist,46,7.2,Low
+E0029,Rowan Okafor,Research & Development,Scientist,41,13.1,Low
+E0030,Sutton Campbell,Research & Development,Research Associate,28,2.1,Low
+E0031,Sage Rivera,Research & Development,Principal Scientist,28,6.4,Low
+E0032,Peyton Santos,Clinical Operations,Clinical Research Coordinator,36,13.0,Low
+E0033,Jamie Morrison,Clinical Operations,Senior Clinical Research Associate,32,0.6,Medium
+E0034,Aspen Nguyen,Clinical Operations,Clinical Research Coordinator,30,4.7,Low
+E0035,Emerson Yamamoto,Clinical Operations,Clinical Research Coordinator,54,9.6,Medium
+E0036,Wren Okafor,Clinical Operations,Clinical Research Associate,55,14.7,Low
+E0037,Jordan Rivera,Clinical Operations,Clinical Research Associate,53,9.3,Medium
+E0038,Blair Okafor,Clinical Operations,Clinical Research Associate,25,2.6,Low
+E0039,Harper Fischer,Clinical Operations,Clinical Research Associate,32,4.3,Low
+E0040,Logan Brown,Clinical Operations,Clinical Trial Manager,33,6.8,Low
+E0041,Alex Santos,Clinical Operations,Director of Clinical Operations,38,14.6,High
+E0042,Tatum Yamamoto,Clinical Operations,Senior Clinical Research Associate,42,19.3,Low
+E0043,River Campbell,Clinical Operations,Director of Clinical Operations,62,12.2,Low
+E0044,Dakota Thompson,Clinical Operations,Senior Clinical Research Associate,40,14.1,Medium
+E0045,Peyton Wilson,Clinical Operations,Clinical Trial Manager,28,6.6,Medium
+E0046,Shiloh Yamamoto,Clinical Operations,Clinical Research Coordinator,44,19.6,Low
+E0047,Peyton Okafor,Clinical Operations,Clinical Research Associate,48,18.0,Medium
+E0048,Taylor Santos,Clinical Operations,Senior Clinical Research Associate,24,1.2,Medium
+E0049,Logan Jackson,Clinical Operations,Director of Clinical Operations,47,12.1,Low
+E0050,Charlie Morrison,Clinical Operations,Senior Clinical Research Associate,22,0.9,Medium
+E0051,Sage Nguyen,Clinical Operations,Senior Clinical Research Associate,58,4.0,Low
+E0052,Shiloh Morrison,Clinical Operations,Clinical Research Associate,42,8.7,Low
+E0053,Peyton Williams,Clinical Operations,Senior Clinical Research Associate,29,1.3,High
+E0054,Phoenix Kim,Clinical Operations,Director of Clinical Operations,58,1.9,Low
+E0055,Sage Nguyen,Clinical Operations,Director of Clinical Operations,60,18.9,Low
+E0056,Jordan Lee,Clinical Operations,Clinical Trial Manager,54,14.9,Low
+E0057,Cameron Williams,Clinical Operations,Clinical Research Coordinator,27,3.1,Medium
+E0058,Sutton Thompson,Clinical Operations,Clinical Research Coordinator,49,5.4,Low
+E0059,Hayden Zhang,Clinical Operations,Clinical Trial Manager,32,8.9,Medium
+E0060,Sutton Rivera,Clinical Operations,Clinical Trial Manager,46,19.9,Low
+E0061,Emerson Jackson,Clinical Operations,Clinical Trial Manager,58,16.8,Low
+E0062,Oakley Campbell,Clinical Operations,Clinical Research Associate,46,5.3,Low
+E0063,Harper Santos,Regulatory Affairs,Regulatory Affairs Manager,33,2.2,High
+E0064,Morgan Chen,Regulatory Affairs,Regulatory Affairs Specialist,56,13.6,Medium
+E0065,Charlie Jackson,Regulatory Affairs,Regulatory Affairs Manager,23,0.7,High
+E0066,Tatum Lee,Regulatory Affairs,Senior Regulatory Affairs Manager,43,4.7,Low
+E0067,Blair Okafor,Regulatory Affairs,Senior Regulatory Affairs Manager,46,19.8,Low
+E0068,Skyler Patel,Regulatory Affairs,Regulatory Affairs Specialist,54,16.8,Low
+E0069,Alex Thompson,Regulatory Affairs,Vice President of Regulatory Affairs,35,5.6,High
+E0070,Riley Davis,Regulatory Affairs,Regulatory Affairs Manager,36,6.4,Low
+E0071,Avery Burke,Regulatory Affairs,Vice President of Regulatory Affairs,35,13.0,Medium
+E0072,Blair Brown,Regulatory Affairs,Senior Regulatory Affairs Manager,45,7.4,Medium
+E0073,Finley Davis,Regulatory Affairs,Regulatory Affairs Manager,38,5.1,Low
+E0074,Phoenix Nguyen,Regulatory Affairs,Regulatory Affairs Specialist,35,9.1,Low
+E0075,Phoenix Okafor,Regulatory Affairs,Vice President of Regulatory Affairs,49,3.7,Medium
+E0076,Cameron Williams,Regulatory Affairs,Senior Regulatory Affairs Specialist,41,4.0,Low
+E0077,Oakley Anderson,Regulatory Affairs,Regulatory Affairs Manager,43,10.0,Low
+E0078,Finley Rivera,Regulatory Affairs,Vice President of Regulatory Affairs,40,5.8,Medium
+E0079,Shiloh Nguyen,Regulatory Affairs,Regulatory Affairs Specialist,43,1.1,Medium
+E0080,Sage Jackson,Regulatory Affairs,Regulatory Affairs Manager,26,2.1,High
+E0081,Peyton Okafor,Regulatory Affairs,Senior Regulatory Affairs Manager,23,1.7,Low
+E0082,Charlie Park,Regulatory Affairs,Regulatory Affairs Manager,48,5.9,Low
+E0083,Reese Brown,Regulatory Affairs,Regulatory Affairs Manager,44,2.6,Medium
+E0084,Remy Chen,Regulatory Affairs,Regulatory Affairs Manager,61,19.6,Low
+E0085,Ellis Burke,Regulatory Affairs,Vice President of Regulatory Affairs,52,10.2,Medium
+E0086,Casey Torres,Regulatory Affairs,Senior Regulatory Affairs Manager,55,16.2,Low
+E0087,Blair Park,Regulatory Affairs,Regulatory Affairs Specialist,59,1.1,Medium
+E0088,Quinn Garcia,Regulatory Affairs,Senior Regulatory Affairs Manager,51,11.9,Low
+E0089,Riley Thompson,Regulatory Affairs,Senior Regulatory Affairs Specialist,54,5.1,Low
+E0090,Hayden Torres,Regulatory Affairs,Regulatory Affairs Specialist,50,17.3,Low
+E0091,Alex Lee,Regulatory Affairs,Regulatory Affairs Specialist,26,2.9,High
+E0092,Lennon Rivera,Regulatory Affairs,Regulatory Affairs Manager,44,13.5,Low
+E0093,Alex Fischer,Regulatory Affairs,Senior Regulatory Affairs Specialist,28,4.7,Low
+E0094,Rowan Torres,Manufacturing & Quality,Quality Control Analyst,26,3.5,Low
+E0095,Rowan Lee,Manufacturing & Quality,Senior Quality Assurance Manager,56,12.3,Low
+E0096,Logan Brown,Manufacturing & Quality,Manufacturing Associate,33,1.6,High
+E0097,Jamie Clarke,Manufacturing & Quality,Senior Quality Assurance Manager,62,5.0,Low
+E0098,Shiloh Wilson,Manufacturing & Quality,Quality Control Analyst,32,9.3,Low
+E0099,Oakley Morrison,Manufacturing & Quality,Senior Quality Assurance Manager,36,12.6,Medium
+E0100,Rowan Morrison,Manufacturing & Quality,Senior Quality Assurance Manager,57,1.3,High
+E0101,Cameron Lee,Manufacturing & Quality,Director of Manufacturing,45,13.6,Medium
+E0102,Finley Yamamoto,Manufacturing & Quality,Director of Manufacturing,23,1.1,High
+E0103,Aspen Okafor,Manufacturing & Quality,Senior Quality Assurance Manager,58,11.7,Low
+E0104,Sage Burke,Manufacturing & Quality,Director of Manufacturing,55,11.8,Medium
+E0105,Oakley Okafor,Manufacturing & Quality,Senior Quality Assurance Manager,49,13.7,Medium
+E0106,Hayden Santos,Manufacturing & Quality,Manufacturing Associate,45,2.8,Medium
+E0107,Sage Johnson,Manufacturing & Quality,Quality Assurance Specialist,27,0.3,Low
+E0108,Riley Garcia,Manufacturing & Quality,Director of Manufacturing,29,7.9,Low
+E0109,Avery Chen,Manufacturing & Quality,Quality Control Analyst,48,16.5,Medium
+E0110,Jordan Santos,Manufacturing & Quality,Quality Assurance Specialist,51,9.7,Medium
+E0111,Avery Campbell,Manufacturing & Quality,Senior Quality Assurance Manager,46,11.2,Medium
+E0112,Taylor Lee,Manufacturing & Quality,Quality Assurance Specialist,56,7.2,Low
+E0113,Aspen Nguyen,Manufacturing & Quality,Quality Assurance Specialist,61,10.2,Low
+E0114,Cameron Wilson,Manufacturing & Quality,Director of Manufacturing,31,7.2,Low
+E0115,Shiloh Patel,Manufacturing & Quality,Quality Control Analyst,33,0.6,High
+E0116,Oakley Anderson,Manufacturing & Quality,Quality Control Analyst,23,1.3,Medium
+E0117,Finley Santos,Manufacturing & Quality,Senior Quality Assurance Manager,24,1.6,Low
+E0118,Charlie Campbell,Manufacturing & Quality,Quality Control Analyst,41,5.1,Low
+E0119,Avery Brown,Manufacturing & Quality,Director of Manufacturing,31,5.8,Low
+E0120,Sage Yamamoto,Manufacturing & Quality,Manufacturing Associate,37,15.0,Medium
+E0121,Charlie Clarke,Manufacturing & Quality,Director of Manufacturing,42,4.2,High
+E0122,Casey Fischer,Manufacturing & Quality,Director of Manufacturing,46,19.7,Low
+E0123,Remy Lee,Manufacturing & Quality,Manufacturing Associate,61,11.1,Low
+E0124,Peyton Jackson,Manufacturing & Quality,Director of Manufacturing,52,1.9,Medium
+E0125,Blair Okafor,Medical Affairs,Director of Medical Affairs,55,5.2,Medium
+E0126,Cameron Chen,Medical Affairs,Chief Medical Officer,35,12.9,Medium
+E0127,Jordan Morrison,Medical Affairs,Senior Medical Science Liaison,27,1.4,Low
+E0128,Finley Okafor,Medical Affairs,Medical Affairs Manager,56,11.0,Medium
+E0129,Phoenix Davis,Medical Affairs,Senior Medical Science Liaison,32,10.1,Low
+E0130,Hayden Nguyen,Medical Affairs,Director of Medical Affairs,27,3.2,Medium
+E0131,Riley Anderson,Medical Affairs,Senior Medical Science Liaison,35,7.7,Medium
+E0132,Drew Patel,Medical Affairs,Director of Medical Affairs,25,3.1,High
+E0133,Phoenix Burke,Medical Affairs,Chief Medical Officer,61,2.8,Medium
+E0134,Riley Torres,Medical Affairs,Medical Science Liaison,41,9.8,Low
+E0135,Remy Zhang,Medical Affairs,Chief Medical Officer,32,3.4,Medium
+E0136,Avery Jackson,Medical Affairs,Director of Medical Affairs,57,10.5,Low
+E0137,Taylor Thompson,Medical Affairs,Chief Medical Officer,54,15.3,Low
+E0138,Avery Garcia,Medical Affairs,Medical Science Liaison,40,11.6,Medium
+E0139,Parker Brown,Medical Affairs,Director of Medical Affairs,36,5.7,Low
+E0140,Rowan Rivera,Medical Affairs,Medical Science Liaison,60,1.1,High
+E0141,Sage Nguyen,Medical Affairs,Senior Medical Science Liaison,29,6.1,Low
+E0142,Casey Johnson,Medical Affairs,Medical Affairs Manager,25,0.4,Medium
+E0143,Cameron Jackson,Medical Affairs,Chief Medical Officer,32,3.1,Low
+E0144,Finley Davis,Medical Affairs,Director of Medical Affairs,31,8.6,Medium
+E0145,Charlie Davis,Medical Affairs,Medical Science Liaison,58,6.7,Low
+E0146,Harper Lee,Medical Affairs,Senior Medical Science Liaison,29,5.2,Medium
+E0147,Oakley Martinez,Medical Affairs,Director of Medical Affairs,50,0.6,Low
+E0148,Sutton Wilson,Medical Affairs,Chief Medical Officer,56,4.4,Medium
+E0149,Kai Chen,Medical Affairs,Senior Medical Science Liaison,54,0.9,High
+E0150,Lennon Torres,Medical Affairs,Medical Affairs Manager,55,13.7,Low
+E0151,Tatum Okafor,Medical Affairs,Chief Medical Officer,61,9.5,Medium
+E0152,Marley Santos,Medical Affairs,Director of Medical Affairs,50,16.7,Medium
+E0153,Sutton Park,Medical Affairs,Medical Science Liaison,55,13.4,Medium
+E0154,Aspen Patel,Medical Affairs,Chief Medical Officer,24,2.2,Medium
+E0155,Alex Jackson,Commercial & Sales,Pharmaceutical Sales Representative,55,11.7,Low
+E0156,Emerson Park,Commercial & Sales,Vice President of Commercial,38,15.5,Low
+E0157,Skyler Brown,Commercial & Sales,Senior Sales Representative,29,5.0,Medium
+E0158,Logan Johnson,Commercial & Sales,National Sales Manager,28,6.7,Low
+E0159,Harper Zhang,Commercial & Sales,Senior Sales Representative,22,0.6,High
+E0160,Aspen Campbell,Commercial & Sales,National Sales Manager,49,6.1,Medium
+E0161,Phoenix Yamamoto,Commercial & Sales,National Sales Manager,52,2.7,Medium
+E0162,Jordan Martinez,Commercial & Sales,National Sales Manager,56,14.1,Low
+E0163,Jamie Lee,Commercial & Sales,Regional Sales Manager,35,1.9,Medium
+E0164,Oakley Thompson,Commercial & Sales,Vice President of Commercial,53,13.7,Low
+E0165,Lennon Davis,Commercial & Sales,Vice President of Commercial,32,10.1,Low
+E0166,Oakley Davis,Commercial & Sales,National Sales Manager,23,1.9,Low
+E0167,Oakley Jackson,Commercial & Sales,National Sales Manager,30,7.1,Low
+E0168,Sage Anderson,Commercial & Sales,Regional Sales Manager,35,11.7,Low
+E0169,Morgan Williams,Commercial & Sales,Regional Sales Manager,23,1.5,Medium
+E0170,Drew Fischer,Commercial & Sales,Pharmaceutical Sales Representative,32,10.2,Medium
+E0171,Dakota Yamamoto,Commercial & Sales,Vice President of Commercial,58,15.7,Low
+E0172,Quinn Davis,Commercial & Sales,National Sales Manager,39,17.4,Low
+E0173,Marley Rivera,Commercial & Sales,Vice President of Commercial,55,13.5,Low
+E0174,Casey Anderson,Commercial & Sales,Regional Sales Manager,60,6.4,Low
+E0175,Avery Kim,Commercial & Sales,Regional Sales Manager,35,9.4,Low
+E0176,Ellis Brown,Commercial & Sales,Senior Sales Representative,45,4.0,Medium
+E0177,Dakota Brown,Commercial & Sales,Senior Sales Representative,40,12.0,Medium
+E0178,Lennon Lee,Commercial & Sales,Vice President of Commercial,53,1.7,Medium
+E0179,Dakota Thompson,Commercial & Sales,Pharmaceutical Sales Representative,57,10.0,High
+E0180,Avery Martinez,Commercial & Sales,Regional Sales Manager,36,5.2,Medium
+E0181,Marley Morrison,Commercial & Sales,Regional Sales Manager,62,6.3,Low
+E0182,Sage Park,Commercial & Sales,Vice President of Commercial,26,2.2,Medium
+E0183,Sutton Anderson,Commercial & Sales,Vice President of Commercial,22,0.5,High
+E0184,Avery Chen,Commercial & Sales,Senior Sales Representative,22,0.6,High
+E0185,Quinn Martinez,Pharmacovigilance,Pharmacovigilance Specialist,29,1.3,Medium
+E0186,Jordan Brown,Pharmacovigilance,Drug Safety Associate,45,19.3,Low
+E0187,Shiloh Lee,Pharmacovigilance,Pharmacovigilance Specialist,38,2.3,Medium
+E0188,Blair Park,Pharmacovigilance,Pharmacovigilance Manager,59,12.2,Medium
+E0189,Wren Santos,Pharmacovigilance,Senior Pharmacovigilance Specialist,62,3.7,High
+E0190,Jamie Chen,Pharmacovigilance,Pharmacovigilance Manager,36,2.3,Low
+E0191,Charlie Kim,Pharmacovigilance,Pharmacovigilance Manager,59,5.2,Low
+E0192,Avery Davis,Pharmacovigilance,Pharmacovigilance Manager,54,6.4,High
+E0193,Riley Santos,Pharmacovigilance,Director of Pharmacovigilance,51,15.5,Low
+E0194,Tatum Rivera,Pharmacovigilance,Drug Safety Associate,48,6.8,Low
+E0195,Reese Fischer,Pharmacovigilance,Senior Pharmacovigilance Specialist,39,14.3,Medium
+E0196,Drew Garcia,Pharmacovigilance,Pharmacovigilance Specialist,42,1.0,Medium
+E0197,Jordan Wilson,Pharmacovigilance,Pharmacovigilance Manager,42,16.6,Low
+E0198,Sage Johnson,Pharmacovigilance,Drug Safety Associate,55,1.0,Medium
+E0199,Harper Torres,Pharmacovigilance,Drug Safety Associate,52,5.3,Low
+E0200,Drew Williams,Pharmacovigilance,Director of Pharmacovigilance,47,7.6,Low
+E0201,Remy Yamamoto,Pharmacovigilance,Director of Pharmacovigilance,54,8.8,Low
+E0202,Wren Torres,Pharmacovigilance,Drug Safety Associate,53,8.1,Low
+E0203,Blair Kim,Pharmacovigilance,Pharmacovigilance Specialist,60,11.2,Low
+E0204,Jamie Yamamoto,Pharmacovigilance,Director of Pharmacovigilance,41,5.2,Low
+E0205,Oakley Lee,Pharmacovigilance,Director of Pharmacovigilance,40,10.0,Medium
+E0206,Taylor Wilson,Pharmacovigilance,Director of Pharmacovigilance,38,0.7,Medium
+E0207,Cameron Lee,Pharmacovigilance,Pharmacovigilance Specialist,24,1.9,Medium
+E0208,Kai Okafor,Pharmacovigilance,Drug Safety Associate,38,2.8,Medium
+E0209,Casey Martinez,Pharmacovigilance,Senior Pharmacovigilance Specialist,47,1.4,Low
+E0210,Quinn Fischer,Pharmacovigilance,Director of Pharmacovigilance,53,15.1,Medium
+E0211,River Brown,Pharmacovigilance,Pharmacovigilance Specialist,35,8.2,Low
+E0212,Wren Davis,Pharmacovigilance,Pharmacovigilance Specialist,45,12.6,Low
+E0213,Parker Brown,Pharmacovigilance,Director of Pharmacovigilance,36,10.3,Low
+E0214,Shiloh Patel,Pharmacovigilance,Pharmacovigilance Manager,35,6.3,Low

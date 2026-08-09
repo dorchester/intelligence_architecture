@@ -1,0 +1,197 @@
+# Guardrail Configuration
+#
+# Engineers tune validation behavior here without touching application code.
+# Each guardrail has: enabled, severity, and rule-specific parameters.
+#
+# Severity levels:
+#   block  - halt the run, surface error to consultant
+#   warn   - continue but flag prominently in UI and logs
+#   log    - record only, no user-visible impact
+
+version: "1.0"
+
+# ============================================================
+# INPUT VALIDATION — runs before any LLM call
+# ============================================================
+
+input_validation:
+
+  company_name_format:
+    enabled: true
+    severity: block
+    description: "Reject malformed company names before spending tokens"
+    min_length: 2
+    max_length: 120
+    # Reject if the string is mostly non-alphabetic
+    min_alpha_ratio: 0.5
+    # Reject obvious keyboard mashing (e.g. "asdfjkl", "qwerty")
+    reject_keyboard_patterns: true
+    # Reject if a single character repeats this many times consecutively
+    max_char_repeat: 4
+    # Reject strings with no vowels (likely gibberish)
+    require_vowels: true
+    # Explicit blocklist of test/placeholder values
+    blocklist:
+      - test
+      - testing
+      - asdf
+      - foo
+      - bar
+      - example
+      - company
+      - acme
+      - lorem ipsum
+      - n/a
+      - none
+      - tbd
+
+  prompt_injection:
+    enabled: true
+    severity: block
+    description: "Detect attempts to manipulate the agent through input fields"
+    patterns:
+      - "ignore (all |the )?(previous|prior|above) instructions"
+      - "disregard (all |the )?(previous|prior|above)"
+      - "you are now"
+      - "new instructions:"
+      - "system prompt"
+      - "<\\|im_start\\|>"
+      - "\\[INST\\]"
+      - "forget everything"
+      - "reveal your (prompt|instructions|system)"
+    # Also scan the engagement_context field
+    scan_fields:
+      - company_name
+      - engagement_context
+
+  engagement_context_length:
+    enabled: true
+    severity: warn
+    description: "Very long context inflates token cost"
+    max_chars: 2000
+
+# ============================================================
+# ENTITY VERIFICATION — LLM-assisted, runs after format checks
+# ============================================================
+
+entity_verification:
+
+  company_exists:
+    enabled: true
+    severity: block
+    description: "Verify the company is a real, identifiable organization"
+    # Model used for the verification call (cheaper model is fine)
+    model: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    # Minimum confidence (0-1) required to proceed
+    min_confidence: 0.6
+    # If the model is unsure, ask the consultant instead of blocking outright
+    ambiguous_action: "confirm_with_user"
+    # Allow known-fictional companies (useful for demos/training)
+    allow_fictional: false
+    # Companies in the preset dataset always pass
+    trust_preset_companies: true
+
+  company_size_sanity:
+    enabled: true
+    severity: warn
+    description: "Flag implausible headcount figures from research"
+    min_headcount: 1
+    max_headcount: 3000000
+    # Warn if research headcount differs from preset dataset by more than this ratio
+    preset_deviation_threshold: 0.5
+
+# ============================================================
+# OUTPUT VALIDATION — runs on LLM responses before showing consultant
+# ============================================================
+
+output_validation:
+
+  research_completeness:
+    enabled: true
+    severity: warn
+    description: "Ensure research returned the fields downstream phases need"
+    required_fields:
+      - full_name
+      - industry
+      - employee_count
+    # Retry the LLM call this many times if fields are missing
+    max_retries: 2
+
+  hallucination_markers:
+    enabled: true
+    severity: warn
+    description: "Flag language suggesting the model is uncertain or inventing"
+    patterns:
+      - "I don't have (specific |current |detailed )?information"
+      - "I'm not able to (find|verify|confirm)"
+      - "as of my (last |knowledge |training )?(update|cutoff)"
+      - "hypothetical"
+      - "for illustrative purposes"
+      - "placeholder"
+      - "XYZ Corp"
+      - "\\[insert"
+      - "TBD"
+
+  pii_leakage:
+    enabled: true
+    severity: block
+    description: "Prevent real personal data appearing in output"
+    patterns:
+      # SSN
+      - "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+      # Credit card
+      - "\\b(?:\\d{4}[- ]?){3}\\d{4}\\b"
+      # Email addresses (synthetic profiles should not carry real emails)
+      - "[a-zA-Z0-9._%+-]+@(?!example\\.|synthetic\\.)[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+
+  minimum_length:
+    enabled: true
+    severity: warn
+    description: "Catch truncated or empty LLM responses"
+    briefing_min_chars: 400
+    analysis_min_chars: 150
+
+# ============================================================
+# COST & RATE CONTROLS
+# ============================================================
+
+cost_controls:
+
+  max_tokens_per_run:
+    enabled: true
+    severity: block
+    description: "Hard ceiling on token spend for a single run"
+    limit: 150000
+
+  max_revisions_per_checkpoint:
+    enabled: true
+    severity: block
+    description: "Prevent infinite revision loops"
+    limit: 5
+
+  max_concurrent_runs:
+    enabled: true
+    severity: block
+    description: "Limit simultaneous runs to control burst cost"
+    limit: 10
+
+# ============================================================
+# DATA ACCESS CONTROLS
+# ============================================================
+
+data_access:
+
+  dataset_query_limits:
+    enabled: true
+    severity: block
+    description: "Bound the size of dataset queries"
+    max_profiles_returned: 1000
+    max_postings_returned: 1000
+
+  cross_company_isolation:
+    enabled: true
+    severity: block
+    description: "A run scoped to one company must never read another company's data"
+    # This is enforced structurally in the query layer; this flag also
+    # enables an assertion that raises if a violation is somehow attempted.
+    enforce_assertion: true

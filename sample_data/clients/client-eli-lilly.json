@@ -1,0 +1,16 @@
+{
+  "client_id": "client-eli-lilly",
+  "client_name": "Eli Lilly",
+  "industry": "Pharmaceuticals",
+  "headcount": 214,
+  "departments": [
+    "Research & Development",
+    "Clinical Operations",
+    "Regulatory Affairs",
+    "Manufacturing & Quality",
+    "Medical Affairs",
+    "Commercial & Sales",
+    "Pharmacovigilance"
+  ],
+  "generated": true
+}

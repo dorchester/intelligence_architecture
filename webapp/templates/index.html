@@ -32,6 +32,43 @@
         header p { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; max-width: 560px; }
 
         /* New engagement form */
+        .alert {
+            background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.28);
+            color: #f87171; border-radius: 10px; padding: 0.9rem 1.2rem;
+            font-size: 0.85rem; margin-bottom: 1.75rem;
+        }
+        .alert.warn {
+            background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.28);
+            color: var(--orange);
+        }
+        .alert-detail { font-size: 0.78rem; opacity: 0.85; }
+
+        .preset-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 0.6rem; margin-bottom: 2.5rem;
+        }
+        .preset-card {
+            background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+            padding: 0.9rem 1.1rem; display: flex; align-items: center;
+            justify-content: space-between; gap: 0.75rem;
+            transition: all 0.15s ease; cursor: pointer;
+        }
+        .preset-card:hover {
+            border-color: var(--blue); transform: translateY(-1px);
+            box-shadow: 0 2px 12px rgba(59,130,246,0.07);
+        }
+        .preset-info { min-width: 0; }
+        .preset-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 0.1rem; }
+        .preset-meta { font-size: 0.74rem; color: var(--text-secondary); }
+        .preset-data { font-size: 0.68rem; color: var(--green); margin-top: 0.15rem; }
+        .preset-btn {
+            background: transparent; color: var(--blue); border: 1px solid var(--border);
+            border-radius: 6px; padding: 0.4rem 0.85rem; font-size: 0.74rem;
+            font-weight: 600; cursor: pointer; font-family: inherit;
+            transition: all 0.15s; flex-shrink: 0;
+        }
+        .preset-card:hover .preset-btn { background: var(--blue); color: #fff; border-color: var(--blue); }
+
         .engagement-form {
             background: var(--card); border: 1px solid var(--border); border-radius: 14px;
             padding: 2rem; margin-bottom: 3rem;
@@ -89,16 +126,49 @@
 <div class="shell">
     <header>
         <h1>Intelligence Engine</h1>
-        <p>Pre-engagement intelligence for management consultants. Enter a company to generate an organizational and workforce briefing before your next engagement.</p>
+        <p>Pre-engagement intelligence for management consultants. Select a client with workforce data, or enter any company to research.</p>
     </header>
 
+    {% if validation_error %}
+    <div class="alert">
+        <strong>{{ validation_error }}</strong>
+        {% if validation_detail %}<br><span class="alert-detail">{{ validation_detail }}</span>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if presets %}
+    <div class="section-title">Clients with Workforce Data</div>
+    <div class="preset-grid">
+        {% for c in presets %}
+        <form action="/run/start" method="POST" class="preset-card">
+            <input type="hidden" name="company_id" value="{{ c.company_id }}">
+            <input type="hidden" name="company_name" value="{{ c.company_name }}">
+            <div class="preset-info">
+                <div class="preset-name">{{ c.company_name }}</div>
+                <div class="preset-meta">{{ c.industry }}</div>
+                <div class="preset-data">
+                    {{ '{:,}'.format(c.profile_count) }} profiles &middot;
+                    {{ '{:,}'.format(c.posting_count) }} postings
+                </div>
+            </div>
+            <button type="submit" class="preset-btn">Analyze</button>
+        </form>
+        {% endfor %}
+    </div>
+    {% elif dataset_error %}
+    <div class="alert warn">
+        <strong>Workforce datasets unavailable</strong><br>
+        <span class="alert-detail">Presets require AWS access. Any company can still be researched below.</span>
+    </div>
+    {% endif %}
+
     <div class="engagement-form">
-        <h2>New Intelligence Briefing</h2>
+        <h2>{% if presets %}Research Any Company{% else %}New Intelligence Briefing{% endif %}</h2>
         <form action="/run/start" method="POST">
             <div class="field">
                 <label>Company</label>
-                <input type="text" name="company_name" placeholder="e.g. Eli Lilly, FedEx, Hilton Worldwide" required autofocus>
-                <p class="hint">Enter the full company name. The engine will research their organization, workforce dynamics, and identify engagement opportunities.</p>
+                <input type="text" name="company_name" placeholder="e.g. Eli Lilly, FedEx, Hilton Worldwide" required {% if not presets %}autofocus{% endif %}>
+                <p class="hint">Enter the full company name. The engine will verify it exists, research their organization, and identify engagement opportunities.</p>
             </div>
             <div class="field">
                 <label>Engagement Context (Optional)</label>
