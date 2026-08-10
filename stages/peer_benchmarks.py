@@ -211,7 +211,7 @@ def register(database: str, bucket: str, rows: int, clients: int) -> None:
             "ie.lineage.compute": "databricks-serverless-sql",
             "ie.lineage.rows_out": str(rows),
             "ie.lineage.contributing_clients": str(clients),
-            "ie.lineage.built_at": pd.Timestamp.utcnow().isoformat(),
+            "ie.lineage.built_at": pd.Timestamp.now("UTC").isoformat(),
         },
         "StorageDescriptor": {
             "Columns": [

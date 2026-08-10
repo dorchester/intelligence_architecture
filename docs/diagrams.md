@@ -168,6 +168,29 @@ flowchart LR
     REQ[needs a new product?] --> FDE[reviewed stage change<br/>via the FDE] --> LK
 ```
 
+## 9. Peer benchmarks: crossing clients without breaking isolation
+
+```mermaid
+flowchart LR
+    subgraph "Per-client, governed"
+        A[(client A<br/>derived/)]
+        B[(client B<br/>derived/)]
+        C[(client C<br/>derived/)]
+        D[(client D<br/>derived/)]
+    end
+    A & B & C & D -->|"read in place, read-only credential"| UC[Unity Catalog view<br/>workforce_composition_all]
+    UC -->|"one SQL statement:<br/>median share by seniority"| AGG{{"suppression:<br/>>= 3 contributing clients"}}
+    AGG -->|"aggregate rows only"| ST["stages/peer_benchmarks.py<br/>(AWS writes, Databricks does not)"]
+    ST --> P[(derived/peer_benchmarks/)]
+    ST -.registers lineage.-> G[Glue catalog of record]
+    P -->|"a run reads the PRODUCT,<br/>never another client's rows"| RUN[Report run<br/>scoped to one client]
+    ISO{{cross_company_isolation<br/>guardrail}} -.still holds.-> RUN
+```
+
+Isolation is preserved because the crossing happens **upstream of any run**
+and only a suppressed aggregate survives it. Databricks holds no write path:
+it computes, the stage writes, and Glue stays the catalog of record.
+
 ---
 
 ## Regenerating and extending

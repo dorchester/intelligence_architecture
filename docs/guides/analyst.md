@@ -109,7 +109,49 @@ analyst surface. The governed path now exists beside it; retiring the raw
 view, and splitting the credential in two so the analyst path cannot reach
 `datasets/` at all, is the outstanding piece of work.
 
-## 6. Why you can't write
+## 6. Peer benchmarks: the one thing only Databricks can do here
+
+Every run is scoped to one client, and the `cross_company_isolation`
+guardrail enforces it. So a report can say *"Clinical is 22% of headcount"*
+but never *"…against a 17% peer median"* — the numbers that would answer
+that live in other clients' data.
+
+`stages/peer_benchmarks.py` closes that gap **without weakening the rule**.
+The cross-client aggregation happens upstream of any run, in Databricks,
+over the already-governed L3 tier; only a suppressed aggregate comes back,
+and a run reads that *product* rather than another client's rows.
+
+```
+seniority      clients  median share           range  median tenure
+Entry                4         41.9%      39.3-47.4%          1.14y
+Mid                  4         21.4%      19.5-21.9%          2.75y
+Senior               4         18.6%      13.6-23.0%          4.23y
+Director             4         12.2%       9.5-12.7%          5.61y
+VP/Executive         4          6.5%        5.0-6.8%          7.42y
+```
+
+Four design points worth knowing before you use it:
+
+- **Databricks has no write path.** It computes; the stage writes; the
+  catalog of record stays in Glue. Provenance is not split across two
+  catalogues.
+- **Suppression twice.** The L3 input is already suppressed, and a cell
+  needs at least three contributing clients to survive here — a median over
+  two clients can still be re-identifying.
+- **Seniority, not department.** An empirical choice: every seniority level
+  is shared by all onboarded clients, while the most widely shared
+  department appears in only two. Department taxonomies are
+  industry-specific, so a cross-industry department median compares things
+  that are not alike.
+- **Share, not headcount.** Absolute headcount mostly measures company size;
+  seniority *shape* is comparable between a 400-person client and a
+  40,000-person one.
+
+It is **optional by construction**: missing parameters, an unreachable
+warehouse or an empty result all log why and exit 0, and the report builds
+exactly as it does without Databricks.
+
+## 7. Why you can't write
 
 The `databricks-uc` role holds no write on anything — so nothing you do in a
 notebook can corrupt a governed tier, mislabel lineage, or leak into the

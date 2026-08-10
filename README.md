@@ -357,7 +357,7 @@ All CloudFormation-managed, tagged `Application=intelligence-engine`.
 | `…-dev-dataplane` | Partitioned data domains — landing, lakehouse, artifacts, site, sensitive vault (KMS) — plus Athena workgroup and upload audit trail | per GB / per query |
 | `…-dev-author-seat` | IAM identity for the authoring persona — artifact read, Bedrock, no deploys | free |
 | `…-dev-llm-controls` | Per-client Bedrock attribution profiles + monthly spend alerts | free |
-| `…-dev-databricks-access` | Read-only Unity Catalog role over the derived and contextualized tiers (plus the raw dataset drop) + credential parameters | free |
+| `…-dev-databricks-access` | Read-only Unity Catalog role over the derived and contextualized tiers (plus the raw dataset drop) + service-principal parameters used by the optional peer-benchmark stage | free |
 | `…-dev-workflow` | Step Functions harness — CodeBuild stages, zero-compute approvals, stage image ECR, golden replay | per run |
 | `…-dev-governance` | Medallion catalog databases, per-tier read/write policies, CloudTrail with object-level data events, stewardship SNS topic | per GB of trail |
 | `…-dev-steward` | Data-steward seat — data admission, console user management, audit read | free |

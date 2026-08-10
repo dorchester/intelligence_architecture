@@ -65,6 +65,7 @@ DIAGRAMS = {
     "criticality": "06-the-access-model-at-a-glance.png",
     "audit": "07-the-audit-surface.png",
     "analyst": "08-the-analyst-s-zero-copy-path.png",
+    "benchmarks": "09-peer-benchmarks-crossing-clients-without-breaking-isolation.png",
 }
 
 TEAL = RGBColor(0x0D, 0x94, 0x88)
@@ -520,6 +521,44 @@ para("Two boundaries are visible in that exchange. The credential is read-only, 
      "owned by the infrastructure service principal, so publishing a permanent "
      "view for analysts is a reviewed change by the team that owns the pipeline "
      "- not something a curious analyst can do at a SQL prompt.", italic=True)
+
+h2("Activity 5.2 - Peer benchmarks: the one thing only Databricks can do here")
+para("Every run is scoped to one client, and the cross_company_isolation "
+     "guardrail enforces it. So a report can say “Clinical is 22% of "
+     "headcount” but never “...against a 17% peer median” - the numbers "
+     "that would answer that live in other clients' data. This is the gap "
+     "Databricks is genuinely placed to close.")
+diagram("benchmarks", "Figure 23. The crossing happens upstream of any run, and only a suppressed "
+                      "aggregate survives it. A run reads the product, never another client's rows, "
+                      "so the isolation guardrail still holds.")
+steps([
+    "Four clients are taken through the medallion path, so there are peers to compare against.",
+    "A Unity Catalog view reads every client's governed L3 tier in place, read-only.",
+    "One SQL statement computes median share of workforce by seniority, suppressing any cell with fewer than three contributing clients.",
+    "The stage - not Databricks - writes the aggregate to derived/peer_benchmarks/ and registers it in Glue with full lineage.",
+    "A report run consumes the product. If Databricks is absent, the stage exits 0 and the report builds unchanged.",
+])
+para("Executed on the deployed harness, four contributing clients:", bold=True)
+code("""OK | wrote s3://<lakehouse>/derived/peer_benchmarks/part-0000.parquet
+     (4734 bytes, 5 cells, up to 4 contributing clients)
+OK | created glue table ie_dev_derived.peer_benchmarks
+steward log: 1 event(s) -> stewardship/gate-events/...""")
+para("The product itself - a workforce pyramid with observed ranges:", bold=True)
+code("""seniority      clients  median share           range  median tenure
+Entry                4         41.9%      39.3-47.4%          1.14y
+Mid                  4         21.4%      19.5-21.9%          2.75y
+Senior               4         18.6%      13.6-23.0%          4.23y
+Director             4         12.2%       9.5-12.7%          5.61y
+VP/Executive         4          6.5%        5.0-6.8%          7.42y""")
+para("Two design decisions are worth carrying into any similar work. Databricks "
+     "holds no write path - it computes, the stage writes, and Glue stays the "
+     "catalog of record, so provenance is never split across two catalogues. "
+     "And the benchmark is keyed on seniority rather than department because "
+     "the first run suppressed every cell: every seniority level is shared by "
+     "all four clients, while the most widely shared department appears in only "
+     "two. Department taxonomies are industry-specific, so a cross-industry "
+     "department median compares things that are not alike. The suppression "
+     "rule caught a modelling error before a human did.", italic=True)
 doc.add_page_break()
 
 # --- admin --------------------------------------------------------------------
@@ -549,13 +588,13 @@ para("The definition below is the whole contract: two checkpoints, two bounded r
      "loops, and an explicit reject path. Everything the consultant chapter describes as a "
      "choice is a Choice state here.")
 shot("11-stepfunctions-full-workflow.jpg",
-     "Figure 23. The complete state machine. MidpointDecision and FinalDecision branch on the "
+     "Figure 24. The complete state machine. MidpointDecision and FinalDecision branch on the "
      "consultant's {decision, feedback}: revise counts a revision and re-runs the stages, "
      "reject ends the run, default carries on.", width=6.2)
 shot("09-stepfunctions-machine.jpg",
-     "Figure 24. The state machine and its execution history.")
+     "Figure 25. The state machine and its execution history.")
 shot("10-stepfunctions-definition.jpg",
-     "Figure 25. Definition beside graph. Execution input pins stage_image by digest; approvals "
+     "Figure 26. Definition beside graph. Execution input pins stage_image by digest; approvals "
      "carry {decision, feedback}; revision loops are bounded by max_revisions.")
 
 h1("Appendix B - The seats, as IAM sees them")

@@ -441,6 +441,35 @@ databricks bundle deploy -t dev
 databricks bundle run profile_enrichment -t dev
 ```
 
+### The optional peer-benchmark step
+
+The one capability the AWS side cannot provide, because every run is scoped
+to a single client by construction:
+
+```bash
+python stages/peer_benchmarks.py          # build the product
+python stages/peer_benchmarks.py --check  # report availability, build nothing
+```
+
+It authenticates as the service principal already in SSM, runs one statement
+against the governed L3 tier through Unity Catalog, and writes a suppressed
+aggregate back to `derived/peer_benchmarks/` — registered in Glue with the
+same lineage vocabulary as every other product. Databricks gets no write
+path; the catalog of record stays in Glue.
+
+Proven on the deployed harness (`product-builder`, four contributing
+clients):
+
+```
+OK | wrote s3://<lakehouse>/derived/peer_benchmarks/part-0000.parquet
+     (4734 bytes, 5 cells, up to 4 contributing clients)
+OK | created glue table ie_dev_derived.peer_benchmarks
+steward log: 1 event(s) -> stewardship/gate-events/...
+```
+
+Skips cleanly and exits 0 when Databricks is absent, so the report pipeline
+is unaffected by its absence.
+
 > **One honest gap.** The same credential still reads the raw dataset drop,
 > where a pre-existing view exposes `first_name`, `last_name` and
 > `full_name`. That is pre-conformance data on an analyst surface. Retiring
