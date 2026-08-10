@@ -59,18 +59,45 @@ TABLE = "peer_benchmarks"
 
 # The whole point of the stage, in one statement. It reads the governed L3
 # tier through Unity Catalog - never foundational, never a raw drop.
+#
+# Benchmarked on seniority_level, NOT department. That is an empirical
+# choice, not a stylistic one: across the onboarded clients every seniority
+# level is shared by all of them, while the most widely shared department
+# appears in only two (the two pharmaceutical firms). Department taxonomies
+# are industry-specific, so a cross-industry department median compares
+# things that are not alike. Seniority is the vocabulary clients genuinely
+# share.
+#
+# Compared as a SHARE of each client's workforce rather than a raw count,
+# because absolute headcount mostly measures company size - a 400-person
+# client and a 40,000-person client have nothing to say to each other in
+# absolute terms, but their seniority *shape* is directly comparable.
 BENCHMARK_SQL = """
+WITH per_client AS (
+    SELECT
+        client_id,
+        seniority_level,
+        SUM(headcount)                                                     AS headcount,
+        SUM(headcount * mean_tenure_years) / NULLIF(SUM(headcount), 0)     AS tenure_years
+    FROM {table}
+    GROUP BY client_id, seniority_level
+),
+client_totals AS (
+    SELECT client_id, SUM(headcount) AS total_headcount
+    FROM per_client GROUP BY client_id
+)
 SELECT
-    department,
-    seniority_level,
-    COUNT(DISTINCT client_id)                          AS contributing_clients,
-    CAST(PERCENTILE(headcount, 0.5)     AS DOUBLE)     AS median_headcount,
-    CAST(PERCENTILE(mean_tenure_years, 0.5) AS DOUBLE) AS median_tenure_years,
-    CAST(AVG(mean_skill_count)          AS DOUBLE)     AS mean_skill_count
-FROM {table}
-GROUP BY department, seniority_level
-HAVING COUNT(DISTINCT client_id) >= {min_clients}
-ORDER BY median_headcount DESC
+    p.seniority_level,
+    COUNT(DISTINCT p.client_id)                                            AS contributing_clients,
+    CAST(PERCENTILE(p.headcount / t.total_headcount, 0.5) AS DOUBLE)       AS median_headcount_share,
+    CAST(PERCENTILE(p.tenure_years, 0.5)                  AS DOUBLE)       AS median_tenure_years,
+    CAST(MIN(p.headcount / t.total_headcount)             AS DOUBLE)       AS min_headcount_share,
+    CAST(MAX(p.headcount / t.total_headcount)             AS DOUBLE)       AS max_headcount_share
+FROM per_client p
+JOIN client_totals t ON p.client_id = t.client_id
+GROUP BY p.seniority_level
+HAVING COUNT(DISTINCT p.client_id) >= {min_clients}
+ORDER BY median_headcount_share DESC
 """
 
 
@@ -178,7 +205,7 @@ def register(database: str, bucket: str, rows: int, clients: int) -> None:
             "ie.owner": "workforce-analytics@intelligence-engine.invalid",
             "ie.contains_personal_data": "false",
             "ie.derived_from_personal_data": "true",
-            "ie.aggregation": f"department x seniority_level, min {MIN_CLIENTS} contributing clients",
+            "ie.aggregation": f"seniority_level share of workforce, min {MIN_CLIENTS} contributing clients",
             "ie.lineage.source_table": "derived.workforce_composition (all clients)",
             "ie.lineage.built_by": "stages/peer_benchmarks.py via Databricks SQL",
             "ie.lineage.compute": "databricks-serverless-sql",
@@ -188,12 +215,12 @@ def register(database: str, bucket: str, rows: int, clients: int) -> None:
         },
         "StorageDescriptor": {
             "Columns": [
-                {"Name": "department", "Type": "string"},
                 {"Name": "seniority_level", "Type": "string"},
                 {"Name": "contributing_clients", "Type": "bigint"},
-                {"Name": "median_headcount", "Type": "double"},
+                {"Name": "median_headcount_share", "Type": "double"},
                 {"Name": "median_tenure_years", "Type": "double"},
-                {"Name": "mean_skill_count", "Type": "double"},
+                {"Name": "min_headcount_share", "Type": "double"},
+                {"Name": "max_headcount_share", "Type": "double"},
             ],
             "Location": f"s3://{bucket}/{PRODUCT_PREFIX}/",
             "InputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
@@ -254,7 +281,8 @@ def main(check_only: bool = False) -> int:
         return 0
 
     df = pd.DataFrame(rows)
-    for col in ("contributing_clients", "median_headcount", "median_tenure_years", "mean_skill_count"):
+    for col in ("contributing_clients", "median_headcount_share", "median_tenure_years",
+                "min_headcount_share", "max_headcount_share"):
         if col in df:
             df[col] = pd.to_numeric(df[col])
 
