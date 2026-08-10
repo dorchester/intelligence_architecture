@@ -144,7 +144,7 @@ consolidated from [`docs/guides/`](docs/guides/):
 | **Forward-deployed engineer (FDE)** ([guide](docs/guides/fde.md)) | Workbench — EC2 + Claude Code inside the account, SSM-only, no SSH | Owns the workload: edits stages and prompts, runs them raw against synthetic data, then runs the full harness against a candidate image digest while the blessed digest serves everyone else. Regression floor: tests + in-account replay + seeded-defect eval of model behavior. | Engineering |
 | **Platform engineer** ([guide](docs/guides/platform-engineer.md)) | Deployer seat (`sts:AssumeRole`) | Turns merged templates into deployed stacks through `cfn-exec` — the only channel by which boundaries change — and promotes tested stage images to "blessed." Can mutate nothing directly; rollback is one command. | Engineering |
 | **Data steward** ([guide](docs/guides/data-steward.md)) | Steward seat (`sts:AssumeRole`) | The only identity that can admit data (`landing/`) or console users; the only one that can read the stewardship log and audit trail. Their policy runs as code in the gates, so a steward absence stops new admissions — never a report. | Nothing at runtime — by design |
-| **Data scientist / analyst** ([guide](docs/guides/analyst.md)) | Databricks (Unity Catalog, zero-copy) | Reads every governed tier in place with no AWS credentials; holds write on nothing, so notebook freedom can't corrupt the pipeline. New products enter through reviewed stage changes, not side doors. | Nothing |
+| **Data scientist / analyst** ([guide](docs/guides/analyst.md)) | Databricks (Unity Catalog, zero-copy) | Reads the derived and contextualized tiers in place with no AWS credentials, through a read-only credential; holds write on nothing, so notebook freedom can't corrupt the pipeline. New products enter through reviewed stage changes, not side doors. | Nothing |
 | **Account admin** ([guide](docs/guides/admin.md)) | SSO — dormant | Two jobs only: seating people (one `sts:AssumeRole` grant each) and recovery if the deploy channel itself breaks. Used on a normal day = design failure. | Nothing, by design |
 
 Machine identities (`conformance`, `product-builder`, `stage-runner`, …) are
@@ -357,8 +357,11 @@ All CloudFormation-managed, tagged `Application=intelligence-engine`.
 | `…-dev-dataplane` | Partitioned data domains — landing, lakehouse, artifacts, site, sensitive vault (KMS) — plus Athena workgroup and upload audit trail | per GB / per query |
 | `…-dev-author-seat` | IAM identity for the authoring persona — artifact read, Bedrock, no deploys | free |
 | `…-dev-llm-controls` | Per-client Bedrock attribution profiles + monthly spend alerts | free |
-| `…-dev-databricks-access` | Read-only Unity Catalog role over datasets + credential parameters | free |
+| `…-dev-databricks-access` | Read-only Unity Catalog role over the derived and contextualized tiers (plus the raw dataset drop) + credential parameters | free |
 | `…-dev-workflow` | Step Functions harness — CodeBuild stages, zero-compute approvals, stage image ECR, golden replay | per run |
+| `…-dev-governance` | Medallion catalog databases, per-tier read/write policies, CloudTrail with object-level data events, stewardship SNS topic | per GB of trail |
+| `…-dev-steward` | Data-steward seat — data admission, console user management, audit read | free |
+| `…-dev-deployer` | Platform-engineer seat + the `cfn-exec` role CloudFormation assumes; no human can assume `cfn-exec` | free |
 
 The first four idle at zero. `…-dev-app` is the only standing cost, and deleting
 that one stack removes it without touching data or datasets.
@@ -452,6 +455,13 @@ Stated plainly:
   every push for secrets, holding no AWS credentials. Deployment is a deliberate
   manual step, and the in-account golden replay covers what hosted runners must
   never touch.
+- **One analyst path still bypasses the medallion tiers.** Databricks now reads
+  the governed `derived` and `contextualized` tiers zero-copy on a read-only
+  credential, but that same credential also reads the raw dataset drop, where a
+  pre-existing view exposes `first_name`, `last_name` and `full_name`. Retiring
+  that view and splitting the credential in two is the outstanding piece — it is
+  described in [`docs/guides/analyst.md`](docs/guides/analyst.md) rather than
+  glossed over.
 
 ---
 

@@ -5,7 +5,9 @@
 A working pre-engagement intelligence tool with real Bedrock inference, S3-backed
 workforce datasets, enforced guardrails, and two separate consoles.
 
-**46 tests passing.** All infrastructure CloudFormation-managed.
+**72 tests passing** (plus a model-behaviour eval that runs in-account). All
+infrastructure CloudFormation-managed, with a drift detector that fails if
+anything exists outside a template.
 
 ## Completed
 
@@ -30,11 +32,17 @@ workforce datasets, enforced guardrails, and two separate consoles.
 
 ## Deployed AWS resources
 
-| Stack | Resource | Cost model |
-|---|---|---|
-| `intelligence-engine-dev-storage` | S3 bucket (artifacts + datasets) | per GB |
-| `intelligence-engine-dev-state` | DynamoDB table | per request |
-| `intelligence-engine-dev-observability` | CloudWatch dashboard | free |
+Fifteen CloudFormation stacks, covering the data plane and its medallion tiers,
+the hosted console, the workflow harness, governance and audit, and the human
+seats (steward, deployer, forward-deployed engineer).
+
+The authoritative list lives in one place rather than being duplicated here,
+because a copied list is a list that drifts:
+
+- [`../README.md`](../README.md#aws-resources) — stack-by-stack with cost model
+- [`aws-walkthrough.md`](aws-walkthrough.md) — deploy from nothing, in order
+- `python scripts/iac_coverage.py` — proves the live account matches the
+  templates, and exits non-zero if it does not
 
 Runtime: Bedrock on-demand — Sonnet 4.6 (engine), Haiku 4.5 (verification).
 

@@ -28,22 +28,41 @@
 - [ ] Wire Code Interpreter for sandboxed dynamic execution.
 - [ ] Promote recurring dynamic operations to named tools.
 - [ ] Full methodology playbook execution (beyond thin slice).
-- [ ] Observability via AgentCore/CloudWatch integration.
-- [ ] Project-specific IAM execution roles (least privilege).
+- [x] Observability via CloudWatch — token, latency and cache dashboard; the
+      AgentCore half remains open.
+- [x] Project-specific IAM execution roles (least privilege) — one role per
+      medallion boundary, read and write always separate policies.
 
 ## V1.x — Operator Interface
 
-- [ ] Web UI or CLI improvements for starting runs and viewing status.
-- [ ] Checkpoint approval UI (not stdin-based).
+- [x] Web UI for starting runs and viewing status (hosted console behind Cognito).
+- [x] Checkpoint approval UI — approve / revise-with-feedback / reject, bounded
+      revision loops, zero compute while suspended.
 - [ ] Report viewer/download via presigned URLs.
 - [ ] Async checkpoint notification (email/webhook).
 
 ## V2 — Evaluation and Quality
 
 - [ ] Automated evaluation dimensions (methodology compliance, evidence grounding).
-- [ ] Regression tests against known-good reports.
+- [x] Regression floor — 72-test suite, in-account golden replay, and a
+      seeded-defect eval that scores the reviewer's recall against planted
+      arithmetic, unsupported-figure, contradiction and stale-trend defects.
 - [ ] Quantitative reconciliation validation.
 - [ ] CI/CD pipeline for tool/methodology deployment.
+
+## Shipped since this roadmap was written
+
+Work that did not exist as a planned line but is now deployed and documented:
+
+- [x] Medallion data plane — landing, foundational, derived, contextualized,
+      stewardship — with policy gates enforced in code on every governed write.
+- [x] Governance surface — CloudTrail with object-level data events, an
+      append-only stewardship log, and an escalation topic.
+- [x] Delegated human seats — steward, deployer (with a `cfn-exec` role no human
+      can assume) and forward-deployed engineer, so the account admin is dormant.
+- [x] Step Functions harness with digest-pinned stage images and an explicit
+      candidate-to-blessed promotion path.
+- [x] Zero-copy Databricks reads of the governed tiers on a read-only credential.
 
 ## Future
 

@@ -59,7 +59,7 @@ runtime. The base image intentionally contains no pipeline code.
 
 | Grant | Scope |
 |---|---|
-| `s3:GetObject` | `<lakehouse>/silver/*` only (via `…-silver-read`) |
+| `s3:GetObject` | `<lakehouse>/foundational/*` only (via `…-foundational-read`) |
 | `s3:ListBucket` | lakehouse bucket |
 | `s3:PutObject`, `s3:GetObject` | `<artifacts>/*` (via `…-artifacts-publish`) |
 | `bedrock:InvokeModel`, `…WithResponseStream` | `us.anthropic.*` inference profiles, `application-inference-profile/*`, `foundation-model/anthropic.*` |
@@ -68,7 +68,7 @@ runtime. The base image intentionally contains no pipeline code.
 | `ecr:*` (pull only) | the stages repository |
 | `logs:*` | `/aws/codebuild/intelligence-engine-<env>-stage*` |
 
-Row-level silver access is an **enumerated grant**, not blanket access — this
+Row-level foundational access is an **enumerated grant**, not blanket access — this
 is what makes the data boundary an IAM property rather than a prompt
 instruction. Note what is absent: no vault, no DynamoDB, no bucket-wide
 access (see Part 3).
@@ -193,8 +193,8 @@ can approve.
 ### 1.4a Conformance is a separate identity
 
 `intelligence-engine-<env>-conformance` is the only role holding
-`silver-write` and `catalog-write`. It reads landing records, drops direct
-identifiers, writes parquet under `silver/`, and registers the Glue partition.
+`foundational-write` and `catalog-write`. It reads landing records, drops
+direct identifiers, writes parquet under `foundational/`, and registers the Glue partition.
 
 This split is the point: a stage that can read microdata **cannot rewrite
 it**. Widening the stage runner instead would have made "read-only"
@@ -203,8 +203,9 @@ meaningless.
 **What conformance does not do.** Dropping names and banding age makes the
 records *pseudonymous, not anonymous*. Department, location, title, seniority,
 tenure and a stable `profile_id` remain, and that combination re-identifies
-in a small population. `silver/*` is governed personal data and the
-`silver-read` grant is an access-control decision, not a privacy clearance.
+in a small population. `foundational/*` is governed personal data and the
+`foundational-read` grant is an access-control decision, not a privacy
+clearance.
 See [Data governance](#data-governance-status) for what that still requires.
 
 ### 1.5a Prompt caching has a threshold, and missing it fails silently
@@ -359,11 +360,11 @@ ECR, SSM, KMS, Logs, Bedrock and STS — roughly $7/month each, so comparable
 cost and materially more to maintain.
 
 What makes it tolerable is that egress is not the control doing the work here.
-The data boundary is enforced by IAM: a stage can only read `silver/*`, and it
+The data boundary is enforced by IAM: a stage can only read `foundational/*`, and it
 cannot reach the vault at all. An exfiltration path would need credentials the
 role does not hold.
 
-**What would change the answer:** real client microdata in silver, or a
+**What would change the answer:** real client microdata in the foundational tier, or a
 vendor credential landing in the SSM namespace. Either makes open egress the
 weakest link, and at that point the interface-endpoint variant — not NAT — is
 the right build. It is a day of work, not a redesign, and the enumerated
@@ -392,8 +393,8 @@ governance half.
 | Public access | Blocked at bucket level on all five |
 | Versioning | Enabled on all five |
 | Vault isolation | The vault CMK grants decrypt to **no principal** beyond root account administration. It currently holds **0 objects** |
-| Grant separation | `silver-read`, `silver-write`, `catalog-write`, `artifacts-publish`, `landing-write` are distinct managed policies held by distinct roles |
-| Identifier removal | Verified: the catalogued `profiles_silver` table contains **no** name, headline or exact-age column |
+| Grant separation | `foundational-read`, `foundational-write`, `catalog-write`, `artifacts-publish`, `landing-write` are distinct managed policies held by distinct roles |
+| Identifier removal | Verified: the catalogued `profiles` table in `ie_dev_foundational` contains **no** name, headline or exact-age column |
 | Landing retention | Raw deliveries expire at **90 days** |
 
 ### Open gaps
@@ -401,18 +402,19 @@ governance half.
 These are real and unresolved. None is hidden behind an optimistic phrasing
 elsewhere in this repository.
 
-1. **No CloudTrail trail.** Event History covers 90 days of management events
-   by default, but there is no durable trail to S3, **no data-event logging**,
-   and no log-file integrity validation. Consequence: *you cannot presently
-   prove who read a row-level object in `silver/`.* For a governed data set
-   that is usually the first control an auditor asks for.
+1. ~~**No CloudTrail trail.**~~ **Closed.** `governance.yaml` deploys a
+   multi-region trail with log-file validation and **object-level data events**
+   on the `foundational/` and `derived/` prefixes and the vault, delivered to a
+   locked bucket the runtime roles cannot write to. Who read a row-level object
+   is now answerable.
 2. **No retention on the lakehouse, vault or site domains.** Objects persist
    indefinitely. Without a retention rule there is no deletion story, and
    without a deletion story there is no answer to a subject-access or erasure
    request.
-3. **Pseudonymous, not anonymous.** See §1.4a. `silver/*` remains personal
-   data; `turnover_risk_score` is an inferred judgement about an individual
-   and is arguably more sensitive than the identifiers that were removed.
+3. **Pseudonymous, not anonymous.** See §1.4a. `foundational/*` remains
+   personal data; `turnover_risk_score` is an inferred judgement about an
+   individual and is arguably more sensitive than the identifiers that were
+   removed.
 4. **Catalogue access is plain IAM, not Lake Formation.** No column-level or
    row-level governance, no centralised grant registry, no tag-based access
    control. Any in-account principal with Glue and S3 permissions can read the
@@ -425,6 +427,11 @@ elsewhere in this repository.
 7. **Invocation logging is undecided.** Prompts carry the workforce signals;
    enabling Bedrock invocation logging would persist them. That is a privacy
    decision, not an engineering one, and it has not been taken.
+8. **One analyst path bypasses the tiers.** The Unity Catalog credential reads
+   the governed `derived/` and `contextualized/` tiers read-only, but it also
+   still reads the raw dataset drop, where a pre-existing view exposes
+   `first_name`, `last_name` and `full_name`. Splitting the credential and
+   retiring that view is outstanding.
 
 ### Why it is safe to run as it stands
 
@@ -432,10 +439,11 @@ The data is **synthetic** — twenty fictional company archetypes generated for
 this project. No real person is described by any row, which is what makes it
 reasonable to operate with the gaps above still open.
 
-**Each gap becomes blocking the moment real workforce data lands.** In rough
-order of lead time: the trail and retention rules are hours of work; Lake
-Formation and classification are days; the lawful-basis and invocation-logging
-decisions are organisational and should start first.
+**Each remaining gap becomes blocking the moment real workforce data lands.**
+In rough order of lead time: retention rules and splitting the Databricks
+credential are hours of work; Lake Formation and classification are days; the
+lawful-basis and invocation-logging decisions are organisational and should
+start first.
 
 ## Two-pass deploys
 
@@ -473,7 +481,12 @@ headline or a short body, which fails the CodeBuild stage and the execution
 with it.
 
 **The data path is proven too.** The lakehouse was empty until conformance
-ran — the `silver-read` grant pointed at nothing:
+ran — the read grant pointed at nothing:
+
+> Quoted verbatim from that run, which predates the tier rename: what the
+> output calls `silver/` is the prefix now called `foundational/`, and
+> `profiles_silver` is now `ie_dev_foundational.profiles`. The evidence is
+> left unedited rather than retrofitted.
 
 | Step | Evidence |
 |---|---|

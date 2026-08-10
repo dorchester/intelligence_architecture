@@ -464,8 +464,9 @@ doc.add_page_break()
 
 # --- analyst ------------------------------------------------------------------
 h1("5. Data Scientist / Analyst")
-para("Surface: Databricks, reading the lakehouse in place through Unity Catalog. "
-     "Zero-copy, read-only, and no AWS credentials in the analyst's hands.", bold=True)
+para("Surface: Databricks, reading the governed derived and contextualized tiers "
+     "in place through Unity Catalog. Zero-copy, read-only, and no AWS "
+     "credentials in the analyst's hands.", bold=True)
 diagram("analyst", "Figure 20. The zero-copy path. No write path exists from the notebook back to "
                    "the governed tiers.")
 bullets([

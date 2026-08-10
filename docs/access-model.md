@@ -158,7 +158,7 @@ across a tier boundary always means crossing into a different role.
 | `wf-approval` | Lambda | Record a pending approval + task token in the run table; write its own logs. ~The smallest role in the account, on purpose — it handles human-approval tokens |
 | `codebuild` | CodeBuild (image build) | Build and push the console image |
 | `cfn-exec` | CloudFormation only (its trust policy admits no human and no workload) | Create/update stack resources when a template says so — the far end of the deploy channel |
-| `databricks-uc` | Databricks Unity Catalog (external ID trust) | Read the lakehouse in place — zero-copy, no export, revocable by deleting one role |
+| `databricks-uc` | Databricks Unity Catalog (external ID trust) | Read the `derived` and `contextualized` tiers in place — zero-copy, no export, revocable by deleting one role. Also still reads the raw dataset drop, which is the one path that bypasses the tiers (see [`guides/analyst.md`](guides/analyst.md)) |
 
 ---
 
@@ -206,7 +206,7 @@ roles.**
 | **Platform engineer (deploys)** | The deployer seat (`sts:AssumeRole`) | Turns merged template changes into deployed stacks, through `cfn-exec` — the only channel by which boundaries change. Mutates nothing directly. | Engineering |
 | **Data steward (governs + admits)** | The steward seat (`sts:AssumeRole`) + the standing decision gates | **Admitting data** (`landing-write` — admission is the steward's decision, so the grant follows the accountability), **admitting people** (console user management in Cognito), and **reading the audit surface** (stewardship log, CloudTrail). Their policy is enforced during runs by the gates *in code* — the steward signs off on what may enter, not on each run. Changing what the gates enforce is a code change — diff, review, redeploy. | Nothing at runtime — admission only |
 | **Forward-deployed engineer / FDE (builds/adjusts)** | The workbench seat (Claude Code + full toolchain, SSM-only) | Edits stages, rebuilds images, reruns the pipeline, inspects everything. Cannot deploy — infra changes go back through git to the platform engineer. | Engineering |
-| **Data scientist / analyst** | Databricks via the `databricks-uc` role | Reads the lakehouse zero-copy through Unity Catalog. Never holds write on anything. | Nothing |
+| **Data scientist / analyst** | Databricks via the `databricks-uc` role | Reads the derived and contextualized tiers zero-copy through Unity Catalog, on a read-only credential. Never holds write on anything. | Nothing |
 | **Consultant (consumes + approves)** | Cognito user in the hosted console | Not an IAM identity at all; the app acts for them within its own scoped role. Their checkpoint decisions are the one human dependency in the run path — on their own report, by design. | Execution |
 | **Account admin** | SSO, dormant | Seats people (one grant per person per seat); recovers the system if the deploy channel breaks. Used on a normal day = design failure. | Nothing, by design |
 

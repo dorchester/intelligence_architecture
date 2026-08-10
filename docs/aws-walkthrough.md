@@ -319,9 +319,11 @@ The instance role is the credential — no keys are configured or stored. What
 that seat can and cannot do (notably: it cannot deploy, on purpose) is the
 subject of [`access-model.md`](access-model.md).
 
-> **No local setup at all**: AWS CloudShell (the terminal icon in the console
-> header) has the CLI and the Session Manager plugin preinstalled — the same
-> `start-session` command works from any browser, no `--profile` needed.
+> **No local setup?** Use **EC2 → the instance → Connect → Session Manager**,
+> a full browser terminal on the same box that needs only console access and
+> the FDE seat. CloudShell also works, but only if your permission set grants
+> `cloudshell:*` — the FDE seat does not, so do not design around it. All
+> three paths are compared in [`guides/fde.md`](guides/fde.md).
 
 ---
 
@@ -402,7 +404,36 @@ auditor asks about.
 
 ## 10. Databricks over the same files
 
-Unity Catalog reads the same S3 objects **in place**. Nothing is copied.
+Unity Catalog reads the same S3 objects **in place**. Nothing is copied. The
+chain is three links, and each one is checkable:
+
+1. `databricks-access.yaml` grants the `databricks-uc` role read on
+   `derived/` and `contextualized/`. `foundational/` is deliberately excluded
+   — record-grain pseudonymous data is a separate, reviewed grant.
+2. A Unity Catalog **storage credential** wraps that role, marked *limit to
+   read-only use*.
+3. An **external location** scoped to one governed prefix inherits the
+   read-only flag.
+
+Creating step 3 runs a live permission check against AWS. It passes Read,
+List, Path Exists, Assume Role and External ID Condition, and fails only the
+write-dependent file-event resources — a read-only analyst path failing its
+write checks is the design working.
+
+```sql
+SELECT department, seniority_level, headcount, round(mean_tenure_years, 2) AS tenure
+FROM read_files('s3://<lakehouse>/derived/workforce_composition/', format => 'parquet')
+ORDER BY headcount DESC
+```
+
+Two boundaries assert themselves immediately: the credential cannot write,
+and the catalog schema is owned by the infrastructure service principal, so
+publishing a permanent view is a reviewed change rather than a prompt-side
+act.
+
+The batch-enrichment bundle is version-controlled alongside it, and
+`ai_query()` does per-row LLM enrichment in one SQL statement — parallelism,
+queuing and retries become the platform's problem:
 
 ```bash
 cd infrastructure/databricks/bundle
@@ -410,12 +441,11 @@ databricks bundle deploy -t dev
 databricks bundle run profile_enrichment -t dev
 ```
 
-`ai_query()` does per-row LLM enrichment in one SQL statement — parallelism,
-queuing and retries are the platform's problem, which is the argument for it
-over a hand-rolled loop.
-
-The number to check: average tenure **3.07 years**, identical from the Python
-layer, Athena, and Databricks. Three engines, one copy of the data.
+> **One honest gap.** The same credential still reads the raw dataset drop,
+> where a pre-existing view exposes `first_name`, `last_name` and
+> `full_name`. That is pre-conformance data on an analyst surface. Retiring
+> the view and splitting the credential is outstanding work, recorded in
+> [`guides/analyst.md`](guides/analyst.md).
 
 ---
 
