@@ -51,6 +51,8 @@ SHOT_FILES = [
     "18-fde-diff-stale-case.jpg",      # workbench terminal: the agent's diff
     "19-fde-eval-recall.jpg",          # workbench terminal: eval recall against Bedrock
     "20-fde-claude-code-session.jpg",  # Claude Code session: analysis + boundary probe
+    "21-databricks-external-location-validation.jpg",  # UC external location: read passes, write fails
+    "22-databricks-governed-query.jpg",                # SQL over the governed derived tier
 ]
 
 DIAGRAMS = {
@@ -475,6 +477,28 @@ para("New or changed product tables are requested, not built here: they are a "
      "reviewed change to the build stages, run under the product-builder identity "
      "with lineage metadata updated. That is what keeps the catalog's ownership "
      "claims true.")
+
+h2("Activity 5.1 - How the connection is wired, and what it proves")
+para("Zero-copy is a claim worth testing rather than repeating. Unity Catalog "
+     "reaches the lakehouse through a storage credential backed by an IAM role "
+     "defined in this repository, and an external location scoped to a single "
+     "governed prefix. Creating that location runs a live permission check "
+     "against AWS, and the result is the governance model stated in someone "
+     "else's words:")
+shot("21-databricks-external-location-validation.jpg",
+     "Figure 21. Validating the external location over derived/. Read, List, Path Exists, Assume "
+     "Role and External ID Condition all pass; the only failures are the write-dependent file-event "
+     "resources, because the credential is read-only by construction.")
+para("With that in place, an analyst queries the governed aggregates directly - "
+     "no copy, no export, no AWS credentials in their hands:")
+shot("22-databricks-governed-query.jpg",
+     "Figure 22. SQL over the L3 tier from Databricks serverless. Every row is an aggregate whose "
+     "small cells were suppressed upstream by the pipeline, not by the query.")
+para("Two boundaries are visible in that exchange. The credential is read-only, "
+     "so no notebook can write into a governed tier. And the catalog schema is "
+     "owned by the infrastructure service principal, so publishing a permanent "
+     "view for analysts is a reviewed change by the team that owns the pipeline "
+     "- not something a curious analyst can do at a SQL prompt.", italic=True)
 doc.add_page_break()
 
 # --- admin --------------------------------------------------------------------
@@ -501,9 +525,9 @@ doc.add_page_break()
 # --- appendix -----------------------------------------------------------------
 h1("Appendix A - The harness in detail")
 shot("09-stepfunctions-machine.jpg",
-     "Figure 21. The report-build state machine and its execution history.")
+     "Figure 23. The report-build state machine and its execution history.")
 shot("10-stepfunctions-definition.jpg",
-     "Figure 22. Definition beside graph. Execution input pins stage_image by digest; approvals "
+     "Figure 24. Definition beside graph. Execution input pins stage_image by digest; approvals "
      "carry {decision, feedback}; revision loops are bounded by max_revisions.")
 
 h1("Appendix B - The seats, as IAM sees them")

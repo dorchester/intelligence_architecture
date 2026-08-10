@@ -60,31 +60,54 @@ column, or different aggregation:
 - **Access you don't have** (e.g. a new schema) → the platform engineer; it's
   a template change to the external location / catalog grants.
 
-## 5. What the connection can actually reach today
+## 5. How the connection is wired, and what it proves
 
-Worth stating plainly, because the picture above describes the intended
-shape and the deployment is one step behind it:
+Zero-copy is a claim worth testing rather than repeating. The chain is:
 
-- The Unity Catalog credential now holds **read on `derived/` and
-  `contextualized/`** in the lakehouse — the governed products, granted in
-  `databricks-access.yaml`. `foundational/` is deliberately excluded:
-  record-grain pseudonymous data should be a separate, reviewed grant, not
-  a side effect of connecting a BI tool.
-- It **also still holds read on the raw dataset drop** (`datasets/*` in the
-  runs bucket), which is what the existing `sterling_profiles` view reads —
-  and that view exposes `first_name`, `last_name`, `full_name` and
-  `headline`. That is pre-conformance data reaching an analyst surface, and
-  it is the one place where the medallion model is currently bypassed.
-- Turning the governed grant into queryable tables needs one Databricks-side
-  step that IAM cannot do for you: an **external location** over
-  `s3://<lakehouse>/derived/` bound to the existing storage credential, then
-  views or external tables on top. Until that exists, a `read_files()` call
-  against the lakehouse returns `UNAUTHORIZED_ACCESS` even though the AWS
-  role permits it.
+1. An **IAM role** (`databricks-uc`, from `databricks-access.yaml`) holding
+   read on `derived/` and `contextualized/`. `foundational/` is deliberately
+   excluded — record-grain pseudonymous data should be a separate, reviewed
+   grant, not a side effect of connecting a BI tool.
+2. A **storage credential** in Unity Catalog backed by that role, marked
+   *limit to read-only use*.
+3. An **external location** (`ie_dev_derived`) scoped to a single governed
+   prefix, inheriting the read-only flag.
 
-The honest summary: AWS-side access to the governed tiers is now correct;
-the Unity Catalog objects that expose them are not yet created, and the raw
-view should be retired once they are.
+Creating step 3 runs a live permission check against AWS, and the result
+states the governance model in Databricks' own words: **Read, List, Path
+Exists, Assume Role and External ID Condition all pass; the only failures
+are the write-dependent file-event resources**, because the credential
+cannot write. A read-only analyst path that fails its write checks is
+working exactly as designed.
+
+With that in place, SQL over the governed aggregates runs with no copy, no
+export, and no AWS credentials in the analyst's hands:
+
+```sql
+SELECT department, seniority_level, headcount, round(mean_tenure_years, 2) AS tenure
+FROM read_files('s3://<lakehouse>/derived/workforce_composition/', format => 'parquet')
+ORDER BY headcount DESC
+```
+
+Two boundaries show up the moment you push further:
+
+- **You cannot write.** The credential is read-only, so nothing in a
+  notebook can reach back into a governed tier.
+- **You cannot publish a view either.** The catalog schema is owned by the
+  infrastructure service principal, so `CREATE VIEW` returns
+  `PERMISSION_DENIED`. Publishing an analyst-facing view is a reviewed
+  change by the team that owns the pipeline — the same rule that governs
+  everything else here, applied to the catalog.
+
+### The one place the medallion model is still bypassed
+
+The same credential **also** holds read on the raw dataset drop
+(`datasets/*` in the runs bucket), which is what the pre-existing
+`sterling_profiles` view reads — and that view exposes `first_name`,
+`last_name`, `full_name` and `headline`. That is pre-conformance data on an
+analyst surface. The governed path now exists beside it; retiring the raw
+view, and splitting the credential in two so the analyst path cannot reach
+`datasets/` at all, is the outstanding piece of work.
 
 ## 6. Why you can't write
 
