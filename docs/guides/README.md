@@ -17,6 +17,14 @@ Each guide's activities have a matching architecture diagram in
 [`../diagrams.md`](../diagrams.md) — Mermaid source, ready for a README or a
 slide deck.
 
+For internal distribution there is also an **illustrated Word edition** of
+these guides — one chapter per role, with screenshots of the live consoles
+embedded at each activity. The document itself is deliberately not in this
+public repository (live-console screenshots expose account-specific values);
+generate it from your own deployment's screenshots with
+[`../../scripts/build_role_guide_docx.py`](../../scripts/build_role_guide_docx.py),
+which lists the exact captures it expects.
+
 Two conventions apply across all of them:
 
 1. **One hat at a time.** A person holding several functions assumes the seat

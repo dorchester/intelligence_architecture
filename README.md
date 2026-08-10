@@ -387,6 +387,7 @@ is the front door — a designed landing page over everything below.
 - [`docs/access-model.md`](docs/access-model.md) — **who can do what, and who deliberately cannot**: every identity, every grant, why no runtime role can deploy, and how to verify it all against live IAM
 - [`docs/guides/`](docs/guides/) — **a user guide per human role**: forward-deployed engineer, platform engineer, data steward, analyst, consultant, admin — real commands for each seat's actual use cases
 - [`docs/diagrams.md`](docs/diagrams.md) — **every architecture diagram as Mermaid source**: one block per activity (report run, data admission, deploy channel, release, audit, zero-copy analytics), renderable on GitHub or exportable to slides
+- [`scripts/build_role_guide_docx.py`](scripts/build_role_guide_docx.py) — generates the **illustrated Word edition** of the role guides from your own deployment's console screenshots (the document itself stays internal — live screenshots expose account-specific values)
 - [`docs/predictive-workflow-readiness.md`](docs/predictive-workflow-readiness.md) — how this substrate maps to an episodic report-generation workflow, and what remains
 - [`docs/corporate-deployment-architecture.md`](docs/corporate-deployment-architecture.md) — target model for a firm where DevOps owns infrastructure
 - [`docs/bedrock-usage-monitoring.md`](docs/bedrock-usage-monitoring.md) — token and cost monitoring
