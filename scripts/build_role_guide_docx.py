@@ -54,6 +54,13 @@ SHOT_FILES = [
     "20-fde-claude-code-session.jpg",  # Claude Code session: analysis + boundary probe
     "21-databricks-external-location-validation.jpg",  # UC external location: read passes, write fails
     "22-databricks-governed-query.jpg",                # SQL over the governed derived tier
+    "23-glue-peer-benchmarks-table.jpg",       # the benchmark product registered in Glue
+    "24-databricks-peer-benchmark-query.jpg",  # analyst reads the suppressed product
+    "25-fde-notebook-flow-task.jpg",           # Claude Code on Bedrock: the notebook-flow task
+    "26-fde-notebook-authoring.jpg",           # drafted notebook in Databricks source format
+    "27-fde-notebook-flow-result.jpg",         # working flow + the three platform constraints
+    "28-fde-parameterised-lakehouse-path.jpg", # account id moved out of the notebook
+    "29-databricks-serverless-runs.jpg",       # serverless Jobs API runs as the service principal
 ]
 
 DIAGRAMS = {
@@ -378,7 +385,55 @@ para("When the candidate passes, the digest is handed to the deployer seat for "
      "promotion. Releasing is deliberately not an FDE action - the same "
      "separation as infrastructure, applied to the pipeline default.")
 
-h2("Activity 2.5 - Know where the work shows up")
+h2("Activity 2.5 - Build a Databricks notebook flow, in Claude Code")
+para("Some analysis does not belong in a stage. A stage runs inside a report run, "
+     "scoped to one client. Cross-client work that wants Spark belongs in a notebook "
+     "submitted from the workbench. The session below was executed end to end on the "
+     "live workbench, in the ordinary Claude Code interface, against the real "
+     "Databricks workspace.")
+steps([
+    "State the task: a notebook that scores each client's seniority shape against the peer median, plus a submission harness that runs it on serverless compute.",
+    "Let the agent read the conventions first - it explores stages/peer_benchmarks.py and the infrastructure templates before writing anything.",
+    "Review the notebook it drafts, cell separators and all, at the write-approval prompt.",
+    "Run it for real. The first submission fails; the agent reads the actual run output rather than guessing, and fixes three genuine platform constraints.",
+    "Catch the disclosure problem before committing: the draft hardcoded the lakehouse bucket, whose name embeds the AWS account ID.",
+    "Re-run to confirm the parameterised version still works, then run the suite and commit.",
+])
+shot("25-fde-notebook-flow-task.jpg",
+     "Figure 11. Step 1: the task, in the familiar interface. The header shows what this seat "
+     "actually is - Claude Code on Amazon Bedrock, in the repository checkout, reached over SSM.")
+shot("26-fde-notebook-authoring.jpg",
+     "Figure 12. Step 3: the drafted notebook in Databricks source format - '# COMMAND ----------' "
+     "cell separators, so the file is reviewable as ordinary Python in git and readable as cells "
+     "in the workspace. Nothing is written until the prompt below it is answered.")
+shot("27-fde-notebook-flow-result.jpg",
+     "Figure 13. Step 4: the working flow, and an honest account of what it took. All three "
+     "findings are governance holding rather than failing - most importantly, direct S3 reads are "
+     "refused, so the governed external location is the only route to the data.")
+shot("28-fde-parameterised-lakehouse-path.jpg",
+     "Figure 14. Step 5: the disclosure fix threaded through - the bucket is resolved at run time "
+     "and handed to the submission rather than written down - followed by a repository-wide search "
+     "for the account identifier, to prove it is gone rather than assert it.")
+para("The submission harness keeps the same optionality contract as every other "
+     "Databricks touchpoint - missing configuration, an unreachable workspace or an "
+     "API error all print SKIP and exit 0:", bold=True)
+code("""python scripts/submit_databricks_notebook.py
+OK | imported notebook to /intelligence-engine/notebooks/peer_cohort_shape
+OK | submitted run 305998269280317
+  ... RUNNING
+OK | run 305998269280317 completed successfully""")
+shot("29-databricks-serverless-runs.jpg",
+     "Figure 15. The same work seen from Databricks: one-time serverless runs submitted through "
+     "the Jobs API as the pipeline service principal. The failed run is the one from Figure 15, "
+     "left in place - the record of a debugging session is part of the evidence, not a blemish.")
+para("One boundary this activity exposed is worth naming. The workbench holds no "
+     "GitHub identity - it authenticates to AWS by instance role - so the commit "
+     "could be made but not pushed. That is deliberate: a shared analysis box with "
+     "write access to a public repository is a wider blast radius than the seat "
+     "needs. scripts/handoff_patch.py carries the commit out through a bucket both "
+     "ends already hold, and the engineer pushes it as themselves.")
+
+h2("Activity 2.6 - Know where the work shows up")
 para("The terminal is one surface, not the whole job.")
 table([
     ["Question", "Surface that answers it"],
@@ -392,10 +447,10 @@ table([
     ["Who did what, account-wide?", "CloudTrail - including the agent's own calls"],
 ], widths=[2.6, 3.8])
 shot("16-engineer-dashboard.jpg",
-     "Figure 11. The engineer console: run states, checkpoints, datasets, infrastructure. An "
+     "Figure 16. The engineer console: run states, checkpoints, datasets, infrastructure. An "
      "observation deck, not a cockpit.")
 shot("17-guardrails.jpg",
-     "Figure 12. The guardrail surface - input validation, entity verification, output validation, "
+     "Figure 17. The guardrail surface - input validation, entity verification, output validation, "
      "cost ceilings, data-access isolation. Read-only when deployed: enforcement changes ride "
      "through git.")
 doc.add_page_break()
@@ -405,7 +460,7 @@ h1("3. Platform Engineer")
 para("Surface: the deployer seat. Operates CloudFormation on project stacks "
      "through cfn-exec - an execution role whose trust policy admits only the "
      "CloudFormation service, never a human - and mutates nothing directly.", bold=True)
-diagram("deploy", "Figure 13. The deploy channel. Boundaries change through exactly one path: a "
+diagram("deploy", "Figure 18. The deploy channel. Boundaries change through exactly one path: a "
                   "reviewed template, applied as a logged stack operation.")
 
 h2("Activity 3.1 - Routine deploy")
@@ -441,7 +496,7 @@ h1("4. Data Steward")
 para("Surface: the steward seat. Exactly three capabilities - admit data, admit "
      "people, read the audit surface - and no ability to deploy, write a governed "
      "tier, invoke a model, or reach the vault.", bold=True)
-diagram("admission", "Figure 14. Admission through the medallion tiers. The steward decides what "
+diagram("admission", "Figure 19. Admission through the medallion tiers. The steward decides what "
                      "enters; the gates in code enforce the rules on every write thereafter.")
 
 h2("Activity 4.1 - Admit a source")
@@ -452,7 +507,7 @@ para("The steward seat is the only identity that can write landing/, so every "
      "basis and inferred-attribute sensitivity are decisions taken before this "
      "command, not after.")
 shot("02-lakehouse-tiers.jpg",
-     "Figure 15. The governed data plane: medallion tiers as prefixes - foundational "
+     "Figure 20. The governed data plane: medallion tiers as prefixes - foundational "
      "(pseudonymous), derived (aggregates, small cells suppressed), contextualized (vectors and "
      "graph), stewardship (append-only log).")
 
@@ -465,19 +520,19 @@ para("Set a permanent password rather than relying on the temporary-password "
      "be stranded.")
 
 h2("Activity 4.3 - Read the audit surface")
-diagram("audit", "Figure 16. Append-only by construction: the identities that write the log cannot "
+diagram("audit", "Figure 21. Append-only by construction: the identities that write the log cannot "
                  "read it, and the identity that reads it can write nothing but the drop zone.")
 shot("05-stewardship-gate-events.jpg",
-     "Figure 17. The stewardship log in S3. gate-events/ records every gate evaluation as JSONL - "
+     "Figure 22. The stewardship log in S3. gate-events/ records every gate evaluation as JSONL - "
      "which gate, which caller, BLOCK / WARN / NOTE, and what triggered it.")
 shot("13-cloudtrail-trail.jpg",
-     "Figure 18. CloudTrail: multi-region, log-file validation enabled, and object-level data "
+     "Figure 23. CloudTrail: multi-region, log-file validation enabled, and object-level data "
      "events on the governed prefixes - every individual read of governed data, not just "
      "management calls.")
 
 h2("Activity 4.4 - Review a lineage claim")
 shot("07-glue-lineage-properties.jpg",
-     "Figure 19. Governance as table metadata: ie.owner names the accountable human, lineage "
+     "Figure 24. Governance as table metadata: ie.owner names the accountable human, lineage "
      "records 500 rows in and 37 aggregate cells out, and contains_personal_data=false sits beside "
      "derived_from_personal_data=true - the honest pair.")
 doc.add_page_break()
@@ -487,7 +542,7 @@ h1("5. Data Scientist / Analyst")
 para("Surface: Databricks, reading the governed derived and contextualized tiers "
      "in place through Unity Catalog. Zero-copy, read-only, and no AWS "
      "credentials in the analyst's hands.", bold=True)
-diagram("analyst", "Figure 20. The zero-copy path. No write path exists from the notebook back to "
+diagram("analyst", "Figure 25. The zero-copy path. No write path exists from the notebook back to "
                    "the governed tiers.")
 bullets([
     "derived/ is the everyday surface for BI - a normal external table with suppression already applied.",
@@ -508,13 +563,13 @@ para("Zero-copy is a claim worth testing rather than repeating. Unity Catalog "
      "against AWS, and the result is the governance model stated in someone "
      "else's words:")
 shot("21-databricks-external-location-validation.jpg",
-     "Figure 21. Validating the external location over derived/. Read, List, Path Exists, Assume "
+     "Figure 26. Validating the external location over derived/. Read, List, Path Exists, Assume "
      "Role and External ID Condition all pass; the only failures are the write-dependent file-event "
      "resources, because the credential is read-only by construction.")
 para("With that in place, an analyst queries the governed aggregates directly - "
      "no copy, no export, no AWS credentials in their hands:")
 shot("22-databricks-governed-query.jpg",
-     "Figure 22. SQL over the L3 tier from Databricks serverless. Every row is an aggregate whose "
+     "Figure 27. SQL over the L3 tier from Databricks serverless. Every row is an aggregate whose "
      "small cells were suppressed upstream by the pipeline, not by the query.")
 para("Two boundaries are visible in that exchange. The credential is read-only, "
      "so no notebook can write into a governed tier. And the catalog schema is "
@@ -528,7 +583,7 @@ para("Every run is scoped to one client, and the cross_company_isolation "
      "headcount” but never “...against a 17% peer median” - the numbers "
      "that would answer that live in other clients' data. This is the gap "
      "Databricks is genuinely placed to close.")
-diagram("benchmarks", "Figure 23. The crossing happens upstream of any run, and only a suppressed "
+diagram("benchmarks", "Figure 28. The crossing happens upstream of any run, and only a suppressed "
                       "aggregate survives it. A run reads the product, never another client's rows, "
                       "so the isolation guardrail still holds.")
 steps([
@@ -550,6 +605,14 @@ Mid                  4         21.4%      19.5-21.9%          2.75y
 Senior               4         18.6%      13.6-23.0%          4.23y
 Director             4         12.2%       9.5-12.7%          5.61y
 VP/Executive         4          6.5%        5.0-6.8%          7.42y""")
+shot("23-glue-peer-benchmarks-table.jpg",
+     "Figure 29. The product registered in Glue, which stays the catalog of record. Databricks "
+     "computed it; the stage wrote it. Six typed columns, and the location points at the governed "
+     "L3 tier.")
+shot("24-databricks-peer-benchmark-query.jpg",
+     "Figure 30. The analyst side of the same product. Note what is being read: the suppressed "
+     "aggregate, not another client's rows. Querying the cross-client view directly returns "
+     "INSUFFICIENT_PERMISSIONS for a human - only the pipeline service principal may cross.")
 para("Two design decisions are worth carrying into any similar work. Databricks "
      "holds no write path - it computes, the stage writes, and Glue stays the "
      "catalog of record, so provenance is never split across two catalogues. "
@@ -588,13 +651,13 @@ para("The definition below is the whole contract: two checkpoints, two bounded r
      "loops, and an explicit reject path. Everything the consultant chapter describes as a "
      "choice is a Choice state here.")
 shot("11-stepfunctions-full-workflow.jpg",
-     "Figure 24. The complete state machine. MidpointDecision and FinalDecision branch on the "
+     "Figure 31. The complete state machine. MidpointDecision and FinalDecision branch on the "
      "consultant's {decision, feedback}: revise counts a revision and re-runs the stages, "
      "reject ends the run, default carries on.", width=6.2)
 shot("09-stepfunctions-machine.jpg",
-     "Figure 25. The state machine and its execution history.")
+     "Figure 32. The state machine and its execution history.")
 shot("10-stepfunctions-definition.jpg",
-     "Figure 26. Definition beside graph. Execution input pins stage_image by digest; approvals "
+     "Figure 33. Definition beside graph. Execution input pins stage_image by digest; approvals "
      "carry {decision, feedback}; revision loops are bounded by max_revisions.")
 
 h1("Appendix B - The seats, as IAM sees them")

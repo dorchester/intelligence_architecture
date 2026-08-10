@@ -119,6 +119,53 @@ run harness with new digest → diff artifacts against the old run (both in S3,
 keyed by run) → merge
 ```
 
+### Notebook flows: analysis that needs Spark, not a stage
+
+Some work does not belong in a stage. A stage runs inside a report run,
+scoped to one client, on the run's schedule. Cross-client analysis, anything
+that wants a Spark cluster, and anything exploratory belongs in a **Databricks
+notebook flow** submitted from the workbench.
+
+`notebooks/peer_cohort_shape.py` is the worked example. It builds each
+client's seniority share vector, then measures L1 distance and cosine
+similarity against the peer median shape from `derived/peer_benchmarks` —
+"whose workforce is shaped unlike its peers, and by how much". It is a
+Databricks source-format notebook (`# COMMAND ----------` cell separators), so
+it is a plain reviewable `.py` file in git that Databricks reads as cells.
+
+`scripts/submit_databricks_notebook.py` is the harness around it: resolve
+config from the same SSM path the peer-benchmark stage uses, import the
+notebook through the Workspace API, submit a one-time run on **serverless job
+compute**, poll to a terminal state. Same optionality contract as every other
+Databricks touchpoint — missing config, an unreachable workspace, or an API
+error all print `SKIP` and exit 0.
+
+```bash
+python scripts/submit_databricks_notebook.py
+# OK | imported notebook to /intelligence-engine/notebooks/peer_cohort_shape
+# OK | submitted run 305998269280317
+#   ... RUNNING
+# OK | run 305998269280317 completed successfully
+```
+
+Four constraints this flow ran into, all of which are governance working
+rather than obstacles:
+
+- **Direct S3 reads are refused.** `spark.read.format("parquet").load("s3://…")`
+  fails without an attached Unity Catalog external location. Reads must go
+  through `read_files()` or a registered catalog view — so the governed
+  external location is the *only* path to the data, exactly as designed.
+- **`spark.conf.get(...)` is forbidden** in serverless Spark Connect mode, so
+  the catalog name is supplied to the notebook rather than discovered.
+- **The Workspace API will not create parent folders**; `mkdirs` must precede
+  `import`.
+- **The lakehouse bucket name embeds the AWS account ID**, so it is never
+  written into the notebook. The notebook declares a required
+  `lakehouse_s3_prefix` widget with no default and raises if it is unset; the
+  submission script resolves the bucket from SSM at run time and passes it as
+  a job parameter. A notebook that cannot run without being told where the
+  data is cannot leak where the data is.
+
 ## 3. The regression floor
 
 Before anything you changed reaches a consultant:
@@ -189,7 +236,19 @@ task token) — production runs are answered by the consultant in the console.
 ## 6. Version control and promotion
 
 - **Code** (stages, prompts, webapp, tests): plain git on the workbench —
-  branch, commit, push. Claude Code commits on your behalf as anywhere else.
+  branch and commit as normal, and Claude Code commits on your behalf as
+  anywhere else. **Pushing is the one thing the workbench cannot do**: it
+  authenticates to AWS by instance role and carries no GitHub identity, so
+  `git push` fails with `could not read Username`. That is deliberate — a
+  shared analysis box holding write access to the public repository is a
+  wider blast radius than this seat needs.
+- **Getting a commit off the workbench** uses the bucket both ends already
+  have. On the workbench, `python scripts/handoff_patch.py export` writes the
+  commit to `s3://<runs-bucket>/handoff/` under the instance role; from a
+  machine that already has your git credentials,
+  `python scripts/handoff_patch.py fetch --apply` replays it with `git am`,
+  keeping the original message and authorship. You review and push as
+  yourself. No new credential exists at either end.
 - **Which version is live is always recorded**: images by digest in each
   execution's input; stage source packaged from committed state (`git archive`
   of HEAD, so every image maps to a checkout-able commit).

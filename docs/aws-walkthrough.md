@@ -476,6 +476,37 @@ is unaffected by its absence.
 > the view and splitting the credential is outstanding work, recorded in
 > [`guides/analyst.md`](guides/analyst.md).
 
+### Notebook flows on serverless compute
+
+The peer-benchmark stage runs one SQL statement. When analysis needs Spark —
+vector maths, cross-client distance, anything exploratory — the surface is a
+notebook submitted from the workbench, not a stage inside a report run.
+
+`notebooks/peer_cohort_shape.py` measures how far each client's seniority
+shape sits from the peer median (L1 distance and cosine similarity). It is a
+Databricks source-format notebook, so it lives in git as an ordinary
+reviewable `.py` file and Databricks reads it as cells.
+
+```bash
+python scripts/submit_databricks_notebook.py
+# OK | imported notebook to /intelligence-engine/notebooks/peer_cohort_shape
+# OK | submitted run 305998269280317
+#   ... RUNNING
+# OK | run 305998269280317 completed successfully
+```
+
+The notebook never contains an S3 path. The bucket name embeds the AWS
+account ID, so the notebook declares a required `lakehouse_s3_prefix` widget
+with no default and refuses to run unset; the submission script resolves the
+bucket from SSM and passes it as a job parameter.
+
+Running it live also confirmed the boundary holds from inside Databricks:
+`spark.read.format("parquet").load("s3://…")` is **refused** without an
+attached Unity Catalog external location. Every read must go through
+`read_files()` or a registered catalog view, which means the governed
+external location is the only route to the data — not by convention, but
+because the alternative does not work.
+
 ---
 
 ## 11. Verify everything

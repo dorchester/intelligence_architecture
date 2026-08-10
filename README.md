@@ -318,6 +318,10 @@ stages/             reference workflow stages - one per class of work
   analyse_workforce.py   IPF raking, logistic fit, Kish effective n, chart
   enrich_profiles_llm.py batched extraction, synthesis, advisory reviewer
   _bedrock.py            caching, bounded concurrency, structured output
+  peer_benchmarks.py     optional: cross-client medians computed in Databricks
+notebooks/          Databricks source-format notebooks - plain .py in git,
+                    cells in the workspace
+  peer_cohort_shape.py   L1 distance + cosine similarity vs the peer median
 Dockerfile          console image (single worker, non-root)
 infrastructure/
   deploy.sh         deploy every stack, optionally the hosted console
@@ -333,6 +337,8 @@ scripts/
   bedrock_usage.py  CloudWatch tokens + Cost Explorer
   export_samples.py refresh docs/samples from S3
   qa_sweep.py       read-only health check over every deployed stack
+  submit_databricks_notebook.py  import + run a notebook on serverless compute
+  handoff_patch.py  move a workbench commit to git without a git credential
 docs/
   architecture-report.html   full visual walkthrough
   samples/                   real output, no AWS needed

@@ -17,9 +17,11 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-NOTEBOOK_PATH = "/intelligence-engine/notebooks/peer_cohort_shape"
+# A Databricks workspace path, not a local filesystem path - keep it POSIX even
+# when this script runs on Windows, or the API rejects the backslashes.
+NOTEBOOK_PATH = PurePosixPath("/intelligence-engine/notebooks/peer_cohort_shape")
 LOCAL_NOTEBOOK = Path(__file__).resolve().parent.parent / "notebooks" / "peer_cohort_shape.py"
 
 ENVIRONMENT = os.environ.get("IE_ENV", "dev")
@@ -48,9 +50,10 @@ def databricks_settings() -> dict | None:
         "client_id": _param(ssm, f"{SSM_BASE}/client_id"),
         "client_secret": _param(ssm, f"{SSM_BASE}/client_secret", decrypt=True),
         "host": os.environ.get("DATABRICKS_HOST") or _param(ssm, f"{SSM_BASE}/host"),
-        "warehouse_id": os.environ.get("DATABRICKS_WAREHOUSE_ID")
-        or _param(ssm, f"{SSM_BASE}/warehouse_id"),
     }
+    # No warehouse_id here on purpose: this flow runs on serverless job compute
+    # through the Jobs API, not on a SQL warehouse. Requiring it would make the
+    # script skip for a setting it never reads.
     missing = [k for k, v in settings.items() if not v]
     if missing:
         print(f"SKIP | Databricks not configured (missing: {', '.join(missing)})")
@@ -59,18 +62,17 @@ def databricks_settings() -> dict | None:
 
 
 def _lakehouse_bucket() -> str | None:
-    """Resolve the lakehouse bucket from SSM stage config (same source as _aws.config)."""
-    import boto3
-    profile = os.environ.get("AWS_PROFILE_NAME")
-    kwargs = {"region_name": os.environ.get("AWS_REGION", "us-east-1")}
-    if profile:
-        kwargs["profile_name"] = profile
-    ssm = boto3.Session(**kwargs).client("ssm")
-    config_param = f"/intelligence-engine/{ENVIRONMENT}/stages/demo-config"
+    """Resolve the lakehouse bucket from SSM stage config (same source as _aws.config).
+
+    The bucket name embeds the AWS account ID, so it is resolved at run time and
+    passed to the notebook as a job parameter rather than written into any file.
+    """
+    raw = _param(_ssm_client(), f"/intelligence-engine/{ENVIRONMENT}/stages/demo-config", decrypt=True)
+    if not raw:
+        return None
     try:
-        raw = ssm.get_parameter(Name=config_param, WithDecryption=True)["Parameter"]["Value"]
         return json.loads(raw).get("lakehouse_bucket")
-    except Exception:
+    except json.JSONDecodeError:
         return None
 
 
@@ -96,17 +98,22 @@ def _api(host: str, token: str, method: str, path: str, payload=None):
     req = urllib.request.Request(url, data=data, method=method)
     req.add_header("Authorization", f"Bearer {token}")
     req.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.load(r)
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        # Databricks puts the actionable reason in the body; a bare status line
+        # ("HTTP Error 400: Bad Request") is not enough to diagnose anything.
+        raise RuntimeError(f"{method} {path} -> {e.code} {e.reason}: {e.read().decode()[:400]}") from e
 
 
 def import_notebook(host: str, token: str) -> None:
-    parent = str(Path(NOTEBOOK_PATH).parent)
-    _api(host, token, "POST", "/api/2.0/workspace/mkdirs", {"path": parent})
+    # The parent folder is not created implicitly by the import API.
+    _api(host, token, "POST", "/api/2.0/workspace/mkdirs", {"path": str(NOTEBOOK_PATH.parent)})
     content = LOCAL_NOTEBOOK.read_text()
     encoded = base64.b64encode(content.encode()).decode()
     _api(host, token, "POST", "/api/2.0/workspace/import", {
-        "path": NOTEBOOK_PATH,
+        "path": str(NOTEBOOK_PATH),
         "language": "PYTHON",
         "overwrite": True,
         "format": "SOURCE",
@@ -121,7 +128,7 @@ def submit_run(host: str, token: str, lakehouse_bucket: str) -> str:
         "tasks": [{
             "task_key": "shape_analysis",
             "notebook_task": {
-                "notebook_path": NOTEBOOK_PATH,
+                "notebook_path": str(NOTEBOOK_PATH),
                 "base_parameters": {
                     "lakehouse_s3_prefix": f"s3://{lakehouse_bucket}",
                 },
@@ -170,7 +177,7 @@ def main() -> int:
 
     try:
         token = _token(settings)
-    except (urllib.error.URLError, KeyError) as e:
+    except (urllib.error.URLError, RuntimeError, KeyError) as e:
         print(f"SKIP | could not authenticate to Databricks ({type(e).__name__}: {e})")
         return 0
 
@@ -180,7 +187,7 @@ def main() -> int:
         import_notebook(host, token)
         run_id = submit_run(host, token, lakehouse_bucket)
         result = poll_run(host, token, run_id)
-    except (urllib.error.URLError, TimeoutError) as e:
+    except (urllib.error.URLError, TimeoutError, RuntimeError) as e:
         print(f"SKIP | Databricks run failed ({type(e).__name__}: {e})")
         return 0
 
