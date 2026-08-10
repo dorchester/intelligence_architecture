@@ -16,6 +16,16 @@ API calls (see [Use case 7](#7-proposing-an-infrastructure-change)).
 
 ## 1. Sitting down
 
+Two equally good paths to the terminal:
+
+- **Your own terminal** — needs the AWS CLI plus the Session Manager plugin
+  installed once (`winget install Amazon.SessionManagerPlugin` on Windows,
+  then open a fresh terminal so PATH updates).
+- **AWS CloudShell, zero install** — the console's built-in browser terminal
+  ships both the CLI and the SSM plugin, so the same `start-session` command
+  works from any machine that can open the AWS console. Console → the
+  CloudShell icon (or search "CloudShell") → run the commands below as-is.
+
 ```bash
 # find the box (once)
 aws ec2 describe-instances --profile <your-profile> --region us-east-1 \
@@ -25,7 +35,7 @@ aws ec2 describe-instances --profile <your-profile> --region us-east-1 \
 # start it if stopped (it auto-stops after ~1h idle; this is normal)
 aws ec2 start-instances --instance-ids <workbench-id> --profile <your-profile> --region us-east-1
 
-# connect - no SSH, no keys; needs the Session Manager plugin installed once
+# connect - no SSH, no keys (from CloudShell, drop the --profile flag)
 aws ssm start-session --target <workbench-id> --profile <your-profile> --region us-east-1
 
 # inside:

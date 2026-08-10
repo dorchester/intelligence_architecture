@@ -319,6 +319,10 @@ The instance role is the credential — no keys are configured or stored. What
 that seat can and cannot do (notably: it cannot deploy, on purpose) is the
 subject of [`access-model.md`](access-model.md).
 
+> **No local setup at all**: AWS CloudShell (the terminal icon in the console
+> header) has the CLI and the Session Manager plugin preinstalled — the same
+> `start-session` command works from any browser, no `--profile` needed.
+
 ---
 
 ## 8. The workflow harness
