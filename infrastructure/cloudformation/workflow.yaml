@@ -363,7 +363,13 @@ Resources:
                 Action:
                   - ssm:GetParameter
                   - ssm:GetParameters
-                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/intelligence-engine/${Environment}/stages/*
+                Resource:
+                  - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/intelligence-engine/${Environment}/stages/*
+                  # The optional peer-benchmark stage authenticates to
+                  # Databricks as the service principal already stored here.
+                  # Read-only, and the stage skips cleanly when absent - which
+                  # is what keeps the Databricks dependency optional.
+                  - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/intelligence-engine/${Environment}/databricks/*
               - Effect: Allow
                 Action: kms:Decrypt
                 Resource: '*'

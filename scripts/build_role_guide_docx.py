@@ -159,8 +159,27 @@ def _figure(path, text, width):
     caption(text)
 
 
-def shot(fname, text, width=6.4):
-    _figure(os.path.join(args.shots, fname), text, width)
+# Screenshots arrive at whatever width the capture produced. Printing them all
+# at one fixed width makes the narrower ones visibly softer than the rest, so
+# the display width is derived from the native pixels to hold a roughly
+# constant effective resolution. Explicit widths still win.
+TARGET_DPI = 225
+MAX_FIGURE_IN = 6.4
+MIN_FIGURE_IN = 3.2
+
+
+def shot(fname, text, width=None):
+    path = os.path.join(args.shots, fname)
+    if width is None:
+        width = MAX_FIGURE_IN
+        try:
+            from PIL import Image
+            with Image.open(path) as im:
+                width = round(im.size[0] / TARGET_DPI, 2)
+        except Exception:
+            pass
+        width = max(MIN_FIGURE_IN, min(MAX_FIGURE_IN, width))
+    _figure(path, text, width)
 
 
 def diagram(key, text, width=6.0):
