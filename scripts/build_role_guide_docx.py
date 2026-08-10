@@ -43,7 +43,8 @@ SHOT_FILES = [
     "07-glue-lineage-properties.jpg",  # Glue table properties: the ie.* lineage keys
     "09-stepfunctions-machine.jpg",    # state machine page + execution history
     "10-stepfunctions-definition.jpg", # definition tab: JSON beside the graph
-    "12-execution-graph.png",          # a succeeded execution's graph view
+    "11-stepfunctions-full-workflow.jpg",  # whole definition incl. both revision loops
+    "12-execution-graph.jpg",          # a succeeded execution's graph view
     "13-cloudtrail-trail.jpg",         # trail: validation, multi-region, data events
     "15-consultant-console.jpg",       # consultant home
     "16-engineer-dashboard.jpg",       # /engineer dashboard
@@ -266,9 +267,9 @@ steps([
     "Revisions are bounded (default two per checkpoint), so a run cannot loop forever.",
     "At the final checkpoint, approve to publish the artifacts.",
 ])
-shot("12-execution-graph.png",
-     "Figure 6. A real execution: stages in green flowing into MidpointApproval and FinalApproval.",
-     width=4.6)
+shot("12-execution-graph.jpg",
+     "Figure 6. A real execution: every stage green, flowing through MidpointApproval and "
+     "FinalApproval to Done.", width=3.6)
 
 h2("What a consultant never has to worry about")
 bullets([
@@ -524,10 +525,17 @@ doc.add_page_break()
 
 # --- appendix -----------------------------------------------------------------
 h1("Appendix A - The harness in detail")
+para("The definition below is the whole contract: two checkpoints, two bounded revision "
+     "loops, and an explicit reject path. Everything the consultant chapter describes as a "
+     "choice is a Choice state here.")
+shot("11-stepfunctions-full-workflow.jpg",
+     "Figure 23. The complete state machine. MidpointDecision and FinalDecision branch on the "
+     "consultant's {decision, feedback}: revise counts a revision and re-runs the stages, "
+     "reject ends the run, default carries on.", width=6.2)
 shot("09-stepfunctions-machine.jpg",
-     "Figure 23. The report-build state machine and its execution history.")
+     "Figure 24. The state machine and its execution history.")
 shot("10-stepfunctions-definition.jpg",
-     "Figure 24. Definition beside graph. Execution input pins stage_image by digest; approvals "
+     "Figure 25. Definition beside graph. Execution input pins stage_image by digest; approvals "
      "carry {decision, feedback}; revision loops are bounded by max_revisions.")
 
 h1("Appendix B - The seats, as IAM sees them")
