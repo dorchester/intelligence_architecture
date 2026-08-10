@@ -12,10 +12,16 @@ kinds of figure:
               and the pictures in the repository can never drift apart
   screenshots captured from a live deployment
 
-Screenshots show account-specific values (account id, bucket names, console
-URLs). Capture your own from your own deployment rather than reusing someone
-else's - SHOT_FILES lists exactly what the document expects, and any missing
-file renders as a visible placeholder instead of failing the build.
+The screenshots committed under docs/assets/screenshots are from the real
+deployment with the account identifier blacked out - the repository rule
+against publishing it holds for pixels as much as for text. Redaction was
+done by locating each occurrence visually and drawing boxes, because font
+matching across the console's Amazon Ember and the terminal's monospace face
+kept missing occurrences, and a redaction that silently misses one is worse
+than none. If you re-capture from your own deployment, verify every image
+before committing; SHOT_FILES lists exactly what the document expects, and
+any missing file renders as a visible placeholder rather than failing the
+build.
 
 The prose mirrors docs/guides/. If a guide changes, change this in the same
 PR.

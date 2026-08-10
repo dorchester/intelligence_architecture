@@ -17,13 +17,24 @@ Each guide's activities have a matching architecture diagram in
 [`../diagrams.md`](../diagrams.md) — Mermaid source, ready for a README or a
 slide deck.
 
-For internal distribution there is also an **illustrated Word edition** of
-these guides — one chapter per role, with screenshots of the live consoles
-embedded at each activity. The document itself is deliberately not in this
-public repository (live-console screenshots expose account-specific values);
-generate it from your own deployment's screenshots with
-[`../../scripts/build_role_guide_docx.py`](../../scripts/build_role_guide_docx.py),
-which lists the exact captures it expects.
+There is also an **illustrated Word edition** of these guides —
+[`Intelligence-Engine-Operations-Guide.docx`](../Intelligence-Engine-Operations-Guide.docx)
+— one chapter per role, one section per activity, with rendered architecture
+diagrams throughout and screenshots of the live consoles (including real
+Claude Code sessions on the workbench) at each step.
+
+It is generated, not hand-maintained:
+
+```bash
+python scripts/render_diagrams.py --out docs/assets/diagrams
+python scripts/build_role_guide_docx.py \
+    --shots docs/assets/screenshots --diagrams docs/assets/diagrams \
+    --out docs/Intelligence-Engine-Operations-Guide.docx
+```
+
+The committed screenshots have the account identifier blacked out — the rule
+against publishing it applies to pixels as much as to text. If you re-capture
+from your own deployment, check every image before committing.
 
 Two conventions apply across all of them:
 
