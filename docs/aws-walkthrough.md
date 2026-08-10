@@ -312,7 +312,7 @@ and the repo cloned at first boot:
 aws ec2 start-instances --instance-ids <workbench-id> --profile intelligence-dev
 aws ssm start-session   --target <workbench-id>       --profile intelligence-dev
 # then, inside:
-sudo su - ec2-user && cd /work/intelligence_architecture && claude
+sudo su - ec2-user && cd ~/intelligence_architecture && claude
 ```
 
 The instance role is the credential — no keys are configured or stored. What

@@ -17,25 +17,25 @@ diamonds are decisions. Names match the deployed resources
 
 ```mermaid
 flowchart LR
-    subgraph People
+    subgraph "People"
         C[Consultant<br/>Cognito login]
         F[FDE<br/>workbench seat]
         S[Steward<br/>sts:AssumeRole]
         P[Platform engineer<br/>deployer seat]
     end
-    subgraph Product
+    subgraph "Product"
         APP[Hosted console<br/>App Runner]
         SF[Step Functions<br/>report-build]
         CB[CodeBuild<br/>stage-runner]
     end
-    subgraph Data plane
+    subgraph "Data plane"
         L[(landing/)]
         FD[(foundational/)]
         DV[(derived/)]
         CX[(contextualized/)]
         ST[(stewardship/)]
     end
-    subgraph Governance
+    subgraph "Governance"
         CT[CloudTrail]
         SNS[Steward digest SNS]
     end
@@ -47,8 +47,8 @@ flowchart LR
     S -- reads --> ST
     ST -. escalations .-> SNS -.-> S
     F -- builds/tests --> CB
-    P -- deploys via cfn-exec --> Product
-    CT -.. logs everything ..- Product
+    P -- deploys via cfn-exec --> APP
+    CT -. logs every call .-> SF
 ```
 
 ## 2. A report run, end to end (the consultant's activity)
@@ -122,14 +122,14 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    subgraph Critical to execution
+    subgraph "Critical to execution"
         C[Consultant - own checkpoints only]
     end
-    subgraph Critical to engineering
+    subgraph "Critical to engineering"
         F[FDE - workbench]
         P[Platform engineer - deployer seat]
     end
-    subgraph Accountable, never blocking
+    subgraph "Accountable, never blocking"
         S[Steward - admission before, gates-in-code during, audit after]
         A[Analyst - Databricks read-only]
         AD[Admin - dormant: seating + recovery only]
@@ -144,7 +144,7 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    subgraph Writers - cannot read what they write
+    subgraph "Writers - cannot read what they write"
         CONF[conformance]
         PB[product-builder]
         SR[stage-runner]

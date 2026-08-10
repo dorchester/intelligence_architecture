@@ -5,11 +5,12 @@ a *model* still behaves. That gap matters because a reviewer degrades
 silently: nothing errors, findings just stop appearing, and the first symptom
 is a defect reaching a client.
 
-Three planted defects, one per failure class the reviewer exists to catch:
+Four planted defects, one per failure class the reviewer exists to catch:
 
   arithmetic     a stated difference that does not match its own inputs
   unsupported    a figure with no basis in the data provided
   contradiction  two claims in one summary that cannot both be true
+  stale          a year-over-year trend asserted from point-in-time counts
 
 Scored as recall - how many planted defects the reviewer names - because a
 reviewer that catches two of three has degraded even while still "working".
@@ -48,6 +49,12 @@ SEEDED = [
         "summary": ("Technology is the smallest function in the organisation, "
                     "and at 60 roles it is larger than Corporate Functions at 50."),
         "defect": "cannot be both the smallest and larger than another function",
+    },
+    {
+        "id": "stale",
+        "counts": {"Data Science": 74, "Engineering": 215},
+        "summary": "Data Science has grown 30% year over year while Engineering remains flat.",
+        "defect": "year-over-year trend cannot be derived from a single point-in-time count",
     },
 ]
 
@@ -94,7 +101,7 @@ def test_reviewer_catches_seeded_defects():
 
 def test_seeded_suite_is_well_formed():
     """Runs everywhere. Guards the fixtures themselves against rot."""
-    assert len(SEEDED) == 3
-    assert {c["id"] for c in SEEDED} == {"arithmetic", "unsupported", "contradiction"}
+    assert len(SEEDED) == 4
+    assert {c["id"] for c in SEEDED} == {"arithmetic", "unsupported", "contradiction", "stale"}
     for case in SEEDED:
         assert case["summary"] and case["defect"] and case["counts"]

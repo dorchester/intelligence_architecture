@@ -131,6 +131,40 @@ Resources:
                 Condition:
                   StringLike:
                     s3:prefix: ['datasets/*', 'datasets']
+              # The governed products. Until this existed, Unity Catalog could
+              # reach the raw drop but not a single medallion tier, so every
+              # Databricks query necessarily read pre-conformance data - the
+              # opposite of what the analyst guide promised.
+              #
+              # Deliberately derived + contextualized only. Aggregates and
+              # vectors are what an analyst needs; record-grain foundational
+              # data is pseudonymous personal data, and granting it should be
+              # a separate, reviewed decision rather than a side effect of
+              # connecting a BI tool.
+              - Sid: ReadGovernedProducts
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - Fn::Sub:
+                      - '${B}/derived/*'
+                      - B:
+                          Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+                  - Fn::Sub:
+                      - '${B}/contextualized/*'
+                      - B:
+                          Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+              - Sid: ListGovernedProducts
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource:
+                  Fn::ImportValue: !Sub intelligence-engine-${Environment}-lakehouse-arn
+                Condition:
+                  StringLike:
+                    s3:prefix: ['derived/*', 'derived', 'contextualized/*', 'contextualized']
               - Sid: SelfAssume
                 Effect: Allow
                 Action: sts:AssumeRole

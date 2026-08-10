@@ -110,7 +110,7 @@ through.
 
 ## Runtime identities
 
-Fifteen roles exist, all named `intelligence-engine-dev-*`, all defined in
+Sixteen roles exist, all named `intelligence-engine-dev-*`, all defined in
 this repo. Outside the deploy channel described above, none can touch IAM or
 CloudFormation. Grouped by what they are for:
 
@@ -118,6 +118,7 @@ CloudFormation. Grouped by what they are for:
 
 | Role | Assumed by | Can | Deliberately cannot |
 |---|---|---|---|
+| `fde` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Find, wake, reach and sleep the workbench — that is the entire grant | Read any tier; invoke a model; deploy; touch IAM. All four verified denied by probe |
 | `workbench` | EC2 (the FDE's box, reached via SSM only — no SSH exists) | Invoke Bedrock; read/write the project bucket and run table; push images to ECR; start CodeBuild builds; read stacks, logs, metrics | Deploy or modify any stack; touch IAM; touch billing; touch non-project resources |
 | `steward` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Admit data (`landing-write`); admit people (create/disable console users in the project Cognito pool); read the stewardship log and CloudTrail | Deploy; touch IAM; write to any lakehouse tier; invoke models; reach the vault. The steward governs — it does not operate the pipeline |
 | `deployer` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Operate CloudFormation on `intelligence-engine-*` stacks (through `cfn-exec`); start image builds; write stage config | Mutate any resource directly; operate any non-project stack; assume `cfn-exec` itself |
@@ -194,7 +195,7 @@ Notable absences are load-bearing:
 
 ## The human functions, mapped onto the seats
 
-The fifteen roles above are *machine* identities. The people questions — who
+Most of the sixteen roles above are *machine* identities. The people questions — who
 governs the data, who uploads datasets, who engineers the pipelines — map onto
 a deliberately small set of human functions. The design goal is that **adding
 a person means attaching existing policies to a seat, never minting new

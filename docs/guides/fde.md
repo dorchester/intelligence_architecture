@@ -16,33 +16,62 @@ API calls (see [Use case 7](#7-proposing-an-infrastructure-change)).
 
 ## 1. Sitting down
 
-Two equally good paths to the terminal:
+### Your seat, in IAM
 
-- **Your own terminal** — needs the AWS CLI plus the Session Manager plugin
-  installed once (`winget install Amazon.SessionManagerPlugin` on Windows,
-  then open a fresh terminal so PATH updates).
-- **AWS CloudShell, zero install** — the console's built-in browser terminal
-  ships both the CLI and the SSM plugin, so the same `start-session` command
-  works from any machine that can open the AWS console. Console → the
-  CloudShell icon (or search "CloudShell") → run the commands below as-is.
+Your access is the **`intelligence-engine-dev-fde` role** (from
+`workbench.yaml`), and it is deliberately tiny: find the box, wake it, open a
+session, put it back to sleep. That is *all* it grants — it cannot read a
+data tier, invoke a model, or deploy anything (all four denials are verified
+by probe). Every capability you actually use arrives from the **instance
+role** once you are at the prompt. That split is the point: widening what an
+FDE can do is a reviewed change to `WorkbenchRole` in a template, never a
+grant handed to a person.
+
+```ini
+# ~/.aws/config
+[profile intelligence-fde]
+role_arn = arn:aws:iam::<account>:role/intelligence-engine-dev-fde
+source_profile = <your-sso-profile>
+region = us-east-1
+```
+
+### Three ways to the prompt
+
+| Path | Needs | Use when |
+|---|---|---|
+| **Local terminal** | AWS CLI + Session Manager plugin, installed once (`winget install Amazon.SessionManagerPlugin` on Windows — then open a *fresh* terminal so PATH updates) | Your day-to-day. Best ergonomics, real scrollback, your own editor beside it |
+| **Console → Session Manager** | Only console access + the FDE seat. No install, no plugin | A borrowed machine, or when the plugin fight is not worth it. EC2 → select the instance → **Connect** → *Session Manager* tab → **Connect**; or Systems Manager → Session Manager → Start session |
+| **CloudShell** | Console access **plus** `cloudshell:*` in your permission set — which the FDE seat does **not** include | Only if your organisation's permission set happens to grant it. Do not design around this one |
+
+The middle path is the honest answer to "what if I have no local setup" — it
+is a full browser terminal on the same box, gated by the same seat, logged
+the same way in CloudTrail.
 
 ```bash
 # find the box (once)
-aws ec2 describe-instances --profile <your-profile> --region us-east-1 \
+aws ec2 describe-instances --profile intelligence-fde --region us-east-1 \
   --filters "Name=tag:Application,Values=intelligence-engine" \
   --query "Reservations[].Instances[].[InstanceId,State.Name]" --output text
 
 # start it if stopped (it auto-stops after ~1h idle; this is normal)
-aws ec2 start-instances --instance-ids <workbench-id> --profile <your-profile> --region us-east-1
+aws ec2 start-instances --instance-ids <workbench-id> --profile intelligence-fde --region us-east-1
 
-# connect - no SSH, no keys (from CloudShell, drop the --profile flag)
-aws ssm start-session --target <workbench-id> --profile <your-profile> --region us-east-1
+# connect - no SSH, no keys
+aws ssm start-session --target <workbench-id> --profile intelligence-fde --region us-east-1
 
-# inside:
+# inside (the shell lands you in the repo with the venv active):
 sudo su - ec2-user
-cd /work/intelligence_architecture
-claude        # first launch asks for YOUR Anthropic login - that credential is yours
+claude
 ```
+
+**Claude Code here runs on Bedrock through the instance role** — no API key,
+no personal Anthropic login, nothing to leak. The banner says
+`Amazon Bedrock`, and the settings that do it (`CLAUDE_CODE_USE_BEDROCK=1`
+plus the model ids) are written by the workbench template at first boot. The
+consequence worth understanding: **your agent's inference stays inside the
+account boundary** — same Bedrock account, same CloudTrail, same data path as
+the product's own model calls. An engineer's exploratory prompts are not a
+side channel out of the estate.
 
 Set your git identity on first use — pushing is *your* identity, deliberately
 not baked into the box:
@@ -99,9 +128,16 @@ Before anything you changed reaches a consultant:
   `golden-replay` CodeBuild project, against the same data boundary as the
   workload.
 - **Seeded-defect eval** (`tests/test_seeded_defects.py`) — checks *model
-  behavior*, not code: does the reviewer still catch planted arithmetic,
-  unsupported-figure and contradiction defects? Scored as recall against a
-  2/3 floor. This is what catches "my new prompt quietly broke the reviewer."
+  behavior*, not code: four planted defect classes (arithmetic, unsupported
+  figure, contradiction, and a trend asserted from point-in-time counts),
+  scored as recall against a 2/3 floor. This is what catches "my new prompt
+  quietly broke the reviewer."
+
+Extending that suite is itself a normal FDE activity, and a good first task
+to run through Claude Code on the workbench: add a defect class, run the eval
+against live Bedrock, read the recall line. A run that reports
+`reviewer recall 100% - caught [...], missed []` is evidence about the model,
+not about the code.
 
 If you touch a reviewer or extraction prompt, run the seeded eval. If recall
 drops below the bar, that is a regression even though nothing errored.
@@ -180,7 +216,31 @@ That asymmetry is the enforced review boundary: your code takes effect
 through image digests you control; boundary changes take effect only through
 a template someone at the deployer seat applies.
 
-## 8. Observability when something misbehaves
+## 8. Where your work shows up
+
+The terminal is one surface, not the whole job. Everything you do lands
+somewhere durable, and knowing which surface answers which question is most
+of the operational skill:
+
+| Question | Surface |
+|---|---|
+| What did I change? | `git` on the workbench → branch, diff, push → the PR on GitHub. Code review is the record |
+| Did my pipeline version run, and which one? | Step Functions **Executions** — each input pins a `stage_image` digest |
+| What did a stage actually do? | CodeBuild **build history** + its CloudWatch log stream, per stage run |
+| What did the model see and say? | `/engineer` run traces — the exact context injected into every prompt |
+| What did it produce? | `analysis/<client_id>/…` in the artifacts bucket; the dataset browser renders them |
+| What did it cost, in tokens? | the CloudWatch Bedrock dashboard, and `summary()` from `_bedrock.py` per run |
+| Did a governance gate fire? | your run's exception text; the recorded event lives in the steward's log |
+| Is the estate still as the templates describe? | `python scripts/iac_coverage.py` |
+| Who did what, account-wide? | CloudTrail — including your own SSM session and every call your agent made |
+
+Two habits worth forming. **Work on a branch**, because the digest you test
+and the commit you merged should be traceable to each other. And **read the
+trace, not just the output** — a briefing that looks right and a prompt that
+received the right context are different claims, and only the second one
+survives a client asking "where did this number come from?"
+
+## 9. Observability when something misbehaves
 
 - **Engineer console** (`https://<ServiceUrl>/engineer`): run traces, the
   exact context injected into every prompt, dataset browser. Guardrails are
@@ -194,7 +254,7 @@ a template someone at the deployer seat applies.
 - `python scripts/qa_sweep.py` — the system-wide health check; run it after
   anything invasive.
 
-## 9. What working with the steward looks like
+## 10. What working with the steward looks like
 
 - You **cannot** drop new source data into `landing/` — that is admission,
   the steward's act. Hand them the file and the provenance story.

@@ -60,7 +60,33 @@ column, or different aggregation:
 - **Access you don't have** (e.g. a new schema) → the platform engineer; it's
   a template change to the external location / catalog grants.
 
-## 5. Why you can't write
+## 5. What the connection can actually reach today
+
+Worth stating plainly, because the picture above describes the intended
+shape and the deployment is one step behind it:
+
+- The Unity Catalog credential now holds **read on `derived/` and
+  `contextualized/`** in the lakehouse — the governed products, granted in
+  `databricks-access.yaml`. `foundational/` is deliberately excluded:
+  record-grain pseudonymous data should be a separate, reviewed grant, not
+  a side effect of connecting a BI tool.
+- It **also still holds read on the raw dataset drop** (`datasets/*` in the
+  runs bucket), which is what the existing `sterling_profiles` view reads —
+  and that view exposes `first_name`, `last_name`, `full_name` and
+  `headline`. That is pre-conformance data reaching an analyst surface, and
+  it is the one place where the medallion model is currently bypassed.
+- Turning the governed grant into queryable tables needs one Databricks-side
+  step that IAM cannot do for you: an **external location** over
+  `s3://<lakehouse>/derived/` bound to the existing storage credential, then
+  views or external tables on top. Until that exists, a `read_files()` call
+  against the lakehouse returns `UNAUTHORIZED_ACCESS` even though the AWS
+  role permits it.
+
+The honest summary: AWS-side access to the governed tiers is now correct;
+the Unity Catalog objects that expose them are not yet created, and the raw
+view should be retired once they are.
+
+## 6. Why you can't write
 
 The `databricks-uc` role holds no write on anything — so nothing you do in a
 notebook can corrupt a governed tier, mislabel lineage, or leak into the

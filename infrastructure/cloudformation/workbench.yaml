@@ -279,9 +279,95 @@ Resources:
             echo "export ENVIRONMENT=${Environment}" >> ~/.bashrc
             echo "cd ~/intelligence_architecture && source .venv/bin/activate" >> ~/.bashrc
           '
+
+          # Point Claude Code at Bedrock through the instance role, so the
+          # engineer never supplies an API key and agent inference stays
+          # inside the account boundary - same billing, same CloudTrail, same
+          # data path as the product itself. Without this a fresh workbench
+          # would prompt for a personal Anthropic login on first launch,
+          # which sends the engineer's work outside the account.
+          # Written on one line on purpose: a heredoc would have to dedent to
+          # its terminator, and a dedent inside this YAML block scalar ends
+          # the block early - which silently corrupts the whole template.
+          sudo -u ec2-user bash -lc '
+            mkdir -p ~/.claude
+            printf "%s" "{\"env\":{\"CLAUDE_CODE_USE_BEDROCK\":\"1\",\"AWS_REGION\":\"${AWS::Region}\",\"ANTHROPIC_DEFAULT_OPUS_MODEL\":\"us.anthropic.claude-opus-4-6-v1\",\"ANTHROPIC_DEFAULT_SONNET_MODEL\":\"us.anthropic.claude-sonnet-4-5-20250929-v1:0\",\"ANTHROPIC_DEFAULT_HAIKU_MODEL\":\"us.anthropic.claude-haiku-4-5-20251001-v1:0\"},\"model\":\"opus\",\"theme\":\"dark\"}" > ~/.claude/settings.json
+          '
       Tags:
         - Key: Name
           Value: !Sub intelligence-engine-${Environment}-workbench
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+
+  # The FDE's *seat*, as distinct from the instance role above.
+  #
+  # The instance role is what the FDE's work runs AS once they are on the box.
+  # This role is the human's right to REACH the box - and nothing more. Until
+  # this existed, that right had no artifact: reaching the workbench required
+  # account admin, which quietly made every engineer an administrator and
+  # contradicted the access model's own rule.
+  #
+  # Deliberately tiny. Everything the seat can do is: find the box, wake it,
+  # open a session, put it back to sleep. All authority beyond the SSH-less
+  # prompt comes from the instance role, so widening what an FDE can do is a
+  # reviewed change to WorkbenchRole - never a grant handed to a person.
+  FdeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub intelligence-engine-${Environment}-fde
+      Description: Forward-deployed engineer seat - reach the workbench, nothing else
+      MaxSessionDuration: 14400
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: reach-the-workbench
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Describe calls do not support resource-level permissions.
+              - Sid: FindTheBox
+                Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:DescribeInstanceStatus
+                  - ssm:DescribeInstanceInformation
+                  - ssm:DescribeSessions
+                Resource: '*'
+              # Scoped by tag rather than instance id, so replacing the
+              # workbench does not silently strip every engineer's access.
+              - Sid: WakeAndSleepOwnBox
+                Effect: Allow
+                Action: [ec2:StartInstances, ec2:StopInstances]
+                Resource: !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*
+                Condition:
+                  StringEquals:
+                    ec2:ResourceTag/Application: intelligence-engine
+              - Sid: OpenASession
+                Effect: Allow
+                Action: ssm:StartSession
+                Resource: !Sub arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*
+                Condition:
+                  StringEquals:
+                    ssm:resourceTag/Application: intelligence-engine
+              - Sid: TheShellDocument
+                Effect: Allow
+                Action: ssm:StartSession
+                Resource: !Sub arn:aws:ssm:${AWS::Region}::document/SSM-SessionManagerRunShell
+              # Own sessions only - an engineer cannot cut someone else off.
+              - Sid: EndOwnSessions
+                Effect: Allow
+                Action: [ssm:TerminateSession, ssm:ResumeSession]
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:session/${!aws:userid}-*
+      Tags:
         - Key: Application
           Value: intelligence-engine
         - Key: Environment
@@ -322,4 +408,8 @@ Outputs:
   StopCommand:
     Value: !Sub aws ec2 stop-instances --instance-ids ${Workbench} --profile intelligence-dev
   RoleArn:
+    Description: What the FDE's work runs as once they are on the box
     Value: !GetAtt WorkbenchRole.Arn
+  FdeRoleArn:
+    Description: The FDE seat - assume this to reach the workbench (seating a person is one sts:AssumeRole grant on it)
+    Value: !GetAtt FdeRole.Arn
