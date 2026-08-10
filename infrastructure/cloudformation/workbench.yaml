@@ -255,8 +255,14 @@ Resources:
           dnf update -y
           dnf install -y git python3.12 python3.12-pip nodejs npm jq tmux
 
-          # Claude Code, so the engineer works with an agent inside the account
-          npm install -g @anthropic-ai/claude-code || true
+          # Claude Code, so the engineer works with an agent inside the account.
+          # Installed under the engineer's own npm prefix rather than the
+          # root-owned global one: the agent updates itself, and a prefix it
+          # cannot write makes every session open with an auto-update failure.
+          install -d -o ec2-user -g ec2-user /home/ec2-user/.npm-global
+          sudo -u ec2-user npm config set prefix /home/ec2-user/.npm-global
+          sudo -u ec2-user npm install -g @anthropic-ai/claude-code || true
+          echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> /home/ec2-user/.bashrc
 
           # Databricks CLI (v1.x) for bundles and workspace automation
           curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh || true
