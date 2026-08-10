@@ -13,6 +13,10 @@ illustrations.
 | [`consultant.md`](consultant.md) | Consultant / engagement lead | Hosted console (Cognito) |
 | [`admin.md`](admin.md) | Account admin | SSO — dormant by design |
 
+Each guide's activities have a matching architecture diagram in
+[`../diagrams.md`](../diagrams.md) — Mermaid source, ready for a README or a
+slide deck.
+
 Two conventions apply across all of them:
 
 1. **One hat at a time.** A person holding several functions assumes the seat
