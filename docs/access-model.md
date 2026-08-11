@@ -106,6 +106,54 @@ variant (GitHub Actions OIDC assuming the deployer seat) remains the natural
 next step; it changes *who triggers* deploys, not the channel they flow
 through.
 
+## Running Claude Code outside the account
+
+Bedrock originally sat only on *machine* identities — the workbench instance
+role, App Runner, the CodeBuild stage roles. Reaching a model therefore meant
+first reaching the workbench. That is a reasonable default and a poor
+requirement, so `bedrock-seats.yaml` grants the model calls to the seats a
+person actually assumes. The grant is Anthropic models only and carries **no
+data access**: a laptop can call a model, and still cannot read a tier.
+
+Three ways to authenticate, in the order worth reaching for:
+
+| | How | Lifetime | Needs |
+|---|---|---|---|
+| **Assumed seat** | `AWS_PROFILE=intelligence-fde`, `CLAUDE_CODE_USE_BEDROCK=1` | 4h session | Nothing new — the credential chain already works |
+| **Short-term API key** | `python scripts/bedrock_api_key.py --profile intelligence-fde`, or Bedrock console → API keys → short-term | ≤12h | Nothing new; the key inherits that session's permissions |
+| **Long-term API key** | Deploy `bedrock-api-key-user.yaml` per person, then `create-service-specific-credential` | Until deleted | A dedicated IAM user |
+
+```ini
+# ~/.aws/config - the same per-hat pattern as every other seat
+[profile intelligence-fde]
+role_arn = arn:aws:iam::<account>:role/intelligence-engine-dev-fde
+source_profile = intelligence-dev
+region = us-east-1
+```
+
+```bash
+aws sso login --profile intelligence-dev
+export AWS_PROFILE=intelligence-fde CLAUDE_CODE_USE_BEDROCK=1
+claude
+```
+
+**On long-term keys.** A long-term Bedrock API key is an IAM service-specific
+credential, and those can only hang off an IAM *user* — there is no version of
+it that does not create one. This estate otherwise has zero users on purpose:
+every identity is federated and every session expires. So the long-term path
+exists, declared in a template rather than improvised in the console, but it
+is the last resort rather than the default. The user it creates can do exactly
+one thing, cannot log in, and holds no access keys, so a leaked key spends
+your Bedrock budget and reaches nothing else — which is why the per-client
+spend alarms in `llm-controls.yaml` are the control that matters for it.
+Revoking a leaver is deleting their stack.
+
+Who gets model access is a deploy-time parameter, not a code change:
+`AttachToFde` defaults to Yes because that is the seat that runs Claude Code;
+`AttachToSteward` and `AttachToDeployer` default to No because admission and
+deploying are not model work. Deleting the stack revokes all of it and leaves
+every other permission intact.
+
 ---
 
 ## Runtime identities
@@ -118,7 +166,7 @@ CloudFormation. Grouped by what they are for:
 
 | Role | Assumed by | Can | Deliberately cannot |
 |---|---|---|---|
-| `fde` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Find, wake, reach and sleep the workbench — that is the entire grant | Read any tier; invoke a model; deploy; touch IAM. All four verified denied by probe |
+| `fde` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Find, wake, reach and sleep the workbench; invoke Anthropic models (from `bedrock-seats.yaml`, so Claude Code runs on a laptop as well as on the box) | Read any tier; deploy; touch IAM — verified denied by probe. The model grant carries **no** data access with it |
 | `workbench` | EC2 (the FDE's box, reached via SSM only — no SSH exists) | Invoke Bedrock; read/write the project bucket and run table; push images to ECR; start CodeBuild builds; read stacks, logs, metrics | Deploy or modify any stack; touch IAM; touch billing; touch non-project resources |
 | `steward` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Admit data (`landing-write`); admit people (create/disable console users in the project Cognito pool); read the stewardship log and CloudTrail | Deploy; touch IAM; write to any lakehouse tier; invoke models; reach the vault. The steward governs — it does not operate the pipeline |
 | `deployer` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Operate CloudFormation on `intelligence-engine-*` stacks (through `cfn-exec`); start image builds; write stage config | Mutate any resource directly; operate any non-project stack; assume `cfn-exec` itself |

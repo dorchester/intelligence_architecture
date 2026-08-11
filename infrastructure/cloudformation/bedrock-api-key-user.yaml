@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Intelligence Engine - one IAM user that exists only to hold a Bedrock API key
+
+# Deploy once per person who needs to run Claude Code from their own machine
+# against Bedrock:
+#
+#   aws cloudformation deploy \
+#     --template-file infrastructure/cloudformation/bedrock-api-key-user.yaml \
+#     --stack-name intelligence-engine-dev-bedrock-key-alex \
+#     --parameter-overrides PersonName=alex \
+#     --capabilities CAPABILITY_NAMED_IAM
+#
+# Why an IAM user, in an estate that otherwise has none:
+#
+# A long-term Bedrock API key is an IAM *service-specific credential*, and
+# service-specific credentials can only hang off a user. There is no version of
+# "generate a long-term API key" that does not create one. Doing it here rather
+# than improvising in the console means the identity is declared, reviewed in a
+# diff, tagged, scoped to exactly one permission, and deleted by deleting a
+# stack - instead of an unmanaged user named BedrockAPIKey-3f2a that nobody can
+# later account for.
+#
+# What this user deliberately cannot do:
+#   - log in (no console password is ever set)
+#   - hold access keys (none created; the key below is service-specific, and
+#     is only usable against Bedrock)
+#   - touch the data plane, the run history, or any other service
+#
+# So the blast radius of a leaked key is: someone can spend your Bedrock budget.
+# That is a real cost exposure, which is why the per-client spend alarms in
+# llm-controls.yaml matter, and why the key should carry an expiry.
+#
+# THE KEY ITSELF IS NEVER CREATED HERE, and must never be committed. CloudFormation
+# cannot create a service-specific credential, and that is a good thing - it would
+# put the secret in stack outputs. Generate it out of band, once:
+#
+#   aws iam create-service-specific-credential \
+#     --user-name intelligence-engine-dev-bedrock-alex \
+#     --service-name bedrock.amazonaws.com \
+#     --credential-age-days 90
+#
+# or from the Bedrock console: API keys -> Generate long-term API key, choosing
+# this user. Hand it over out of band; the recipient sets:
+#
+#   export AWS_BEARER_TOKEN_BEDROCK=<key>
+#   export CLAUDE_CODE_USE_BEDROCK=1
+#
+# Rotation is generating a new one and deleting the old with
+# delete-service-specific-credential. Revocation for a leaver is deleting this
+# stack, which takes the user and every credential on it.
+#
+# Prefer a short-term key where the workflow allows it - see
+# scripts/bedrock_api_key.py, which mints a <= 12h token from an ordinary SSO
+# session and needs no user at all.
+#
+# Cost: nothing for the identity. Model calls bill per token as usual.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+  PersonName:
+    Type: String
+    Description: Short lowercase identifier for the person (becomes part of the user name)
+    AllowedPattern: '^[a-z0-9][a-z0-9._-]{1,30}$'
+    ConstraintDescription: lowercase letters, digits, dot, underscore or hyphen; 2-31 characters
+
+Resources:
+
+  BedrockKeyUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub intelligence-engine-${Environment}-bedrock-${PersonName}
+      # One permission, from the same managed policy the human seats use, so
+      # widening or narrowing model access happens in exactly one place.
+      ManagedPolicyArns:
+        - Fn::ImportValue: !Sub intelligence-engine-${Environment}-bedrock-seat-policy-arn
+      Tags:
+        - Key: Application
+          Value: intelligence-engine
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: ManagedBy
+          Value: cloudformation
+        - Key: Purpose
+          Value: bedrock-api-key-only
+        - Key: Person
+          Value: !Ref PersonName
+
+Outputs:
+  UserName:
+    Description: Generate the key against this user, then hand it over out of band
+    Value: !Ref BedrockKeyUser
+
+  GenerateCommand:
+    Description: Run once to mint the key - the key is never stored by CloudFormation
+    Value: !Sub >-
+      aws iam create-service-specific-credential
+      --user-name ${BedrockKeyUser}
+      --service-name bedrock.amazonaws.com
+      --credential-age-days 90

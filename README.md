@@ -339,6 +339,7 @@ scripts/
   qa_sweep.py       read-only health check over every deployed stack
   submit_databricks_notebook.py  import + run a notebook on serverless compute
   handoff_patch.py  move a workbench commit to git without a git credential
+  bedrock_api_key.py short-term Bedrock key for Claude Code on a laptop
 docs/
   architecture-report.html   full visual walkthrough
   samples/                   real output, no AWS needed
@@ -368,6 +369,7 @@ All CloudFormation-managed, tagged `Application=intelligence-engine`.
 | `…-dev-governance` | Medallion catalog databases, per-tier read/write policies, CloudTrail with object-level data events, stewardship SNS topic | per GB of trail |
 | `…-dev-steward` | Data-steward seat — data admission, console user management, audit read | free |
 | `…-dev-deployer` | Platform-engineer seat + the `cfn-exec` role CloudFormation assumes; no human can assume `cfn-exec` | free |
+| `…-dev-bedrock-seats` | Anthropic-model access for the human seats, so Claude Code runs on a laptop as well as on the workbench — no data access rides along | free |
 
 The first four idle at zero. `…-dev-app` is the only standing cost, and deleting
 that one stack removes it without touching data or datasets.

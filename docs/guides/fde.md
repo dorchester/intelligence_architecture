@@ -20,12 +20,17 @@ API calls (see [Use case 7](#7-proposing-an-infrastructure-change)).
 
 Your access is the **`intelligence-engine-dev-fde` role** (from
 `workbench.yaml`), and it is deliberately tiny: find the box, wake it, open a
-session, put it back to sleep. That is *all* it grants — it cannot read a
-data tier, invoke a model, or deploy anything (all four denials are verified
-by probe). Every capability you actually use arrives from the **instance
-role** once you are at the prompt. That split is the point: widening what an
-FDE can do is a reviewed change to `WorkbenchRole` in a template, never a
-grant handed to a person.
+session, put it back to sleep — plus the ability to call an Anthropic model,
+which arrives separately from `bedrock-seats.yaml`. It still cannot read a
+data tier or deploy anything (both denials verified by probe). Every *other*
+capability you use arrives from the **instance role** once you are at the
+prompt. That split is the point: widening what an FDE can do is a reviewed
+change to a template, never a grant handed to a person.
+
+The model grant is what lets you run Claude Code on your own machine rather
+than only on the box — see [Running Claude Code locally](#running-claude-code-locally)
+below. It carries no data access with it: your laptop can call a model and
+still cannot read a tier.
 
 ```ini
 # ~/.aws/config
@@ -46,6 +51,37 @@ region = us-east-1
 The middle path is the honest answer to "what if I have no local setup" — it
 is a full browser terminal on the same box, gated by the same seat, logged
 the same way in CloudTrail.
+
+### Running Claude Code locally
+
+You do not have to be on the workbench to work with the agent. The workbench
+is where the *pipeline* runs — it holds the data access, the ECR push, the
+build triggers. Claude Code itself only needs a model, and your seat has one.
+
+```bash
+aws sso login --profile intelligence-dev
+export AWS_PROFILE=intelligence-fde CLAUDE_CODE_USE_BEDROCK=1
+claude
+```
+
+That is the whole setup, and it is the path to prefer: no key to leak, and
+the session expires with your seat. Two alternatives when the credential
+chain is not available to you:
+
+- **Short-term API key** (≤12 hours), from a session you already hold:
+  `python scripts/bedrock_api_key.py --profile intelligence-fde` prints the
+  two exports to paste. The Bedrock console offers the same thing under
+  API keys → short-term.
+- **Long-term API key**, when something genuinely cannot carry a
+  short-lived credential. This needs a dedicated IAM user, declared in
+  `bedrock-api-key-user.yaml` and deployed per person; the key is minted out
+  of band and never committed. Treat it as the last resort — it is the only
+  credential in this system that does not expire on its own.
+
+What you gain locally is the agent and your own editor. What you do **not**
+gain is the data plane: reading a tier, pushing an image or starting a build
+still means being on the box, because those grants live on the instance role
+and not on you.
 
 ```bash
 # find the box (once)
