@@ -91,6 +91,16 @@ Resources:
               - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/us.anthropic.*
               - !Sub arn:aws:bedrock:*:${AWS::AccountId}:application-inference-profile/*
               - arn:aws:bedrock:*::foundation-model/anthropic.*
+          # Authenticating with a Bedrock API key rather than SigV4 is a
+          # separate action, checked in addition to InvokeModel above. Without
+          # it a minted key is accepted as a token and then refused at the
+          # call: "not authorized to perform: bedrock:CallWithBearerToken".
+          # It grants no model access on its own - it only permits presenting
+          # a bearer token as this identity.
+          - Sid: AuthenticateWithApiKey
+            Effect: Allow
+            Action: bedrock:CallWithBearerToken
+            Resource: '*'
           # Claude Code resolves model ids at startup. Listing is metadata
           # only - it reveals which models exist, never any content - and
           # these calls do not support resource-level permissions.

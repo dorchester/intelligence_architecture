@@ -70,8 +70,9 @@ chain is not available to you:
 
 - **Short-term API key** (≤12 hours), from a session you already hold:
   `python scripts/bedrock_api_key.py --profile intelligence-fde` prints the
-  two exports to paste. The Bedrock console offers the same thing under
-  API keys → short-term.
+  two exports to paste. Add `--role-arn` instead if you have not set up the
+  seat profile. The Bedrock console offers the same thing under
+  API keys → short-term. Needs `pip install aws-bedrock-token-generator`.
 - **Long-term API key**, when something genuinely cannot carry a
   short-lived credential. This needs a dedicated IAM user, declared in
   `bedrock-api-key-user.yaml` and deployed per person; the key is minted out

@@ -120,7 +120,7 @@ Three ways to authenticate, in the order worth reaching for:
 | | How | Lifetime | Needs |
 |---|---|---|---|
 | **Assumed seat** | `AWS_PROFILE=intelligence-fde`, `CLAUDE_CODE_USE_BEDROCK=1` | 4h session | Nothing new — the credential chain already works |
-| **Short-term API key** | `python scripts/bedrock_api_key.py --profile intelligence-fde`, or Bedrock console → API keys → short-term | ≤12h | Nothing new; the key inherits that session's permissions |
+| **Short-term API key** | `python scripts/bedrock_api_key.py --profile intelligence-fde` (or `--role-arn …/intelligence-engine-dev-fde` to skip the profile entry), or Bedrock console → API keys → short-term | ≤12h | Nothing new; the key inherits that session's permissions |
 | **Long-term API key** | Deploy `bedrock-api-key-user.yaml` per person, then `create-service-specific-credential` | Until deleted | A dedicated IAM user |
 
 ```ini
@@ -136,6 +136,19 @@ aws sso login --profile intelligence-dev
 export AWS_PROFILE=intelligence-fde CLAUDE_CODE_USE_BEDROCK=1
 claude
 ```
+
+**API-key auth is a second grant, not a side effect of the first.** Presenting
+a bearer token is its own action — `bedrock:CallWithBearerToken` — checked in
+addition to `InvokeModel`. Without it a key mints happily and is then refused
+at the call, which is a confusing failure to debug from the token alone. The
+seat policy grants it; it permits *presenting* a token as that identity and
+confers no model access by itself.
+
+All of this was verified against the deployed stack rather than reasoned
+about: the `fde` seat calls a model, a key minted from that seat authenticates
+to Bedrock on its own, Claude Code runs with the key as its only credential,
+and the same seat is still denied `derived/`, `foundational/` and
+`cloudformation:UpdateStack`.
 
 **On long-term keys.** A long-term Bedrock API key is an IAM service-specific
 credential, and those can only hang off an IAM *user* — there is no version of

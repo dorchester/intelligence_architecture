@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from datetime import timedelta
 
 WINDOW_HOURS = 12
 
@@ -28,6 +29,7 @@ WINDOW_HOURS = 12
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--profile", help="AWS profile to derive the key from")
+    ap.add_argument("--role-arn", help="assume this seat first, so no profile entry is needed")
     ap.add_argument("--region", default=os.environ.get("AWS_REGION", "us-east-1"))
     ap.add_argument("--export", action="store_true",
                     help="print only the export lines, for eval $(...)")
@@ -54,6 +56,21 @@ def main() -> int:
               " try: aws sso login", file=sys.stderr)
         return 1
 
+    if args.role_arn:
+        try:
+            c = session.client("sts").assume_role(
+                RoleArn=args.role_arn, RoleSessionName="bedrock-api-key"
+            )["Credentials"]
+        except Exception as e:  # noqa: BLE001 - surface whatever the SDK says
+            print(f"ERROR | could not assume {args.role_arn}: {e}", file=sys.stderr)
+            return 1
+        session = boto3.Session(
+            aws_access_key_id=c["AccessKeyId"],
+            aws_secret_access_key=c["SecretAccessKey"],
+            aws_session_token=c["SessionToken"],
+            region_name=args.region,
+        )
+
     # Fail here rather than handing over a key that cannot call anything.
     try:
         identity = session.client("sts").get_caller_identity()
@@ -61,7 +78,17 @@ def main() -> int:
         print(f"ERROR | could not verify the session: {e}", file=sys.stderr)
         return 1
 
-    token = provide_token(session=session, region=args.region)
+    # provide_token takes a credential *provider* - anything exposing load().
+    # The token inherits this identity's permissions and nothing more.
+    class _Provider:
+        def load(self):
+            return session.get_credentials()
+
+    token = provide_token(
+        region=args.region,
+        aws_credentials_provider=_Provider(),
+        expiry=timedelta(hours=WINDOW_HOURS),
+    )
 
     if args.export:
         print(f"export AWS_BEARER_TOKEN_BEDROCK={token}")
