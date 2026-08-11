@@ -21,9 +21,11 @@ Description: Intelligence Engine - Bedrock model access for the human seats
 # key-only environment turns up, short-term Bedrock API keys (<= 12h) can be
 # generated from an assumed seat without any of that.
 #
-# Attachment is a deploy-time choice rather than a code change: flip a seat to
-# Yes and redeploy. Revocation is deleting this stack - the seats keep every
-# other permission they had.
+# Attachment is a deploy-time choice rather than a code change: flip a seat's
+# parameter and redeploy. All three human seats are on by default - the grant
+# is model calls only, so it changes what a seat can *ask*, never what it can
+# *touch*. Revocation is deleting this stack - the seats keep every other
+# permission they had.
 #
 # Cost: nothing. A policy bills nothing; the model calls it permits bill per
 # token, against the same per-client Bedrock budgets in llm-controls.yaml.
@@ -39,24 +41,26 @@ Parameters:
     Default: 'Yes'
     AllowedValues: ['Yes', 'No']
     Description: >-
-      The forward-deployed engineer seat. This is the seat that runs Claude
-      Code, so it is the one seat on by default.
+      The forward-deployed engineer seat - the seat that most obviously runs
+      Claude Code.
 
   AttachToSteward:
     Type: String
-    Default: 'No'
+    Default: 'Yes'
     AllowedValues: ['Yes', 'No']
     Description: >-
-      The data-steward seat. Off by default: admission and audit reading are
-      not model work, and this seat already holds the only write into L1.
+      The data-steward seat. Admission and audit reading are not model work,
+      but the seat holder is still a person with a laptop; the grant adds
+      model calls and nothing else on top of what the seat already had.
 
   AttachToDeployer:
     Type: String
-    Default: 'No'
+    Default: 'Yes'
     AllowedValues: ['Yes', 'No']
     Description: >-
-      The platform-engineer seat. Off by default: it exists to run stack
-      operations, and widening it widens the deploy channel.
+      The platform-engineer seat. The grant does not widen the deploy
+      channel - it adds model calls only, and stack operations still flow
+      through cfn-exec exactly as before.
 
 Conditions:
   FdeSeat: !Equals [!Ref AttachToFde, 'Yes']

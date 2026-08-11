@@ -115,6 +115,16 @@ requirement, so `bedrock-seats.yaml` grants the model calls to the seats a
 person actually assumes. The grant is Anthropic models only and carries **no
 data access**: a laptop can call a model, and still cannot read a tier.
 
+Why tiers stay out: `foundational-read` and `derived-read` are held
+exclusively by machine identities inside the account — the workbench instance
+role and the CodeBuild stage roles. That is the data boundary, not a gap.
+`foundational/` is pseudonymous personal data; the surfaces that read it are
+governed, in-account, and logged object-by-object in CloudTrail. A seat is a
+person on an arbitrary laptop, so granting it a tier would move personal data
+onto unmanaged disks and outside the audited perimeter. Model calls have no
+such property — the model sees what you paste into it, which is already in
+your hands — which is why widening Bedrock did not require touching this.
+
 Three ways to authenticate, in the order worth reaching for:
 
 | | How | Lifetime | Needs |
@@ -161,11 +171,12 @@ your Bedrock budget and reaches nothing else — which is why the per-client
 spend alarms in `llm-controls.yaml` are the control that matters for it.
 Revoking a leaver is deleting their stack.
 
-Who gets model access is a deploy-time parameter, not a code change:
-`AttachToFde` defaults to Yes because that is the seat that runs Claude Code;
-`AttachToSteward` and `AttachToDeployer` default to No because admission and
-deploying are not model work. Deleting the stack revokes all of it and leaves
-every other permission intact.
+Who gets model access is a deploy-time parameter, not a code change. All
+three human seats — `fde`, `steward`, `deployer` — hold it by default: the
+grant is model calls only, so it changes what a seat can *ask*, never what it
+can *touch*. Admission still cannot deploy, deploying still flows through
+`cfn-exec`, and no seat gained a byte of data access. Deleting the stack
+revokes all of it and leaves every other permission intact.
 
 ---
 
@@ -181,8 +192,8 @@ CloudFormation. Grouped by what they are for:
 |---|---|---|---|
 | `fde` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Find, wake, reach and sleep the workbench; invoke Anthropic models (from `bedrock-seats.yaml`, so Claude Code runs on a laptop as well as on the box) | Read any tier; deploy; touch IAM — verified denied by probe. The model grant carries **no** data access with it |
 | `workbench` | EC2 (the FDE's box, reached via SSM only — no SSH exists) | Invoke Bedrock; read/write the project bucket and run table; push images to ECR; start CodeBuild builds; read stacks, logs, metrics | Deploy or modify any stack; touch IAM; touch billing; touch non-project resources |
-| `steward` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Admit data (`landing-write`); admit people (create/disable console users in the project Cognito pool); read the stewardship log and CloudTrail | Deploy; touch IAM; write to any lakehouse tier; invoke models; reach the vault. The steward governs — it does not operate the pipeline |
-| `deployer` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Operate CloudFormation on `intelligence-engine-*` stacks (through `cfn-exec`); start image builds; write stage config | Mutate any resource directly; operate any non-project stack; assume `cfn-exec` itself |
+| `steward` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Admit data (`landing-write`); admit people (create/disable console users in the project Cognito pool); read the stewardship log and CloudTrail; invoke Anthropic models (`bedrock-seats.yaml`) | Deploy; touch IAM; write to any lakehouse tier; reach the vault. The steward governs — it does not operate the pipeline |
+| `deployer` | A human, via `sts:AssumeRole` (max 4-hour sessions) | Operate CloudFormation on `intelligence-engine-*` stacks (through `cfn-exec`); start image builds; write stage config; invoke Anthropic models (`bedrock-seats.yaml`) | Mutate any resource directly; operate any non-project stack; assume `cfn-exec` itself |
 | `author` | EC2 (a second, narrower seat from `author-seat.yaml` — the beginning of per-person seats) | A subset of the workbench grants | Same exclusions, smaller surface |
 
 The **consultant is not an IAM identity at all.** Consultants sign in through
